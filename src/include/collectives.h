@@ -18,6 +18,12 @@ struct ncclDevRedOpFull {
   uint64_t scalarArg;
 };
 
+/* 中文精读：主机和设备必须一致的函数表下标
+ * 0 留给 SendRecv，后面先放单 rank 归约函数，再按操作/归约/类型/算法/协议展开。
+ * FUNC_INDEX 把多维索引线性化，enqueue 的 ncclKerns 与 device/functions.cu 的 ncclFuncs
+ * 必须遵守同一排列；否则会把正确数据交给错误算法或错误类型的设备函数。
+ * 模板实例在构建时生成，这不是运行时根据字符串编译 CUDA 源码。
+ */
 #define FUNC_INDEX_P2P 0
 #define FUNC_INDEX(func, devredop, ncclType, al, pr) (1+ncclNumTypes+(((((func)*ncclNumDevRedOps + (devredop))*ncclNumTypes) + (ncclType))*NCCL_NUM_ALGORITHMS+(al))*NCCL_NUM_PROTOCOLS+(pr))
 

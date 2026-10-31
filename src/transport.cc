@@ -23,6 +23,10 @@ struct ncclTransport ncclTransports[NTRANSPORTS] = {
 };
 
 template <int type>
+/* 中文导读：
+ * 按照 ncclTransports 的顺序询问 canConnect，命中后调用该 transport 的 setup。
+ * 这里的 P2pSetup 是逻辑对端建链框架，内部可能选择 NET，因此函数名不保证数据走 NVLink。
+ */
 static ncclResult_t selectTransport(struct ncclComm* comm, struct ncclTopoGraph* graph, struct ncclConnect* connect, int channelId, int peer, int connIndex, int* transportType) {
   struct ncclPeerInfo* myInfo = comm->peerInfo+comm->rank;
   struct ncclPeerInfo* peerInfo = comm->peerInfo+peer;
@@ -44,6 +48,16 @@ static ncclResult_t selectTransport(struct ncclComm* comm, struct ncclTopoGraph*
   return ncclSystemError;
 }
 
+/* 中文导读：
+ * 只把需要连接的 channel 写进每 peer 的 send/recv 位图，跳过 self、无效 peer 和已建好的槽位。
+ * 真正的资源分配与连接握手发生在 ncclTransportP2pSetup 中，而不是本函数。
+ */
+/* 中文精读：先标记需要的连接，再批量执行建链
+ * 把给定邻居的 channel 位写入 connectRecv/connectSend 掩码；已 connected 的槽位跳过。
+ * 此处主要记录需求，真正 setup/connect 在 ncclTransportP2pSetup 完成。
+ * 集合通信预先标记拓扑邻居，Send/Recv 则可在首次遇到新 peer 时按需标记连接索引 1。
+ * 所以 init 完成后的 QP/MR 不一定是未来所有 P2P 负载所需的峰值。
+ */
 ncclResult_t ncclTransportP2pConnect(struct ncclComm* comm, struct ncclChannel* channel, int nrecv, int* peerRecv, int nsend, int* peerSend, int connIndex) {
   TRACE(NCCL_INIT, "nsend %d nrecv %d", nsend, nrecv);
   uint32_t mask = 1 << channel->id;
@@ -69,6 +83,10 @@ void dumpData(struct ncclConnect* data, int ndata) {
   }
 }
 
+/* 中文导读：
+ * 消费待连接位图：选择 transport/setup → bootstrap 交换连接句柄 → connect → 同步设备端 connector。
+ * connIndex 区分连接用途；一次逻辑边可能使用本地 P2P，也可能落到网络后端的一组 QP。
+ */
 ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, int connIndex, int* highestTransportType/*=NULL*/) {
   // Stream used during transport setup; need for P2P pre-connect + CUDA Graph
   cudaStream_t transportSetupStream;

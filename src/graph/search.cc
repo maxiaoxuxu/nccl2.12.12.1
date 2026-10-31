@@ -62,6 +62,12 @@ static ncclResult_t findRevLink(struct ncclTopoNode* node1, struct ncclTopoNode*
 // This is unfortunately needed since manipulating floats often results in rounding errors.
 #define SUB_ROUND(a, b) (a = roundf((a-b)*1000)/1000)
 
+/* 中文精读：搜索阶段如何扣减链路带宽
+ * 搜索一个 channel 时，沿候选硬件路径暂时扣除所需 speed；容量不足就不能再走这条边。
+ * 回溯时用相反符号恢复已占带宽，才能尝试另一组 GPU/NIC 顺序。
+ * 这只是主机内存中的拓扑模型计算，不是在配置 NVLink 路由器或 NIC 硬件带宽限额。
+ * 多个逻辑 channel 可以复用同一物理路径，因此 channel 数没有“等于物理链路数”的约束。
+ */
 static ncclResult_t followPath(struct ncclTopoLinkList* path, struct ncclTopoNode* start, int maxSteps, float speed, int* steps) {
   float pciSpeed = speed;
   for (int step=0; step<path->count; step++) {
@@ -290,6 +296,12 @@ ncclResult_t ncclTopoSearchTryGpu(struct ncclTopoSystem* system, struct ncclTopo
   return ncclSuccess;
 }
 
+/* 中文精读：搜索目标是有效带宽与路径代价的折中
+ * 候选包含通道数、每通道机内/机间速度、路径类型和跳数；这里比较候选是否优于已保存结果。
+ * 不能只追求 nChannels 更大：通道过多但每条速度下降，可能没有收益。
+ * 外层 Compute 还受搜索预算、sameChannels/crossNic/路径级别的限制，因此它是受限启发式搜索，
+ * 不是对所有可能拓扑穷举后保证数学意义上的全局最优。
+ */
 ncclResult_t ncclTopoCompareGraphs(struct ncclTopoGraph* graph, struct ncclTopoGraph* refGraph, int* copy) {
   // 1. Constraint to get the same nChannels between Rings and Trees
   if (graph->nChannels < graph->minChannels) return ncclSuccess;
@@ -733,6 +745,10 @@ float speedArrayInter[] = { 48.0, 30.0, 24.0, 22.0, 18.0, 15.0, 12.0, 10.0, 9.0,
 
 NCCL_PARAM(CrossNic, "CROSS_NIC", 2);
 
+/* 中文导读：
+ * 从候选路径、带宽和 channel 数等条件搜索通信图，受搜索预算限制并可使用 XML 图输入。
+ * 它寻找适合当前硬件的方案，不直接分配 QP，也不能被理解为固定按 GPU 数生成全连接。
+ */
 ncclResult_t ncclTopoCompute(ncclTopoSystem* system, struct ncclTopoGraph* graph) {
   int ngpus = system->nodes[GPU].count;
   graph->crossNic = ncclParamCrossNic();
@@ -783,6 +799,12 @@ ncclResult_t ncclTopoCompute(ncclTopoSystem* system, struct ncclTopoGraph* graph
   tmpGraph.speedIntra = tmpGraph.speedInter = speedArray[speedIndex];
   int64_t globalTimeout = NCCL_SEARCH_GLOBAL_TIMEOUT;
 
+/* 中文精读：channel 数不是由数据大小直接生成的
+ * 初始化时尚不知道未来用户张量大小；此处依据 GPU/NIC/链路容量搜索可用通信图。
+ * 先尝试同样的通道路径，再放宽不同通道顺序、路径类型、crossNic 或速度，遇到预算限制退出。
+ * 选出图后可能复制高速通道来增加并行 block，最终 Postset 还会继续调整。
+ * 真正收到一条消息时，getAlgoInfo 才按 nBytes 缩减本次 channel/线程数。
+ */
 search:
   int time = tmpGraph.sameChannels ? NCCL_SEARCH_TIMEOUT_SAMECHANNELS :
     tmpGraph.pattern == NCCL_TOPO_PATTERN_TREE ? NCCL_SEARCH_TIMEOUT_TREE : NCCL_SEARCH_TIMEOUT;
@@ -943,6 +965,10 @@ ncclResult_t ncclTopoDumpGraphs(struct ncclTopoSystem* system, int ngraphs, stru
 NCCL_PARAM(P2pPxnLevel, "P2P_PXN_LEVEL", 2);
 
 #include "comm.h"
+/* 中文导读：
+ * 为本次 channel/peer 选择网络设备及发送代理 rank。
+ * 有通信图时遵循图中的端点；无图的 P2P 路径还要考虑本地亲和性/PXN，rank 与实际出口不一定一一对应。
+ */
 ncclResult_t ncclTopoGetNetDev(struct ncclComm* comm, int rank, struct ncclTopoGraph* graph, int channelId, int peerRank, int* dev, int* proxyRank) {
   if (graph) {
     // Honor the net device in the graph

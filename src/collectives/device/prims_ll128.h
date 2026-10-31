@@ -6,6 +6,12 @@
 
 #include "op128.h"
 
+/* 中文精读：LL128 如何提高有效载荷比例
+ * 每 128B 线包含 16 个 uint64_t，15 个数据元素和 1 个进度 flag，有效载荷 120/128。
+ * 指定线程负责 flag，其余线程与之协作，把寄存器、warp shuffle 和共享内存暂存结合起来搬运。
+ * 相较 LL 减少标记开销；适用性仍受硬件写入顺序/原子性和模型允许组合限制。
+ * 名称 LL128 的 128 指协议行的字节格式，不是 128 个 rank、channel 或 RDMA QP。
+ */
 #define NCCL_LL128_FLAGTHREAD (NCCL_LL128_LINEELEMS-1)
 
 template<typename T, typename RedOp, typename Fan, int Direct, int P2p>
@@ -277,6 +283,10 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL128, P2p>:
   static constexpr int DataEltPerSlice = (WireWordPerSlice - WireWordPerSlice/NCCL_LL128_LINEELEMS)*(sizeof(uint64_t)/sizeof(T));
 
   template <int RECV, int SEND, int SrcBuf, int DstBuf>
+/* 中文导读：
+ * LL128 以 128 字节通信行为粒度，其中 15 个 64 位元素承载数据、1 个承载 flag。
+ * 相比 LL 提高有效载荷比例，但依赖其访问/可见性假设；能否使用还受调优模型和平台条件限制。
+ */
   __device__ __forceinline__ void GenericOp(intptr_t srcIx, intptr_t dstIx, int nelem, bool postOp) {
     constexpr int SRC = SrcBuf != -1 ? 1 : 0;
     constexpr int DST = DstBuf != -1 ? 1 : 0;

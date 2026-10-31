@@ -7,6 +7,12 @@
 #ifndef OP128_H_
 #define OP128_H_
 
+/* 中文精读：读 PTX 内联汇编的方法
+ * ld/st.global 访问全局地址空间，ld/st.shared 访问 SM 片上共享内存，v2.u64 一次处理两个 64 位值。
+ * cvta.to.shared 把通用指针转换为共享内存地址供 PTX 使用，不能把所有指针数值直接互换。
+ * volatile 和 memory clobber 影响编译器访存处理；跨线程/跨设备发布仍需上层屏障和 fence。
+ * 向量 load/store 的宽度不意味着对所有观察者具有整段 16B 原子性。
+ */
 inline __device__ void load128(const uint64_t* ptr, uint64_t &v0, uint64_t &v1) {
   asm volatile("ld.volatile.global.v2.u64 {%0,%1}, [%2];"
       : "=l"(v0), "=l"(v1) : "l"(ptr));

@@ -23,6 +23,12 @@
 #define NODE_TYPE_CLOSE 2
 #define NODE_TYPE_SINGLE 3
 
+/* 中文精读：硬件 XML 与通信图 XML 的区别
+ * 硬件拓扑描述 CPU/PCI/GPU/NIC 等节点及属性，之后转成 ncclTopoSystem。
+ * 通信图 XML 描述搜索所得 channel 的 GPU 顺序和 NIC 端点，用于导入/导出图搜索结果。
+ * 本结构用固定节点池、属性数组和父子指针表达 XML，避免引入通用解析器依赖。
+ * XML 节点不是 GPU 上的 work 或用户张量；修改拓扑输入也不会改变真实硬件连线。
+ */
 struct ncclXmlNode {
   char name[MAX_STR_LEN+1];
   struct {

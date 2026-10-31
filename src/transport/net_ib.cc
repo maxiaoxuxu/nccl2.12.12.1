@@ -30,6 +30,10 @@
 static char ncclIbIfName[MAX_IF_NAME_SIZE+1];
 static union ncclSocketAddress ncclIbIfAddr;
 
+/* 中文导读：
+ * MR 缓存条目：页对齐起始地址、页数、引用计数及实际 ibv_mr。
+ * 同一 IB 设备缓存内，只有起始地址与页数都相同才命中；不是任意重叠/包含区间都复用。
+ */
 struct ncclIbMr {
   uintptr_t addr;
   int pages;
@@ -366,6 +370,10 @@ struct ncclIbRequest {
   };
 };
 
+/* 中文导读：
+ * 底层通信对象的公共前缀，保存设备索引、共享 PD、该对象的 CQ 和请求数组。
+ * sendComm/recvComm 把它放在相同偏移，regMr 等公共回调因此可从不透明指针找到设备与 PD。
+ */
 struct ncclIbVerbs {
   int dev;
   struct ibv_pd* pd; // duplicate of ncclIbDevs[dev].pd
@@ -389,6 +397,10 @@ struct ncclIbSendFifo {
   uint64_t idx;
 };
 
+/* 中文导读：
+ * 一个底层发送连接对象：持有 nqps 个 RC 数据 QP、对端接收地址发布 FIFO 及其本地 MR。
+ * 高层多个逻辑连接能否共用此对象由 transport/net.cc 决定；不能把一个 SendComm 当成一个 communicator。
+ */
 struct ncclIbSendComm {
   struct ncclIbVerbs verbs;
   struct ncclIbSendFifo fifo[MAX_REQUESTS][NCCL_NET_IB_MAX_RECVS];
@@ -427,6 +439,10 @@ struct ncclIbRemFifo {
   struct ibv_sge sge;
 };
 
+/* 中文导读：
+ * 一个底层接收连接对象：数据 QP、向发送方发布接收地址的 remFifo，以及可选 GDR flush 资源。
+ * 用于写 payload 的 rkey 来自接收缓冲区 MR；RDMA_WRITE_WITH_IMM 的完成通知仍需要预挂接收 WQE。
+ */
 struct ncclIbRecvComm {
   struct ncclIbVerbs verbs;
   struct ncclIbRemFifo remFifo;
@@ -440,6 +456,10 @@ static_assert((offsetof(struct ncclIbRecvComm, remFifo) % 32) == 0, "ncclIbSendC
 
 NCCL_PARAM(IbQpsPerConn, "IB_QPS_PER_CONNECTION", 1);
 
+/* 中文导读：
+ * 为通信对象取得 IB 设备的引用计数共享 PD，并创建自己的 CQ。
+ * 共享 PD 允许同设备/同进程内的不同 QP 使用合适的已注册 MR；共享 PD 不代表 CQ 或 QP 也全局只有一个。
+ */
 ncclResult_t ncclIbInitVerbs(int dev, struct ibv_context* ctx, struct ncclIbVerbs* verbs) {
   verbs->dev = dev;
 
@@ -475,6 +495,11 @@ returning:
   return res;
 }
 
+/* 中文导读：
+ * 创建 RC QP，配置 SQ/RQ 深度及单个 SGE，然后转到 INIT。
+ * qpInitAttr 清零后没有绑定 srq，因此本内置后端走每 QP 的接收队列；后续 Irecv 调用 post_recv。
+ * 改变为 SRQ 只会改变接收队列组织，不会自然消除各 peer 的 RC QP 或 payload MR。
+ */
 ncclResult_t ncclIbCreateQp(uint8_t ib_port, struct ncclIbVerbs* verbs, int access_flags, struct ibv_qp** qp) {
   struct ibv_qp_init_attr qpInitAttr;
   memset(&qpInitAttr, 0, sizeof(struct ibv_qp_init_attr));
@@ -498,6 +523,10 @@ ncclResult_t ncclIbCreateQp(uint8_t ib_port, struct ncclIbVerbs* verbs, int acce
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 把 QP 转为 RTR，装入对端 QPN、路由地址、端口与协商 MTU 等信息。
+ * IB 与 RoCE 的地址字段处理不同；到达 RTR 后仍需 RTS 才能按本实现正常推进发送。
+ */
 ncclResult_t ncclIbRtrQp(struct ibv_qp* qp, uint32_t qpn, struct ncclIbQpInfo* info) {
   struct ibv_qp_attr qpAttr;
   memset(&qpAttr, 0, sizeof(struct ibv_qp_attr));
@@ -553,6 +582,10 @@ ncclResult_t ncclIbListen(int dev, void* opaqueHandle, void** listenComm) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 发起底层发送连接：socket 握手交换 QP 信息，建立 nqps 个数据 QP，并注册发送方接收控制 FIFO。
+ * 连接是分阶段非阻塞推进的，成功返回但 sendComm 仍为空表示尚未完成，调用方必须重试。
+ */
 ncclResult_t ncclIbConnect(int dev, void* opaqueHandle, void** sendComm) {
   struct ncclIbHandle* handle = (struct ncclIbHandle*) opaqueHandle;
   enum ncclSocketState conState;
@@ -640,6 +673,10 @@ ib_send:
 
 NCCL_PARAM(IbGdrFlushDisable, "GDR_FLUSH_DISABLE", 0);
 
+/* 中文导读：
+ * 接收侧分阶段建链并配对数据 QP，注册 remFifo；满足条件时再创建一个 flush QP 和 hostMr。
+ * 这些控制/flush MR 直接调用 verbs 注册，不进入下方 ncclIbRegMr 的协议缓冲缓存。
+ */
 ncclResult_t ncclIbAccept(void* listenComm, void** recvComm) {
   struct ncclIbListenComm* lComm = (struct ncclIbListenComm*)listenComm;
   struct ncclIbCommStage* stage = &lComm->stage;
@@ -711,6 +748,10 @@ ib_recv:
   rComm->remFifo.sge.lkey = rComm->remFifo.mr->lkey;
   if (ncclParamIbUseInline()) rComm->remFifo.flags = IBV_SEND_INLINE;
 
+/* 中文导读：
+ * 条件启用的额外硬件资源：每个这样的 RecvComm 增加 1 个自连接 RC QP 和 1 个小 host MR。
+ * 该 QP 用 RDMA_READ 协助 GPU 内存可见性，不是又一条跨机数据连接，数量也不随 nqps 倍增。
+ */
   // Allocate Flush dummy buffer for GPU Direct RDMA
   rComm->gpuFlush.enabled = (ncclIbGdrSupport(lComm->dev) == 0) && (ncclParamIbGdrFlushDisable() == 0) ? 1 : 0;
   if (rComm->gpuFlush.enabled) {
@@ -810,8 +851,17 @@ ncclResult_t ncclRecvCheck(struct ncclIbRecvComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 非阻塞轮询 CQ，检查 WC 状态并按 wr_id 找到请求，递减相应事件计数。
+ * 一个请求可跨多个 QP/聚合多个子请求，只有要求的完成事件全部收齐才报告 done。
+ */
 ncclResult_t ncclIbTest(void* request, int* done, int* size);
 
+/* 中文导读：
+ * 对协议数据缓冲做页对齐后查设备级 MR 缓存；精确匹配 addr/pages 时增引用，否则调用 verbs 注册。
+ * 此函数没有遍历 QP，mhandle 本质上返回 ibv_mr，发送使用 lkey，远端写入使用接收方发布的 rkey。
+ * 缓存局限于本进程对应设备条目及共享 PD；不同进程不能直接共享这里的软件缓存。
+ */
 ncclResult_t ncclIbRegMr(void* comm, void* data, int size, int type, void** mhandle) {
   static_assert(offsetof(struct ncclIbSendComm, verbs) == offsetof(struct ncclIbRecvComm, verbs), "Send and recv comms must have verbs at the same offset");
   assert(size > 0);
@@ -863,6 +913,10 @@ returning:
   return res;
 }
 
+/* 中文导读：
+ * 释放一次注册引用；只有引用数归零才从缓存删除并真正 ibv_dereg_mr。
+ * 单次通信结束不调用这里释放持久缓冲 MR，实际释放由 transport/连接的生命周期控制。
+ */
 ncclResult_t ncclIbDeregMr(void* comm, void* mhandle) {
   struct ncclIbVerbs* verbs = (struct ncclIbVerbs*)comm;
   struct ncclIbMrCache* cache = &ncclIbDevs[verbs->dev].mrCache;
@@ -890,6 +944,11 @@ returning:
   return res;
 }
 
+/* 中文导读：
+ * 从接收方公布的 addr/rkey 生成 RDMA_WRITE 链，末端使用 WRITE_WITH_IMM 通知接收完成。
+ * 消息按 nqps 切分并以 128B 对齐后投递，各 QP 使用同一个已注册缓冲的 key，不为每个分片另建 MR。
+ * 多接收聚合或超过自适应路由阈值时，数据 WRITE 与末尾零字节通知可以分开。
+ */
 ncclResult_t ncclIbMultiSend(struct ncclIbSendComm* comm, int slot) {
   struct ncclIbRequest** reqs = comm->fifoReqs[slot];
   volatile struct ncclIbSendFifo* slots = comm->fifo[slot];
@@ -969,6 +1028,10 @@ ncclResult_t ncclIbMultiSend(struct ncclIbSendComm* comm, int slot) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 先检查连接就绪和接收方 FIFO 发布信息，以 tag 匹配发送请求，收齐同一聚合槽后调用 MultiSend。
+ * request 为空时上层应继续推进重试；API 返回成功不等于网卡已经完成传输。
+ */
 ncclResult_t ncclIbIsend(void* sendComm, void* data, int size, int tag, void* mhandle, void** request) {
   struct ncclIbSendComm* comm = (struct ncclIbSendComm*)sendComm;
   if (comm->ready == 0) NCCLCHECK(ncclSendCheck(comm));
@@ -1039,6 +1102,10 @@ ncclResult_t ncclIbIsend(void* sendComm, void* data, int size, int tag, void* mh
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 接收方把目标 addr、rkey、tag、size 和序号写回发送方控制 FIFO，授予向该缓冲写入的条件。
+ * 控制消息也用 RDMA_WRITE；周期性请求 signaled completion，避免一直 unsignaled 导致 SQ 无法回收。
+ */
 ncclResult_t ncclIbPostFifo(struct ncclIbRecvComm* comm, int n, void** data, int* sizes, int* tags, void** mhandles, struct ncclIbRequest* req) {
   struct ibv_send_wr wr;
   memset(&wr, 0, sizeof(wr));
@@ -1099,6 +1166,11 @@ ncclResult_t ncclIbPostFifo(struct ncclIbRecvComm* comm, int n, void** data, int
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 先在每个数据 QP 上 post_recv 一个零 SGE 接收 WQE，再公布接收缓冲地址/rkey。
+ * 零 SGE 因 payload 直接 RDMA 写入目标 MR，RQ WQE 用于接收 WRITE_WITH_IMM 完成通知。
+ * 这不是 SRQ：代码直接向各个 qp 投递，完成事件数先设为 nqps。
+ */
 ncclResult_t ncclIbIrecv(void* recvComm, int n, void** data, int* sizes, int* tags, void** mhandles, void** request) {
   struct ncclIbRecvComm* comm = (struct ncclIbRecvComm*)recvComm;
   if (comm->ready == 0) NCCLCHECK(ncclRecvCheck(comm));
@@ -1137,6 +1209,10 @@ ncclResult_t ncclIbIrecv(void* recvComm, int n, void** data, int* sizes, int* ta
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 必要时利用自连接 flush QP 从收到的 GPU 数据区域执行一个小 RDMA_READ。
+ * 目标是建立所需可见性，不是再次搬运整个消息；是否调用还受上层协议/GDR/平台分支控制。
+ */
 ncclResult_t ncclIbIflush(void* recvComm, int n, void** data, int* sizes, void** mhandles, void** request) {
   struct ncclIbRecvComm* comm = (struct ncclIbRecvComm*)recvComm;
   int last = -1;
@@ -1170,6 +1246,12 @@ ncclResult_t ncclIbIflush(void* recvComm, int n, void** data, int* sizes, void**
   return ncclSuccess;
 }
 
+/* 中文精读：一个 request 可能对应多个 CQ completion
+ * r->events 记录此请求尚待完成的事件数，只有减到 0 才 done 并回收 request 槽。
+ * 一次 poll_cq 也可能取出同一 CQ 上其他 request 的完成，按 wr_id 解码找到真正所属对象。
+ * 多个 QP 拆分发送或聚合接收时，不能把一个完成事件直接等同于整个用户消息完成。
+ * wc.status 非成功会打印对端地址、opcode、vendor_err，定位是网络执行错误而非 GPU 归约错误。
+ */
 ncclResult_t ncclIbTest(void* request, int* done, int* sizes) {
   struct ncclIbRequest *r = (struct ncclIbRequest*)request;
   *done = 0;
@@ -1226,6 +1308,12 @@ ncclResult_t ncclIbTest(void* request, int* done, int* sizes) {
   }
 }
 
+/* 中文精读：网络资源释放要跟随真实 backend 连接
+ * 先关闭建链控制 socket，逐个销毁数据 QP，注销该连接的控制 FIFO MR，再回收 verbs 资源。
+ * NET 上层通常先注销各协议数据缓冲的 MR，再关闭 backend comm；共享连接还受引用计数约束。
+ * 逻辑 channel 销毁与底层连接实际销毁不是永远一一对应，最后引用释放才可回收共享对象。
+ * 这里不是每次 AllReduce 结束都执行；后续任务通常复用已建好的连接和注册缓冲。
+ */
 ncclResult_t ncclIbCloseSend(void* sendComm) {
   struct ncclIbSendComm* comm = (struct ncclIbSendComm*)sendComm;
   if (comm) {

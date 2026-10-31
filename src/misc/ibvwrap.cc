@@ -41,6 +41,16 @@ const char * (*ibv_internal_event_type_str)(enum ibv_event_type event);
 // IBVERBS Library versioning
 #define IBVERBS_VERSION "IBVERBS_1.1"
 
+/* 中文导读：
+ * 动态装载 libibverbs 及所需符号，隔离网络后端对具体 verbs 库可用性的依赖。
+ * NCCL 的内置 IB 后端经此进入 verbs/provider；这个包装层本身不会自动引入 UCX 或 SRQ。
+ */
+/* 中文精读：verbs 包装与厂商 provider 的层次
+ * 此处动态解析 libibverbs 符号并统一错误返回；post_send/poll_cq 等热路径还可走 verbs 对象的 ops。
+ * 厂商 provider 负责把 verbs 操作落实到自己的设备队列、doorbell 与硬件完成机制。
+ * NCCL net_ib 是 verbs 的使用者，通常不直接编码某个厂商的寄存器格式。
+ * 添加自研 RDMA 设备时，应区分 rdma-core provider 接入与 NCCL 网络插件接入这两个接口层。
+ */
 ncclResult_t wrap_ibv_symbols(void) {
   if (ibvState == ibvInitialized)
     return ncclSuccess;

@@ -31,6 +31,10 @@ struct cudaLaunchParams {
 #define NCCL_LL128_THREAD_THRESHOLD 8
 #define NCCL_SIMPLE_THREAD_THRESHOLD 64
 
+/* 中文导读：
+ * 发送方向的控制区。head 表示消费者已经释放的进度，生产者据此判断环形槽位能否复用。
+ * 它与 ncclRecvMem、协议数据缓冲区共同组成 GPU/对端/Proxy 之间的流控接口。
+ */
 struct ncclSendMem {
   union {
     struct {
@@ -45,6 +49,10 @@ struct ncclSendMem {
   };
 };
 
+/* 中文导读：
+ * 接收方向的控制区：tail 发布可读进度，sizesFifo 传递有效字节数，offsFifo 传递共享池偏移。
+ * 这些字段承担控制与可见性协调；不要把它们与 net_ib.cc 的远端地址/rkey FIFO 混为一谈。
+ */
 struct ncclRecvMem {
   union {
     struct {
@@ -85,6 +93,11 @@ struct ncclNodeRanks {
   int* localRankToRank;
 };
 
+/* 中文导读：
+ * communicator 的主机端总对象；同一通信组中的每个 rank 各有自己的实例。
+ * 持有拓扑、channel、连接、调优模型、工作队列和 Proxy 状态；不是一个 RDMA QP。
+ * 多 communicator 的工作与连接通常分别管理，不能据此假定硬件资源自动共享。
+ */
 struct ncclComm {
   struct ncclChannel channels[MAXCHANNELS];
 
@@ -121,6 +134,12 @@ struct ncclComm {
   cudaEvent_t intDoneEvent;
   bool checkPointers;
 
+/* 中文精读：opCount 与 collOpCount 的用途
+ * opCount 跟踪提交批次（含 P2P/collective），collOpCount 标记 collective 操作顺序。
+ * Proxy 利用操作编号把兼容子任务聚合并保持同连接的推进顺序，它们不直接表示字节偏移。
+ * 多个 channel 处理同一 collective 时共享该 collective 的编号，分片号则分别保存在 bid。
+ * 读到 opCount 增加不能据此认为 GPU 已执行完成，也不能用它统计创建过多少 QP。
+ */
   // Counter for tracking CUDA launches (P2P and collectives included)
   uint64_t opCount;
   // Collective operation counter
@@ -157,6 +176,12 @@ struct ncclComm {
   // Host copy of the devComm (to free CUDA allocs)
   struct ncclDevComm hostDevComm;
 
+/* 中文精读：同进程多 GPU 与集群 rank 是不同范围
+ * intraRank/intraRanks 是同进程发射组的编号/规模；localRank/localRanks 是本节点范围。
+ * rank/nRanks 则是整个 communicator 的逻辑编号/规模。三者在单机单进程时可能看起来相同。
+ * intraBarrier/intraParams 用于本地协调发射，跨进程通信仍由 bootstrap/transport 协议完成。
+ * 排查多机运行时，应先确认一个字段属于哪个范围，避免把本地数组当成整个集群的表。
+ */
   // Intra-process sync
   int intraRank;
   int intraRanks;

@@ -162,6 +162,10 @@ struct setupReq {
 
 /* Determine if we will use this transport for this peer and return connect
  * information for this peer */
+/* 中文导读：
+ * NET 发送方向配置：选择 NIC/Proxy rank，判断 GDR 能力，然后向 service 发送 setup 请求。
+ * graph 非空时此处使用专用缓冲；普通无图 P2P 默认可使用共享缓冲。setup 与 connect 是分离阶段。
+ */
 static ncclResult_t sendSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* send, int channelId, int connIndex) {
   struct setupReq req;
 
@@ -350,6 +354,10 @@ static ncclResult_t recvFree(struct ncclConnector* recv) {
 }
 
 #define NCCL_SHARED_STEPS 16
+/* 中文导读：
+ * 为某个 localRank 和方向维护共享缓冲池，按 channel/槽位切分空间，并用引用数管理生命周期。
+ * 共享缓冲可让多个逻辑 peer 注册相同页范围；它与共享 NET 连接是两个独立的复用维度。
+ */
 static ncclResult_t sharedBuffersInit(struct ncclComm* comm, int cuda, int localRank, int type, int sameProcess,
     int nChannels, char** gpuPtr, char** cpuPtr, int* size, cudaIpcMemHandle_t* ipc) {
   if (cuda == 0 && sameProcess == 0) {
@@ -392,6 +400,12 @@ static ncclResult_t sharedBuffersInit(struct ncclComm* comm, int cuda, int local
   return ncclSuccess;
 }
 
+/* 中文精读：共享数据池如何避免每连接分一整块缓冲
+ * 按 channel 和活跃 slot 算出共享池偏移，再通过 offsFifo 通知 GPU 本次应访问哪一段。
+ * 逻辑 connector 仍独立保存进度；复用的是有限在途数据槽，不是让所有 peer 同时覆盖同一地址。
+ * 共享池减少缓冲内存和可能的重复注册；连接是否共享还要看 NET_SHARED_COMMS 等独立条件。
+ * 具体偏移用字节，设备端使用 T* 时需除 sizeof(T)。
+ */
 static ncclResult_t sharedBuffersGet(struct ncclComm* comm, int channel, int slot, int* offset) {
   // Use different pools for different channels and also separate send/recv.
   int slotSize = comm->buffSizes[NCCL_PROTO_SIMPLE]/(NCCL_STEPS*SENDRECV_SLICEFACTOR);
@@ -482,6 +496,11 @@ static ncclResult_t recvProxySetup(struct ncclProxyConnection* connection, struc
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * service 侧完成底层 sendComm 建立并分配/注册缓冲区，再把映射信息返回调用方。
+ * shared 且 maxRecvs>1 且 NET_SHARED_COMMS 启用时，尝试按 netDev/remoteRank/channel 复用 sendComm。
+ * 注册按协议缓冲区执行，而非按 qps[] 循环执行，所以增加单连接 QP 数不直接倍增这些 MR。
+ */
 static ncclResult_t sendProxyConnect(struct ncclProxyConnection* connection, struct ncclComm* comm, void* reqBuff, int reqSize, void* respBuff, int respSize, int* done) {
   struct sendResources* resources = (struct sendResources*)(connection->transportResources);
   if (reqSize != sizeof(ncclNetHandle_t)) return ncclInternalError;
@@ -596,6 +615,11 @@ static ncclResult_t sendProxyConnect(struct ncclProxyConnection* connection, str
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 完成接收方向底层 accept、共享/专用缓冲分配和协议 MR 注册。
+ * 共享连接表按 netDev/proxyRank/channel 索引，条件不满足时为逻辑连接单独 accept。
+ * closeListen 只关闭监听资源，不会把已经建立的 netRecvComm 一起销毁。
+ */
 static ncclResult_t recvProxyConnect(struct ncclProxyConnection* connection, struct ncclComm* comm, void* reqBuff, int reqSize, void* respBuff, int respSize, int* done) {
   if (reqSize != sizeof(int)) return ncclInternalError;
   struct recvResources* resources = (struct recvResources*)(connection->transportResources);
@@ -769,6 +793,11 @@ static ncclResult_t recvProxyFree(struct ncclProxyConnection* connection, struct
 
 static_assert(NCCL_STEPS <= NCCL_NET_MAX_REQUESTS, "Not enough net requests to cover for steps");
 
+/* 中文导读：
+ * 发送状态机：给 GPU 提供可用槽位/偏移 → 等待 GPU 发布大小和就绪状态 → isend → test → 回收槽位。
+ * LL/LL128 的就绪判断有协议专门分支；不能只看 tail 就认定所有协议数据均已可发送。
+ * GDR 模式下 Proxy 提交的是指向 GPU 内存的网络请求，不要求 CPU 把 payload 拷入系统内存。
+ */
 static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArgs* args) {
   if (args->state == ncclProxyOpReady) {
     for (int s=0; s<args->nsubs; s++) {
@@ -794,6 +823,12 @@ static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArg
       char* localBuff = NCCL_NET_MAP_GET_POINTER(&resources->map, cpu, buffs[p]);
       int buffSize = stepSize*args->sliceSteps;
       if (sub->nbytes < buffSize) buffSize = sub->nbytes;
+/* 中文精读：发送状态机第 1 阶段：给 GPU 可写空间
+ * 限制 posted < done+maxDepth，避免在途数据超过可回收槽位。
+ * 共享模式先分配 offsFifo 偏移，内存屏障后更新 head，让 GPU 知道当前槽可写。
+ * 非共享模式使用固定缓冲槽，posted 仍跟踪允许推进的步数。
+ * posted 仅表示槽位准备好，数据可能尚未由 GPU 写入，更没有保证已发往网络。
+ */
       // Post buffers to the GPU
       if (sub->posted < sub->nsteps && sub->posted < sub->done + maxDepth) {
         int buffSlot = (sub->base+sub->posted)%NCCL_STEPS;
@@ -814,6 +849,12 @@ static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArg
         args->idle = 0;
         continue;
       }
+/* 中文精读：发送状态机第 2 阶段：等 GPU 完成再提交网络
+ * Simple 观察 sizesFifo 和 tail；LL/LL128 还要按具体缓冲位置检查协议 flag。
+ * 只有整段数据就绪才调用 ncclNetIsend。若 request 返回 NULL，表示暂未接受，下一轮再试。
+ * 请求有效后才清空 sizesFifo 并推进 transmitted，防止 GPU/Proxy 对一个槽重复提交。
+ * 这里 CPU 只是提交 NIC 工作；GDR 时真实载荷可直接由 NIC 读取 GPU 缓冲，不必经 CPU memcpy。
+ */
       // Check whether we received data from the GPU and send it to the network
       if (sub->transmitted < sub->posted && sub->transmitted < sub->done + NCCL_STEPS) {
         int buffSlot = (sub->base+sub->transmitted)%NCCL_STEPS;
@@ -863,6 +904,12 @@ static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArg
           }
         }
       }
+/* 中文精读：发送状态机第 3 阶段：网络完成后回收槽位
+ * ncclNetTest 把异步请求推进到完成，done 才能增加，固定缓冲模式此时发布 head 给 GPU。
+ * 先前 Isend 返回成功只表示请求被接受，不能立即让 GPU 覆盖仍可能被 NIC 读取的源数据。
+ * 所有 sub 的 done 达到 nsteps 后，这个 ProxyArgs 才进入 None，连接本身仍保留供后续操作使用。
+ * resources->step 记录跨操作的基准进度，与设备 conn->step 保持同一协议节奏。
+ */
       // Check whether the network has completed some send operations.
       if (sub->done < sub->transmitted) {
         int done;
@@ -893,8 +940,19 @@ static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArg
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 接收状态机：按相同 recvComm 分组挂接收 → test 网络完成 → 必要时 flush → 发布给 GPU → 等待消费。
+ * 网络完成与 GPU 可见性分开处理；Simple+GDR 的条件分支可能调用 iflush。
+ * maxRecvs 描述一次接口调用可聚合的接收数，不等于 verbs SRQ。
+ */
 static ncclResult_t recvProxyProgress(struct ncclComm* comm, struct ncclProxyArgs* args) {
   if (args->state == ncclProxyOpReady) {
+/* 中文精读：接收聚合不等于共享接收队列 SRQ
+ * 把使用同一 backend recvComm 的子操作排在一起，最多按 maxRecvs 聚合一次 Irecv。
+ * 每个 sub 仍有自己的 channel/连接/步数/指针/标签；后端据此匹配正确发送方。
+ * 这里是 NCCL net 接口层的批量提交，是否使用 verbs SRQ 取决于后端实现。
+ * 本仓库内置 net_ib 没有绑定 SRQ，不能由 maxRecvs>1 推断硬件 SRQ 已启用。
+ */
     // Initialize subs and group them by same recvComm.
     void* recvComm;
     int groupSize = 0;
@@ -1008,6 +1066,12 @@ static ncclResult_t recvProxyProgress(struct ncclComm* comm, struct ncclProxyArg
             }
           }
           subGroup->requests[step%NCCL_STEPS] = NULL;
+/* 中文精读：接收完成还要考虑 GPU 可见性
+ * 网络 Test 完成意味着后端请求结束，某些 GDR 路径还要执行 flush 确保 GPU 后续能看见数据。
+ * 支持时走 GDRCopy 映射读，否则调用 net 后端 Iflush，再等待 flush 请求完成。
+ * 之后才能发布接收 tail，GPU 才能离开 waitPeer 读取这段数据。
+ * flush 不是把整个张量重新传一次；内置 IB 在特定配置下用小型自连接 RDMA read 实现。
+ */
           if (totalSize > 0 && p == NCCL_PROTO_SIMPLE && useGdr) {
             // GDRCOPY support
             struct recvResources* resources = (struct recvResources*) (subGroup->connection->transportResources);

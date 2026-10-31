@@ -10,6 +10,11 @@
 
 namespace {
   template<typename T, typename RedOp, typename Proto>
+/* 中文导读：
+ * Ring AllReduce 的设备端主循环。每个 channel/block 负责输入的一部分，沿 prev/next 传递分块。
+ * 先 send 和 recvReduceSend 形成 ReduceScatter；最终归约块经 directRecvReduceCopySend 衔接到 AllGather。
+ * 这里的 direct 仍受连接能力约束，不能据函数名判断为 GPU 直接提交 RDMA WQE。
+ */
   __device__ __forceinline__ void runRing(ncclWorkElem *args) {
     const int tid = threadIdx.x;
     const int nthreads = args->header.nWarps*WARP_SIZE;
@@ -43,6 +48,15 @@ namespace {
         realChunkSize = min(chunkSize, divUp(size-gridOffset, nChannels*nranks*minChunkSize)*minChunkSize);
       realChunkSize = int(realChunkSize);
 
+/* 中文精读：AllReduce 的地址公式与数值示例
+ * 所有偏移以 T 元素计。Simple 使用 channel 连续布局：
+ * offset=gridOffset + bid*nranks*realChunkSize + chunk*realChunkSize。
+ * 假设 4 rank、2 channel、nthreads=96、共 1024 个 float，且 chunkSize 至少为 128 元素。
+ * 对齐粒度=(96-32)*8/4=128 元素，realChunkSize=ceil(1024/8)=128。
+ * channel0 的 4 块覆盖 [0,512)，channel1 的 4 块覆盖 [512,1024)，块长都是 128 元素。
+ * LL/LL128 用 (chunk*nChannels+bid)*realChunkSize 交错布局；不能把 Simple 公式套到所有协议。
+ * 注意 realChunkSize 是对齐后的容量，不保证每个块都有这么多有效元素。
+ */
       auto calcOffset = [&]__device__(int chunk)->ssize_t {
         if (Proto::Id == NCCL_PROTO_SIMPLE)
           return gridOffset + bid*nranks*realChunkSize + chunk*realChunkSize;
@@ -57,6 +71,10 @@ namespace {
       int nelem;
       int chunk;
 
+/* 中文导读：
+ * 本轮先发送第一个块，再逐块把上游数据与本地输入归约后继续传递。
+ * 各 rank 处理不同块，形成流水线；不是每一轮都发送整个输入数组。
+ */
       // step 0: push data to next GPU
       chunk = modRanks(ringIx + nranks-1);
       offset = calcOffset(chunk);
@@ -73,11 +91,22 @@ namespace {
 
       // step k-1: reduce this buffer and data, which will produce the final
       // result that we store in this data and push to the next GPU
+/* 中文精读：归约分散与结果收集在这一调用衔接
+ * 最初发送 (ringIx-1) 块，再依次处理前面的块；收到本 rank 的 ringIx 块时，
+ * 它已经包含其余 rank 的部分结果，加上本地输入后才成为完整归约结果。
+ * directRecvReduceCopySend 同时把最终值写本地 output 并发下游，启动结果收集阶段。
+ * 对于 4 rank/单 channel，rank0 依次 send 块3，reduceSend 块2、块1，最终归约块0；
+ * 再 copySend 块3、块2，最后 recv 块1。实际环顺序改变时，ringIx 的对应用户 rank 也改变。
+ */
       chunk = ringIx + 0;
       offset = calcOffset(chunk);
       nelem = min(realChunkSize, size-offset);
       prims.directRecvReduceCopySend(offset, offset, offset, nelem, /*postOp=*/true);
 
+/* 中文导读：
+ * 从这里进入结果传播阶段：继续转发已经完成归约的块，不再对这些块重复做全局求和。
+ * 最后 directRecv 收齐本 rank 缺少的最后一个块，整段完成 ReduceScatter+AllGather 语义。
+ */
       // k-2 steps: copy to next GPU
       for (int j=1; j<nranks-1; ++j) {
         chunk = modRanks(ringIx + nranks-j);
@@ -95,6 +124,10 @@ namespace {
   }
 
   template<typename T, typename RedOp, typename Proto>
+/* 中文导读：
+ * Tree 的先向上归约、再向下广播实现；根/叶/中间节点使用不同原语。
+ * root 把孩子与自身输入归约成结果，之后沿反向边传播。所需邻居由初始化时的 tree.up/down 给出。
+ */
   __device__ __forceinline__ void runTreeUpDown(ncclWorkElem *args) {
     const int tid = threadIdx.x;
     const int nthreads = args->header.nWarps*WARP_SIZE;
@@ -167,6 +200,10 @@ namespace {
   }
 
   template<typename T, typename RedOp, typename Proto>
+/* 中文导读：
+ * 在同一 block 中分配不同线程组推进向上归约与向下广播，以改善流水重叠。
+ * 这是设备端线程执行拆分；不要与 graph.h 中决定跨节点流量端点的 SPLIT_TREE 搜索模式混为一谈。
+ */
   __device__ __forceinline__ void runTreeSplit(ncclWorkElem *args) {
     const int tid = threadIdx.x;
     const int nthreads = args->header.nWarps*WARP_SIZE;
@@ -183,6 +220,12 @@ namespace {
     const ssize_t loopSize = int(nChannels*chunkSize);
     const ssize_t size = args->count;
 
+/* 中文精读：Tree 分线程组的流水线
+ * 非根节点把一组线程用于向上归约，另一组线程用于向下广播；二者使用不同 group/barrier。
+ * Simple 大致均分后对归约组作调整，LL/LL128 约 70% 线程给更重的多输入归约。
+ * 根用融合原语同时完成收集、归约、保存、向下分发；叶子没有有效 child，原语自动简化。
+ * 线程组分割是设备执行优化，拓扑 SPLIT_TREE 则是选择跨机端点，两者不能混作一个开关。
+ */
     int nthreadsSplit;
     if (Proto::Id == NCCL_PROTO_SIMPLE) {
       nthreadsSplit = nthreads/2;
@@ -276,6 +319,13 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SI
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO_SIMPLE> {
   __device__ __forceinline__ void run(ncclWorkElem *args) {
+/* 中文精读：CollNet 把一次 AllReduce 分成四组协作流水
+ * Scatter 把本机输入分配给多个 head；Reduce 组在 head 聚合机内贡献并发往网络。
+ * Broadcast 组把网络归约结果分发到机内参与者；Gather 组收齐各个 head 负责的片段。
+ * loopSize=nChannels*nHeads*chunkSize，因此除 channel 分片外，还多了一层 head 分片。
+ * 网络端点 tree->out 对应特殊 peer，Proxy 调插件 Iallreduce；GPU 不直接在交换机上执行归约。
+ * 本版此特化只支持 Simple，启用需要 CollNet 插件与对应硬件/数据类型支持。
+ */
     static constexpr int COLLNET_COPY_THREADS = 96;
     const int tid = threadIdx.x;
     const int bid = args->bid;

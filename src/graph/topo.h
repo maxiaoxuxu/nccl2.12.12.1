@@ -96,6 +96,12 @@ struct ncclTopoLinkList {
 
 #define NCCL_TOPO_UNDEF (-1)
 
+/* 中文精读：硬件节点、边与缓存路径
+ * type/id 决定这是 CPU、PCI、GPU、NET 等哪类硬件对象；union 中保存该类型的专有属性。
+ * links 记录直接邻接的硬件边及带宽，paths 则缓存到各类目标的多跳路径。
+ * 搜索沿 links/path 检查可达性和容量；一个硬件节点不等于一个 communicator rank。
+ * 同一个 GPU 设备在 peerInfo 中有通信组身份，在 topo 中有硬件身份，两层通过 rank/busId 关联。
+ */
 struct ncclTopoNode {
   int type;
   int64_t id;
@@ -139,6 +145,10 @@ struct ncclTopoNodeSet {
   struct ncclTopoNode nodes[NCCL_TOPO_MAX_NODES];
 };
 
+/* 中文导读：
+ * 当前 rank 看到的硬件拓扑：GPU、NVSwitch、PCI、NUMA CPU、NIC/NET 节点及其链路。
+ * 先从硬件描述构图，再预计算路径，最后在此图上搜索 Ring/Tree；硬件图与通信算法图分属不同层。
+ */
 struct ncclTopoSystem {
   struct ncclTopoNodeSet nodes[NCCL_TOPO_NODE_TYPES];
   float maxWidth;

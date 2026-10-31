@@ -592,6 +592,10 @@ static ncclResult_t xmlInitAttrFloat(struct ncclXmlNode* node, const char* attrN
 }
 
 
+/* 中文导读：
+ * 从 XML/系统设备信息、GPU/NVML 和所选网络后端属性建立本机拓扑。
+ * NET 节点带有端口速度、GDR/collective 能力等属性；后续搜索把这些属性作为模型输入。
+ */
 ncclResult_t ncclTopoGetSystem(struct ncclComm* comm, struct ncclTopoSystem** system) {
   struct ncclXml* xml;
   NCCLCHECK(ncclCalloc(&xml, 1));

@@ -8,6 +8,12 @@
 #include "graph.h"
 #include "utils.h"
 
+/* 中文精读：GPU 间共享内存地址如何跨进程表达
+ * 同进程可交换直接指针；跨进程不能把一个进程的普通虚拟地址直接当作另一进程的可用地址。
+ * CUDA IPC handle 表达可导入的 GPU 分配，接收进程打开后得到自己地址空间的映射。
+ * p2p setup/connect 将映射结果填到 conn.buffs/head/tail，再由 GPU 原语访问。
+ * NVLink/PCIe 是实际硬件路径，IPC 是建立地址映射的机制，两者解决的问题不同。
+ */
 struct ncclP2pBuff {
   void* directPtr;
   cudaIpcMemHandle_t devIpc;
@@ -52,6 +58,10 @@ static int busIdToCudaDev(int64_t busId) {
 }
 
 /* Determine if two peers can communicate through p2p */
+/* 中文导读：
+ * 判断两个 GPU 是否能走 P2P，包括拓扑、CUDA peer access/IPC 能力等条件。
+ * 这里的 GPU P2P transport 与公开 ncclSend/ncclRecv 的点对点语义不是同一个层次。
+ */
 ncclResult_t p2pCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTopoGraph* graph, struct ncclPeerInfo* info1, struct ncclPeerInfo* info2) {
   // Rule out different nodes / isolated containers
   if (info1->hostHash != info2->hostHash || info1->shmDev != info2->shmDev) {
@@ -140,6 +150,10 @@ static ncclResult_t p2pGetInfo(struct ncclTopoSystem* topo, struct ncclPeerInfo*
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 把对端 GPU 缓冲区映射到本进程可用的设备地址，同进程直连与跨进程 CUDA IPC 分开处理。
+ * 跨进程交换 IPC handle 后在本地打开映射，不是把另一个进程的裸虚拟地址直接拿来解引用。
+ */
 static ncclResult_t p2pMap(struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclP2pBuff* p2pBuff, void** devMem, void** ipcPtr) {
   if (myInfo->pidHash == peerInfo->pidHash) {
     if (peerInfo->cudaDev != myInfo->cudaDev) {

@@ -31,6 +31,12 @@ static ncclResult_t getPath(struct ncclTopoSystem* system, struct ncclTopoNode* 
 
 NCCL_PARAM(NvbDisable, "NVB_DISABLE", 0);
 
+/* 中文精读：硬件图上的路径预计算
+ * 从 baseNode 出发按层扩展可达节点，记录路径链路、跳数、瓶颈带宽与路径类别。
+ * 带宽由沿途最窄边限制；路径类别反映 NVLink/PCIe/跨 CPU 等代价，不只是最少跳数。
+ * 随后 P2P/GDR 检查还会按实际访问能力改写/绕行路径，因此物理可达不等于可用 CUDA P2P。
+ * 这些路径是 Search 的输入；它们不是用户张量中 chunk 的路径描述。
+ */
 static ncclResult_t ncclTopoSetPaths(struct ncclTopoNode* baseNode, struct ncclTopoSystem* system) {
   if (baseNode->paths[baseNode->type] == NULL) {
     NCCLCHECK(ncclCalloc(baseNode->paths+baseNode->type, system->nodes[baseNode->type].count));
@@ -343,6 +349,16 @@ compare:
 NCCL_PARAM(NetGdrRead, "NET_GDR_READ", -2);
 int ncclTopoUserGdrLevel = -1;
 
+/* 中文导读：
+ * 检查 GPU 与所选 NET 设备能否使用 GPUDirect RDMA，并结合方向、路径距离和环境配置决定。
+ * GDR 表示 NIC 可访问 GPU 内存；本版本内置 IB 的 WQE 提交和 CQ 轮询仍由 CPU Proxy 执行。
+ */
+/* 中文精读：GPU Direct RDMA 是能力与策略的共同结果
+ * 检查 GPU 与 NIC 的 GDR 支持、二者的拓扑距离，以及发送读 GPU 显存时的额外策略。
+ * read 参数区分 NIC 从 GPU 读数据的发送侧与 NIC 向 GPU 写入的接收侧，允许结果不同。
+ * useGdr 决定 NET 分配/注册 GPU 缓冲还是主机缓冲；不决定由 CPU 还是 GPU 调用 ibv_post_send。
+ * 本版本内置 IB 的 verbs 请求仍由 CPU Proxy 推进。
+ */
 ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* system, int64_t busId, int netDev, int read, int* useGdr) {
   *useGdr = 0;
 
@@ -647,6 +663,11 @@ static int nextPow2(int v) {
   return pow2;
 }
 
+/* 中文导读：
+ * 分别计算 p2pnChannels（全局通道空间）与 p2pnChannelsPerPeer（单 peer 的通道预算）。
+ * 遍历本地 GPU/所有 peer 取限制，再向上对齐到 2 的幂，并用位反转偏移让通道分布更均匀。
+ * 日志里的 8 p2p channels、2 per peer 不是 8×2 个独立 channel；具体任务还会按大小调整拆分。
+ */
 ncclResult_t ncclTopoComputeP2pChannels(struct ncclComm* comm) {
   comm->p2pnChannels = std::min(comm->nChannels, (int)ncclParamMaxP2pNChannels());
   comm->p2pnChannels = std::max(comm->p2pnChannels, (int)ncclParamMinP2pNChannels());
@@ -660,6 +681,12 @@ ncclResult_t ncclTopoComputeP2pChannels(struct ncclComm* comm) {
     }
   }
 
+/* 中文精读：8 个 P2P channel、每 peer 2 个的具体映射示例
+ * 向上对齐到 2 的幂后，以 3 位反转生成偏移：全局 8 条时，c=0 -> 0，c=1 -> 4。
+ * 若单 peer 预算为 2，base=1 的这个 peer 就用 (1+0)%8=1 和 (1+4)%8=5。
+ * 另一个 peer 的 base 也可能为 1，复用 channel 1/5，但 peers[peer] 的 connector 不同。
+ * Group 再按消息大小决定实际拆多少块，chunk 号对 perPeer 取模来轮转这些 channel。
+ */
   // Round to next pow2 nChannelsPerPeer and nChannels
   comm->p2pnChannelsPerPeer = nextPow2(minChannels);
   comm->p2pnChannels = nextPow2(comm->p2pnChannels);

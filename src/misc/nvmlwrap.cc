@@ -45,6 +45,12 @@ namespace {
   ncclResult_t initResult;
 }
 
+/* 中文精读：NVML 在 NCCL 中负责发现硬件
+ * 动态装载 NVML 并查找所需符号，读取 GPU、NVLink、PCI 地址及 P2P 能力等拓扑信息。
+ * NVML 的设备编号与 CUDA_VISIBLE_DEVICES 过滤后的 CUDA ordinal 不保证相等，通常按 PCI busId 关联。
+ * 它帮助图搜索了解硬件，不负责每个 chunk 的搬运，也不是 CUDA kernel 发射接口。
+ * 初始化使用锁/缓存，避免同进程多个 communicator 重复无序初始化管理库。
+ */
 ncclResult_t ncclNvmlEnsureInitialized() {
   // Optimization to avoid repeatedly grabbing the lock when we only want to
   // read from the global tables.

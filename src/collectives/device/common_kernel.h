@@ -627,6 +627,13 @@ __device__ int ptrAlign128(T* ptr) { return (uint64_t)ptr % alignof(Pack128); }
 #define PACKELEMS (sizeof(Pack128) / sizeof(T))
 
 template<int UNROLL, class FUNC, typename T, int MINSRCS, int MAXSRCS, int MINDSTS, int MAXDSTS, int PreOpN, typename Int>
+/* 中文精读：最终负责读、归约、写的线程搬运层
+ * 原语已处理流控并装好 srcs/dsts，本函数负责本 slice 的实际数据运算。
+ * 所有指针满足 16B 对齐时优先使用 128-bit 向量加载/写入；剩余尾数降级到小粒度路径。
+ * 多个源在寄存器里归约，再把同一结果写到所有目标；线程按 warp 和 UNROLL 分摊不同元素。
+ * postOp 在归约完成后应用；没有多个有效源时，这个框架自然退化为复制。
+ * 它不知道 QP、socket 或拓扑搜索，只处理已经可安全访问的内存地址。
+ */
 __device__ __forceinline__ void ReduceOrCopyMulti(
     const int tid, const int nthreads, uint64_t* redOpArgs, bool postOp, int nsrcs, const T** srcs, int ndsts, T** dsts, Int N
   ) {

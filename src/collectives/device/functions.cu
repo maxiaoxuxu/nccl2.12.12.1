@@ -86,6 +86,12 @@ __shared__ ncclShmemData ncclShmem;
   NCCL_FUNCS3B(func, Sum)
 
 // Must be consistent with the ncclFuncSet enum
+/* 中文精读：设备函数表怎样被填满
+ * 宏按 collective/归约/数据类型/算法/协议展开函数地址，排列与 FUNC_INDEX 严格一致。
+ * Broadcast/AllGather 仅复制，以 Int8/Sum 的实现填充相应槽；没有真的做跨 rank 求和。
+ * 并非所有声明组合都具备实际可用算法，调优模型须屏蔽不可用的组合。
+ * __CUDA_ARCH__ 条件只在设备编译阶段初始化函数指针，避免主机编译器误取设备函数地址。
+ */
 __device__ ncclKern_t ncclFuncs[1+ncclNumTypes+NCCL_NUM_FUNCTIONS*ncclNumDevRedOps*ncclNumTypes*NCCL_NUM_ALGORITHMS*NCCL_NUM_PROTOCOLS] = {
 // Don't try to initialize the host shadow copy of this device-side global
 // variable. There is no host pointer to a device-side function, which

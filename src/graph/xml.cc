@@ -11,6 +11,12 @@
 #include <ctype.h>
 #include "core.h"
 #include "nvmlwrap.h"
+/* 中文精读：从系统发现信息到图搜索输入
+ * 本文件负责 XML 解析/写出，并从 sysfs/NVML 等补齐硬件属性。
+ * TopoGetSystem 可以读用户文件，也可自动发现，再转换成 graph/topo.h 的节点/链路对象。
+ * 硬件树、路径缓存、通信搜索图是连续的三个表示阶段，应按转换函数逐层跟踪。
+ * 此层只处理元数据，真正的 GPU/NIC 数据传输在 transport 和 collectives/device。
+ */
 #include "xml.h"
 
 /*******************/

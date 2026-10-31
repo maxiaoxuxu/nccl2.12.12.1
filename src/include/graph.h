@@ -62,6 +62,17 @@ ncclResult_t ncclTopoSearchInit(struct ncclTopoSystem* system);
 #define NCCL_TOPO_PATTERN_SPLIT_TREE 2      // Spread NIC traffic between two GPUs (Tree parent on first GPU, tree children on the second GPU)
 #define NCCL_TOPO_PATTERN_TREE 3            // All NIC traffic going to/from the same GPU
 #define NCCL_TOPO_PATTERN_RING 4            // Ring
+/* 中文导读：
+ * 拓扑搜索得到的通信方案：每个 channel 的本地 GPU 顺序及跨节点网络端点。
+ * speedIntra/speedInter 等用于搜索与性能估计，不是已经测得的运行时吞吐率，也不是已创建的连接。
+ */
+/* 中文精读：通信搜索图字段的阅读坐标
+ * id/pattern 标识搜索任务及端点约束，minChannels/maxChannels 限定候选范围。
+ * nChannels 是已找到的图条数；speedIntra/speedInter 为每通道机内/机间目标速度。
+ * intra 按 channel 存 GPU 用户 rank 顺序，inter 每 channel 存两个 NET 端点。
+ * typeIntra/typeInter 约束允许的硬件路径类别，sameChannels/crossNic 影响候选空间。
+ * 本对象是初始化时的搜索结果，运行时再转成 comm.channels 的具体邻居关系。
+ */
 struct ncclTopoGraph {
   // Input / output
   int id; // ring : 0, tree : 1, collnet : 2

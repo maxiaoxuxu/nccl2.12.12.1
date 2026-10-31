@@ -163,6 +163,12 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
   return ncclSuccess;
 }
 
+/* 中文精读：工作 FIFO 的生产者与槽位复用
+ * channel->workFifoTail 是 CPU 单调递增的写入序号，取模 NCCL_MAX_OPS 才是数组下标。
+ * GPU 把一条 work 复制到共享内存后，将主机槽位 header.type 清成 Unused；CPU 等待这个标记再覆盖。
+ * 所以这里等待的是“描述符已被取走”，并非“这条通信的数据传输已经结束”。
+ * workCount 限制本批排队数；它与持久累加的 tail、GPU 的 index 各有不同生命周期。
+ */
 static ncclResult_t getNextOp(struct ncclChannel* channel, struct ncclWork** work, struct ncclWorkElem* base) {
   if (channel->workCount == NCCL_MAX_OPS) {
     WARN("Too many aggregated operations on channel %d (%d max)", channel->id, NCCL_MAX_OPS);
@@ -183,6 +189,12 @@ static ncclResult_t getNextOp(struct ncclChannel* channel, struct ncclWork** wor
 
 // Finalize channel work FIFO states before launch
 // Called during dynamic enqueue
+/* 中文精读：为什么空 channel 也要放一个任务
+ * gridDim.x 覆盖编号 0 到最高使用 channel；中间有空洞时也会产生对应 block。
+ * 给空洞填 nWarps=0 的 P2P work，并给每条通道本批最后一项设 isLast，保证空 block 能正确退出。
+ * 普通提交可以临时缩小 grid，CUDA Graph 的 grid 在捕获时就已固定，因此两条分支不能混用。
+ * channel 0 单条 collective 可通过 kernel 参数内联传入，省一次工作 FIFO 读取。
+ */
 static ncclResult_t setupLaunch(struct ncclQueueInfo* eqInfo, int usingCudaGraph) {
   ncclComm_t comm = eqInfo->comm;
   // Do not use comm->myParams in this function unless in non-graph mode
@@ -280,6 +292,12 @@ ncclResult_t ncclCpuBarrierOut(struct ncclComm* comm) {
 
 // Check dependency wrt outside streams or previous launches
 // Launch kernel in GROUP mode
+/* 中文精读：stream 依赖与本地 GPU 发射屏障
+ * 用户 stream 上先前的计算必须完成，通信 kernel 才能读取它的输入。
+ * 若切到 groupStream，就先在 userStream record event，再在 groupStream wait event 建立依赖。
+ * GROUP 模式还用 intraBarrier 协调同进程的多个 GPU；最后到达的线程可统一启动它们。
+ * 这个 CPU 屏障不是跨机器的集体通信屏障，也不等于等待本次 AllReduce 完成。
+ */
 ncclResult_t ncclLaunchBarrier(struct ncclComm* comm) {
   struct cudaLaunchParams* params = comm->myParams;
   if (params->gridDim.x == 0) return ncclSuccess;
@@ -316,6 +334,10 @@ ncclResult_t ncclLaunchBarrier(struct ncclComm* comm) {
 }
 
 // Launch kernel in PARALLEL mode
+/* 中文导读：
+ * 执行 kernel 启动与相关的本地发射协调。常规路径的通信执行与用户 CUDA stream 有序。
+ * 主机 API 返回表示工作提交进度，不等于远端归约或 GPU/NIC 传输已经全部结束。
+ */
 ncclResult_t ncclLaunchKernel(ncclComm_t comm) {
   struct cudaLaunchParams *params = comm->myParams;
   if (params->gridDim.x == 0) return ncclSuccess;
@@ -339,6 +361,13 @@ ncclResult_t ncclLaunchKernel(ncclComm_t comm) {
 }
 
 // Launch network proxy
+/* 中文精读：实际调用顺序，以代码调用点为准
+ * 下面保留的英文注释提到 kernel launched，但普通路径实际是：
+ * ncclEnqueueCheck / ncclGroupEnd -> ncclEnqueueHostSetup<0> -> 本函数 -> ncclProxyStart，
+ * 然后才进入 ncclLaunchBarrier / ncclLaunchKernel。CUDA Graph 则用图依赖安排 HostSetup。
+ * Start 发布任务并唤醒已有线程，不是每次创建线程，也不是 GPU 给 CPU 发中断。
+ * Proxy 可以先挂接收或准备槽位，发送仍须等 GPU 的 sizes/tail/flag 说明数据已就绪。
+ */
 static ncclResult_t ncclLaunchProxy(struct ncclQueueInfo* eqInfo) {
   // Start the network proxies as soon as the kernel has been launched. We can't
   // perform any CUDA call between the two or having a cudaFree between the CUDA
@@ -420,6 +449,10 @@ static inline ncclResult_t getCollNetSupport(struct ncclInfo* info, int* collNet
 }
 
 // numPipeOps: number of pipelined ops. Can be greater than 1 in aggregation mode. Used to adjust latency.
+/* 中文导读：
+ * 枚举可用算法/协议，取 ncclTopoGetAlgoTime 的最小非负预测时间。
+ * 再按消息大小缩减本次操作的 channel/线程数量：comm 的配置通道数与此次实际使用数是不同概念。
+ */
 static ncclResult_t getAlgoInfo(struct ncclInfo* info, int collNetTypeSupport, int numPipeOps) {
   struct ncclComm* comm = info->comm;
   if (comm->nRanks == 1) {
@@ -485,6 +518,12 @@ static ncclResult_t getAlgoInfo(struct ncclInfo* info, int collNetTypeSupport, i
   return ncclSuccess;
 }
 
+/* 中文精读：API 语义如何变为通信邻居和方向
+ * algorithm 决定 Ring/Tree/CollNet，pattern 再决定沿哪些方向推进。
+ * Broadcast 是从 root 出发的流水线，Reduce 是到 root 结束的流水线；不必把数据绕满一圈。
+ * AllGather/ReduceScatter 走一遍环；AllReduce 的 RingTwice 对应归约分散与结果收集。
+ * pattern 同时交给 ProxySaveColl，确保 CPU 网络工作与 GPU 原语使用相同的邻居。
+ */
 static ncclResult_t getPatternInfo(struct ncclInfo* info) {
   switch (info->coll) {
     case ncclFuncBroadcast:
@@ -503,6 +542,12 @@ static ncclResult_t getPatternInfo(struct ncclInfo* info) {
   return ncclSuccess;
 }
 
+/* 中文精读：算法轮次与 FIFO step 不能混为一谈
+ * Ring 的一轮包含 nRanks 个逻辑数据块，跨每条环边传 nRanks-1 次；RingTwice 是两倍。
+ * Tree/Pipeline 的一轮按一个块计，具体树中间节点的收发由各自连接推进。
+ * nstepsPerLoop 是算法步数；还要乘 chunkSteps，才能得到 Proxy 所用的 FIFO 进度量。
+ * 因此 nsteps 不是 RDMA 包数、WQE 数或 QP 数，NIC 还可能继续拆包和分 QP。
+ */
 static ncclResult_t getLoopInfo(struct ncclInfo* info) {
   switch (info->pattern) {
     case ncclPatternTreeUp:
@@ -524,6 +569,11 @@ static ncclResult_t getLoopInfo(struct ncclInfo* info) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 把 ncclInfo 同时编译成 GPU work 与 ProxyOp，确保两侧对协议、分片和步数的理解一致。
+ * Ring AllReduce 的每轮通信步数为 2*(nRanks-1)，缓冲区每步大小为 buffSizes[protocol]/NCCL_STEPS。
+ * chunk 是算法分块，slice 是原语推进单位，step 是循环缓冲区的进度单位，三者不能随意互换。
+ */
 static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclWorkElem* work, struct ncclProxyOp* proxyOp /* output */) {
   int collNetTypeSupport = 0;
   // Check whether algo and proto have been preset (as in aggregation case)
@@ -555,6 +605,13 @@ comp_next:
 
   work->header.funcIndex = FUNC_INDEX(info->coll, info->opFull.op, info->datatype, info->algorithm, info->protocol);
 
+/* 中文精读：分片尺寸的第一层：协议环形缓冲区
+ * 这里 stepSize/chunkSize 都是字节。NCCL_STEPS=8，把协议缓冲分成 8 个可循环使用的 step。
+ * 只有 Simple+Ring 使用 API 给定的 chunkSteps/sliceSteps；其余组合在这里按 1 step 处理。
+ * chunkSize=stepSize*chunkSteps；一个算法块可含多个 slice，每个 slice 占 sliceSteps 个 step。
+ * GPU 侧会再除 sizeof(T) 转换成元素数。不能把主机的字节尺寸直接代进设备下标。
+ * 采用有限槽位和分片，是为了让 GPU 计算、网络传输、下一块处理形成流水，同时限制临时内存。
+ */
   int stepSize   = info->comm->buffSizes[info->protocol]/NCCL_STEPS;
   int chunkSteps = (info->protocol == NCCL_PROTO_SIMPLE && info->algorithm == NCCL_ALGO_RING) ? info->chunkSteps : 1;
   int sliceSteps = (info->protocol == NCCL_PROTO_SIMPLE && info->algorithm == NCCL_ALGO_RING) ? info->sliceSteps : 1;
@@ -595,6 +652,13 @@ comp_next:
     work->lastChunkSize = chunkSize*NCCL_LL128_DATAELEMS/(NCCL_LL128_LINEELEMS*ncclTypeSize(info->datatype));
   }
 
+/* 中文精读：让 GPU 与 Proxy 对同一分片达成一致
+ * LL 的 16 字节 FIFO 行只有 8 字节有效数据；LL128 每 128 字节中有 120 字节有效数据。
+ * 所以用于覆盖用户数据的 chunkEffectiveSize 要扣掉 flag 开销，而网络缓冲仍按物理字节分配。
+ * nLoops=ceil(nBytes/(nChannels*nchunksPerLoop*chunkEffectiveSize))，
+ * nsteps=nstepsPerLoop*nLoops*chunkSteps。尾块不足也要保持两侧推进步数匹配。
+ * 这个公式是本版本调度器给 Proxy 的预算，不表示每个 step 必然对应一个独立 verbs 请求。
+ */
   // Compute nSteps for proxies
   int chunkEffectiveSize = chunkSize;
   if (info->protocol == NCCL_PROTO_LL) chunkEffectiveSize /= 2;
@@ -696,6 +760,10 @@ reg_fallback:
 // Compute enqueue element, save it in list
 // Compute CUDA launch parameters
 // Capture time code in view of CUDA graph
+/* 中文导读：
+ * 准备集合通信的排队描述：计算算法、协议、工作元素和 Proxy 工作，而不是在 API 包装层做数据归约。
+ * 后续 HostSetup 将描述放进 channel FIFO，Launch 阶段再提交 GPU kernel。
+ */
 static ncclResult_t ncclSetupCollKernel(struct ncclInfo* info) {
   ncclComm_t comm = info->comm;
   if (comm->nRanks == 1 &&
@@ -749,6 +817,12 @@ static ncclResult_t ncclSetupCollKernel(struct ncclInfo* info) {
 }
 
 // Find the channel with the least enqueued work (counted in bytes)
+/* 中文精读：Group 聚合怎样选择物理 channel
+ * 聚合可按已排入字节数找最短队列，也可按 lastChannel 轮转，尽量让多个 block 负载接近。
+ * 分配后的 channelId 是 comm->channels 数组下标；work->bid 是本次操作内的分片编号。
+ * 例如某操作占用物理 channel 3、4，bid 仍是 0、1；GPU 用 bid 计算输入偏移，
+ * 用 blockIdx.x 找实际 channel 的拓扑与连接，两种编号不能互相替换。
+ */
 static inline int findShortestChannel(ncclComm_t comm) {
   size_t minSize = SIZE_MAX;
   int minC = 0;
@@ -776,6 +850,13 @@ static inline int getNextChannel(ncclComm_t comm, int aggMode) {
 
 // Setup aggregated kernels
 // Op info has been previously saved in comm->asyncOps
+/* 中文精读：多个 API 如何打包进一次 kernel 发射
+ * 组内 API 先保存在 asyncOps，最外层 GroupEnd 到这里统一估计每项所需 channel。
+ * channelSize 是每通道目标工作量；消息太小会缩小它，让现有通道得到更多有效工作。
+ * 同操作/归约/类型的 homogeneous 批次可按总字节数统一选算法和协议，减少重复调度与小消息延迟。
+ * 异构批次各自计算。随后把兼容元素装进 work，GPU 在同一个 block 内顺序解释执行，
+ * 并非把用户数据先合并成一个新的连续大数组。
+ */
 ncclResult_t ncclSetupAsyncKernels(ncclComm_t comm) {
   if (comm->asyncOpCount == 0) {
     return ncclSuccess;
@@ -858,6 +939,10 @@ static ncclResult_t ncclSaveAsyncColl(struct ncclInfo* info) {
 
 // Save p2p operations in comm->p2pSends and p2pRecvs. Operations will be posted to channels
 // during ncclGroupEnd()
+/* 中文导读：
+ * 按 peer 保存 Send/Recv，并为尚未连接的 channel/peer 的索引 1 设置建链标记。
+ * 这解释了为什么 communicator 初始化完成后，首次访问新 peer 仍可能增加连接及 QP/MR。
+ */
 static ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
   struct ncclComm* comm = info->comm;
   int peer = info->root;
@@ -919,6 +1004,12 @@ static int getSegment(enum ncclWorkElemType type, enum ncclWorkElemSubType subTy
 }
 
 // Compute kernel arguments for P2P ops
+/* 中文精读：P2P 工作描述的单位和方向
+ * Group 调度已把消息换成 ncclInt8，所以此处 count 表示字节，chunkSize 也表示字节。
+ * Send/Recv 共用 ncclWorkElemP2p：subType 区分方向，peer 是对端，buff 是当前块起点。
+ * header.nWarps 是整个 P2P work 的线程预算；enqueueSegOp 还会为各个元素分配 warpStart/nWarps。
+ * P2P 描述符与 collective 描述符布局不同，不能用 collective 的 count/元素类型规则解释它。
+ */
 static ncclResult_t computeP2pWorkElem(struct ncclInfo* info /* input */, struct ncclWorkElemP2p* elem /* output */) {
   elem->header.type = ncclWorkTypeP2p;
   elem->header.funcIndex = FUNC_INDEX_P2P;
@@ -933,6 +1024,12 @@ static ncclResult_t computeP2pWorkElem(struct ncclInfo* info /* input */, struct
 
 // Equeue work elements into segment of ncclWork
 // Supporting both collectives (aggregated or not) and P2P
+/* 中文精读：一条 work 内怎样分配 P2P 线程组
+ * P2P 把多项收发装在固定大小的 work 中；ngroups 向上取 2 的幂以便均分线程。
+ * 每项记录自己起始 warp 和 warp 数；偶数槽是接收，奇数槽是发送，设备端按同样规则分派。
+ * 发送可多配一个同步 warp，让数据复制与 threadfence 的开销重叠。
+ * collective 分支则复制完整 workElem；不同 funcIndex/线程数的任务不能任意装进同一条 work。
+ */
 static ncclResult_t enqueueSegOp(enum ncclWorkElemType type, struct ncclWork* elem /* input */, struct ncclWork* work, int s,
     struct ncclBuffRegInfo* regInfo, struct ncclChannel* channel, struct ncclComm* comm) {
 
@@ -995,6 +1092,12 @@ static ncclResult_t enqueueSegOp(enum ncclWorkElemType type, struct ncclWork* el
 }
 
 // Enqueue P2P op
+/* 中文精读：P2P 从临时描述到 channel FIFO
+ * 此时 channelId 已由 peer/块号映射选好，不再走集合通信的轮转选择。
+ * 优先找同类型且有空槽的 work 来合并收发；装不下再通过 getNextOp 申请 FIFO 槽位。
+ * 同时保存该 P2P 块的 Proxy 操作。GPU work 与 ProxyOp 是同一传输的两份执行计划，
+ * 一个驱动 GPU 拷贝/同步，一个驱动 CPU 网络推进，不是重复发送两次数据。
+ */
 ncclResult_t ncclEnqueueP2pKernel(struct ncclComm* comm, struct ncclQueueElem* eqElem) {
   struct ncclWorkElemP2p* workElem = eqElem->work.p2pElems;
   struct ncclProxyOp* proxyOp = &eqElem->proxyOp;
@@ -1051,6 +1154,10 @@ ncclResult_t ncclSetupP2pKernel(struct ncclInfo* info) {
 
 // Dynamic enqueue function for collective kernels
 // Supports both aggregated and non-aggregated modes
+/* 中文导读：
+ * 把一项 collective 的工作与 Proxy 需求分配到选中的 channel；聚合时可以装入已有 work 记录。
+ * 每个 work 的 bid 是此次操作中的分片编号，不能把它始终当成独立的硬件网口编号。
+ */
 ncclResult_t ncclEnqueueCollKernel(struct ncclComm* comm, struct ncclQueueElem* eqElem, int aggMode) {
   struct ncclWork* work = &eqElem->work;
   struct ncclWorkElem* elem = work->elems;
@@ -1099,6 +1206,10 @@ ncclResult_t ncclEnqueueCollKernel(struct ncclComm* comm, struct ncclQueueElem* 
 // Host setup node for CUDA Graph
 // Performs the enqueue job
 template<int USING_CUDA_GRAPH>
+/* 中文导读：
+ * 主机侧真正装填任务：遍历排队元素，将 collective/P2P 写入工作 FIFO，完成 launch 配置并发布 Proxy 工作。
+ * CUDA Graph 捕获/重放也复用这个桥接点，但元数据的生命周期由相应 QueueInfo/Graph 分支维护。
+ */
 void CUDART_CB ncclEnqueueHostSetup(void* arg) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   ncclResult_t ret;
@@ -1172,6 +1283,12 @@ void* graphHelperFunc(void *args) {
 }
 
 // Check if we are in CUDA Graph capture mode
+/* 中文精读：捕获与执行是两个时间点
+ * 调用 API 时可能正在捕获 CUDA Graph；这时要保留 QueueInfo，供将来图执行时填写工作 FIFO。
+ * 普通模式可以立即使用/回收排队状态；图模式不能引用随后会被覆盖的 comm->myParams 临时内容。
+ * 本函数检查 stream capture 状态和图标识，后续 HostSetup 节点在每次 replay 时重新发布任务。
+ * CUDA Graph 优化的是提交组织方式，算法分片和协议流控仍然存在。
+ */
 ncclResult_t ncclGetCudaGraph(ncclComm_t comm, cudaGraph_t* graph) {
   comm->usingCudaGraph = 0;
   // Feature requires CUDA 11.3/R465 or above
@@ -1253,6 +1370,12 @@ ncclResult_t ncclCudaGraphHostSetup(ncclComm_t comm, cudaGraph_t graph) {
 #endif
 }
 
+/* 中文精读：用户归约句柄如何变成设备操作
+ * 公开 ncclRedOp_t 与设备模板枚举不是同一份编码；这里解析内建操作或 communicator 内的用户句柄。
+ * 浮点 Avg 可以转成 PreMulSum，让每个输入先乘 1/nRanks；整数平均需在最终结果做 SumPostDiv。
+ * scalarArg 可能保存标量的位模式，也可能是设备指针，scalarArgIsPtr 决定 kernel 是否解引用。
+ * 组内入队时就复制这些信息，避免用户在 GroupEnd 前销毁操作句柄导致悬空引用。
+ */
 static ncclResult_t hostToDevRedOp(
     ncclDevRedOpFull *opFull, ncclRedOp_t op, ncclDataType_t datatype, ncclComm *comm
   ) {
@@ -1321,6 +1444,11 @@ static ncclResult_t hostToDevRedOp(
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 所有主要数据通信 API 的统一入口：检查参数、解析归约操作并保存 stream 信息。
+ * 在 group 中先保存任务，最外层 GroupEnd 再调度；否则直接准备 collective、HostSetup、Launch 和事件。
+ * 这里 isAsync 主要指 group 调度状态，不要与后来版本的 nonblocking communicator 配置混同。
+ */
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   ncclResult_t ret = ncclSuccess;
   bool isAsync = ncclAsyncMode();
@@ -1389,6 +1517,12 @@ end:
 }
 
 NCCL_API(ncclResult_t, ncclRedOpCreatePreMulSum, ncclRedOp_t *op, void *scalar, ncclDataType_t datatype, ncclScalarResidence_t residence, ncclComm_t comm);
+/* 中文精读：自定义归约的边界
+ * 本 API 创建的是“先乘指定标量再求和”的操作，不接受任意用户 C/CUDA 回调函数。
+ * 用户句柄分配在此 communicator 的 userRedOps 表中，datatype 和 scalar residence 决定保存方式。
+ * Destroy 释放的是句柄槽位；已经在 ncclEnqueueCheck 中复制的 opFull 有自己的任务语义。
+ * 设备实现继续通过预编译模板执行，避免运行时编译任意归约函数。
+ */
 ncclResult_t ncclRedOpCreatePreMulSum(ncclRedOp_t *op, void *scalar, ncclDataType_t datatype, ncclScalarResidence_t residence, ncclComm_t comm) {
   if (comm->userRedOpFreeHead == comm->userRedOpCapacity) {
     // double capacity and resize

@@ -41,6 +41,13 @@ namespace {
       return realChunkSize;
     };
 
+/* 中文精读：Reduce 的流水线起点在 root 的后继
+ * root 的后继没有上游需要合并的部分结果，因此先 send 本地输入。
+ * 中间节点 recvReduceSend，将收到的部分结果加本地输入后向下游继续发。
+ * root 最后 recvReduceCopy，把其余 rank 的归约结果与自己的输入合并，只有它需要最终输出。
+ * 这里按 T 元素分片，count 是每 rank 输入长度；每一块都遵循同一条以 root 为终点的路径。
+ * 与 AllReduce 不同，完成后没有再把完整结果广播给所有 rank 的阶段。
+ */
     if (prevRank == root) {
       for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
         int realChunkSize = calcChunkSize(gridOffset);

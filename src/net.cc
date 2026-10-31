@@ -107,6 +107,12 @@ static ncclResult_t ncclCollNet_v4_as_v5_init(ncclDebugLogger_t logfn) {
   return ncclSuccess;
 }
 
+/* 中文精读：插件是网络函数表的动态替换
+ * 按 NCCL_NET_PLUGIN 拼出 libnccl-net-名字.so，未设置则尝试 libnccl-net.so。
+ * dlopen/dlsym 查找 v5 符号，找不到时尝试 v4 并用适配函数补齐 v5 接口。
+ * 这允许外部网络后端实现不同传输协议；本文件不强制插件必须是 UCX 或某种 RDMA 库。
+ * 函数指针多一层调用不等于多复制一遍载荷，主要传输成本仍取决于后端实现。
+ */
 static void initPlugin(ncclNet_v5_t** net, ncclCollNet_v5_t** collnet) {
   char ncclNetPluginName[128];
   const char* envPluginName = getenv("NCCL_NET_PLUGIN");
@@ -157,6 +163,11 @@ static void initPlugin(ncclNet_v5_t** net, ncclCollNet_v5_t** collnet) {
   return;
 }
 
+/* 中文导读：
+ * 网络后端选择入口：初始化 bootstrap 后，依次尝试外部插件、内置 IB、内置 Socket。
+ * NCCL_NET 可按后端名筛选。外部插件通过 libnccl-net*.so 的 v5/v4 函数表接入；不是必须使用 UCX。
+ * 真正的 GPU/Proxy 网络传输通过统一 ncclNet 接口调用已选后端。
+ */
 ncclResult_t ncclNetInit() {
   // Always initialize bootstrap network
   NCCLCHECK(bootstrapNetInit());

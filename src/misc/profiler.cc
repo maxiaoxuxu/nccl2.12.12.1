@@ -4,6 +4,12 @@
  * See LICENSE.txt for license information
  ************************************************************************/
 
+/* 中文精读：内置 Proxy profiling 的观察范围
+ * 本模块记录 Proxy 子任务在 GPU 等待、网络等待、flush 等阶段的时间，用于定位进度瓶颈。
+ * 编译条件关闭时函数退化为空实现，不应把没有记录理解成没有网络活动。
+ * 这些时间属于主机 Proxy 观测点，不能直接当作 GPU 每个归约指令的执行时间。
+ * 实际对比性能还需统一张量大小、rank/channel 配置与同步测量边界。
+ */
 #include "profiler.h"
 
 //#define PROFILE_PROXY 1

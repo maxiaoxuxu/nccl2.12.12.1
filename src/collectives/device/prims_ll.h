@@ -55,6 +55,12 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
     return abort;
   }
 
+/* 中文精读：LL 仍然需要空间流控
+ * 行内 flag 解决“数据是否到达”，head 解决“旧数据是否被消费，槽位能否重写”。
+ * 发送端仍要求 head+NCCL_STEPS 足以覆盖下一 step，并通过 sizesFifo 告诉 Proxy 物理字节数。
+ * 清理轮可能必须发送完整 step 的行内容，即使有效数据很少，也要把可能遗留的 flag 处理干净。
+ * 因此不能把 LL 理解成无缓冲、无流控的任意远端写。
+ */
   inline __device__ void waitSend(int nbytes) {
     if (sendConnHeadPtr) {
       int spins = 0;
@@ -88,6 +94,12 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
     sendStep[i]++;
   }
 
+/* 中文精读：LL 接收为何逐行轮询两个 flag
+ * 读取 data/flag 的 16B 行，只有 flag1 与 flag2 都等于 recvStep+1 才接受这一行。
+ * 数据和完成标记放在同一格式内，降低单独等待整片 tail/fence 的延迟，代价是 50% flag 开销。
+ * 循环会检查 abort；正常情况下数据可以边到边被下游消费，形成细粒度流水。
+ * flag 发生回绕时 incSend 的 cleanup 会清理整段，防止旧 flag 与新期望值碰巧相同。
+ */
   __device__ uint64_t readLL(int offset, int i) {
     union ncclLLFifoLine* src = recvPtr(i) + offset;
     uint32_t flag = recvFlag(i);
@@ -218,6 +230,10 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
   }
 
   template <int RECV, int SEND, int SrcBuf, int DstBuf>
+/* 中文导读：
+ * LL 将有效数据与递增 flag 一起传递，接收方轮询 flag 判断每个粒度的数据是否就绪。
+ * 16 字节 ncclLLFifoLine 中只有 8 字节有效载荷，付出带宽开销以获得细粒度低延迟同步。
+ */
   __device__ __forceinline__ void LLGenericOp(intptr_t srcIx, intptr_t dstIx, int nelem, bool postOp) {
     constexpr int SRC = SrcBuf != -1 ? 1 : 0;
     constexpr int DST = DstBuf != -1 ? 1 : 0;

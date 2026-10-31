@@ -52,6 +52,12 @@ static ncclResult_t ncclShmSetup(char* shmPath, const int shmSize, int* fd, void
   return ncclSuccess;
 }
 
+/* 中文精读：同一共享内存在 CPU/GPU 上的地址视图
+ * 先创建/打开共享文件并 mmap 到本进程，必要时 cudaHostRegisterMapped 注册为 GPU 可访问。
+ * 再通过 cudaHostGetDevicePointer 获取设备侧地址，分别返回 shmPtr 与 devShmPtr。
+ * 跨进程映射同一文件时，CPU 虚拟地址可不同；传递的是共享对象身份，不是假设地址相同。
+ * Close 先取消 CUDA 注册再 munmap；Unlink 删除名字，已存在的映射生命周期另行管理。
+ */
 ncclResult_t ncclShmOpen(char* shmPath, const int shmSize, void** shmPtr, void** devShmPtr, int create) {
   int fd = -1;
   void* ptr = MAP_FAILED;

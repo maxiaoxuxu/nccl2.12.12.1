@@ -11,6 +11,10 @@
 // GDRCOPY support: FIFO_ENABLE when enabled locates a workFifo in CUDA memory
 NCCL_PARAM(GdrCopyFifoEnable, "GDRCOPY_FIFO_ENABLE", 1);
 
+/* 中文导读：
+ * 为一个 channel 分配 peer 表、Ring rank 顺序及工作 FIFO 等对象。
+ * peer 表预留了 rank 槽位；只有 transport setup/connect 成功的 connector 才有相应通信资源。
+ */
 ncclResult_t initChannel(struct ncclComm* comm, int channelid) {
   struct ncclChannel* channel = comm->channels+channelid;
   if (channel->id != -1) return ncclSuccess;
@@ -46,6 +50,12 @@ ncclResult_t initChannel(struct ncclComm* comm, int channelid) {
   return ncclSuccess;
 }
 
+/* 中文精读：沿初始化的反方向释放 channel
+ * 回收 work FIFO 和可选 GDR 映射、Ring rank 表、各 peer 的 transportResources，最后释放 peer 表。
+ * 先释放发送资源再释放接收资源，是为 CollNet 资源关系保留的顺序约束。
+ * transport 的 free 可能还把工作交给 Proxy 服务，并按共享引用计数决定是否关闭实际连接。
+ * 这里处理的是长期对象销毁，不是一次通信完成后立即把所有连接全部拆掉。
+ */
 ncclResult_t freeChannel(struct ncclChannel* channel, int nRanks) {
   if (channel->id == -1) return ncclSuccess;
   // Operation list

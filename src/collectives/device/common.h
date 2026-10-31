@@ -114,6 +114,12 @@ struct ncclShmemGroup {
   int totalSendSize[NCCL_MAX_SLICE_PER_CHUNK];
 };
 
+/* 中文精读：共享内存装的是元数据和小块暂存
+ * comm/channel/work 从全局内存搬到 block 共享内存，使线程重复读取时开销更低。
+ * groups 的 srcs/dsts 是指针表，指向输入、输出或通信缓冲，并不装下整个用户张量。
+ * LL128 的 warp 暂存与 Simple 的 groups 用 union 复用空间，由具体协议决定如何解释。
+ * SM 共享内存是片上存储，与 GPU 显存不同；用户大数组通常仍在显存或映射的通信缓冲中。
+ */
 struct ncclShmemData {
   union {
     uint64_t ll128warp[NCCL_LL128_MAX_NTHREADS/WARP_SIZE][NCCL_LL128_SHMEM_ELEMS_PER_THREAD*WARP_SIZE];
@@ -151,6 +157,11 @@ static __device__ void ncclRedopPtrDeref(struct ncclWorkElem* we) {
 extern __shared__ ncclShmemData ncclShmem;
 
 template<ncclFunc_t Fn, typename T, typename RedOp, int Algo, int Proto, int FnIndex>
+/* 中文导读：
+ * GPU 通信 kernel 的工作解释器：blockIdx.x 选择 channel，复制执行上下文到共享内存。
+ * 从 FIFO 取 ncclWork，按 funcIndex 调用 RunWork 或设备函数表；遇到 isLast 退出本批任务。
+ * 它可以执行一批已排队工作，不应被描述为一个永不退出的全局后台 kernel。
+ */
 __device__ void ncclKernel(struct ncclDevComm* comm, ncclWorkElem first)  {
   int tid = threadIdx.x;
   int nthreads = blockDim.x;
@@ -186,6 +197,12 @@ __device__ void ncclKernel(struct ncclDevComm* comm, ncclWorkElem first)  {
     }
 
   SkipLoadWork:
+/* 中文精读：为什么提前释放 FIFO 槽仍然安全
+ * 上面已经把整条 ncclWork 复制到共享内存，当前 block 接下来使用的是私有副本。
+ * 因此可以把主机 FIFO type 清零，让 CPU 重用描述符槽；这不授权复用用户数据缓冲。
+ * index 持久写回真实设备 channel，下次 kernel 从后续工作继续读取；本次遇 isLast 就退出。
+ * 这是按批解释 FIFO 的 kernel，不是程序启动后永远常驻的后台循环。
+ */
     workFifoIx = (workFifoIx + 1)%NCCL_MAX_OPS;
     if (tid == 0)
       channel->index = workFifoIx; // write back to real channel, not shmem shadow
@@ -198,6 +215,12 @@ __device__ void ncclKernel(struct ncclDevComm* comm, ncclWorkElem first)  {
     }
     __syncthreads();
 
+/* 中文精读：kernel 入口与实际设备算法可能不同
+ * 若当前任务正好匹配编译期 FnIndex，直接实例化调用 RunWork；否则经 ncclFuncs 表间接分派。
+ * 本版本为减少入口数量，很多非 LL/Sum 组合仍借用有限的全局 kernel 入口进入解释器。
+ * 因此看到 kernel 符号含 LL/Sum，不足以断言所有 work 都实际执行 LL 或 Sum。
+ * 应继续检查 work.header.funcIndex 和对应 RunWorkElement 特化。
+ */
     if (ncclShmem.work.header.funcIndex == FnIndex)
       RunWork<Fn, T, RedOp, Algo, Proto>().run(&ncclShmem.work);
     else

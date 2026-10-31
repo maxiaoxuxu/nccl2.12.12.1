@@ -49,6 +49,12 @@ pthread_mutex_t gdrLock = PTHREAD_MUTEX_INITIALIZER;
     *cast = tmp;                                         \
   } while (0)
 
+/* 中文精读：GDRCopy 与 GPUDirect RDMA 不是同一接口
+ * 此包装动态加载 libgdrapi，让 CPU 建立 GPU 显存的映射并执行小数据复制/读取。
+ * 本仓库用它优化 work FIFO、进度同步或 flush；是否启用还取决于运行环境与参数。
+ * GPUDirect RDMA 则指 NIC 直接访问已注册的 GPU 内存，走网络后端的 regMr/verbs 路径。
+ * 两者可以配合，但没有 GDRCopy 不自动意味着所有 GDR 网络传输不可用。
+ */
 ncclResult_t wrap_gdr_symbols(void) {
   if (gdrState == gdrInitialized)
     return ncclSuccess;

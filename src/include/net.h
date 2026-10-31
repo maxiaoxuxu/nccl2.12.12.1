@@ -17,6 +17,10 @@ typedef char ncclNetHandle_t[NCCL_NET_HANDLE_MAXSIZE];
 ncclResult_t ncclNetInit();
 int ncclNetVersion();
 
+/* 中文导读：
+ * 统一 NET 回调层：把 transport 的操作转发给 ncclNet 当前指向的后端函数表。
+ * 相同 regMr/isend 接口在 IB、Socket 或外部插件中的实现不同；不能只凭接口名判断有多少硬件 MR/QP。
+ */
 // Translation to external API
 static const char* ncclNetName() { return ncclNet->name; }
 static ncclResult_t ncclNetDevices(int* ndev) { NCCLCHECK(ncclNet->devices(ndev)); return ncclSuccess; }

@@ -10,6 +10,10 @@
 
 namespace {
   template<typename T, typename RedOp, typename Proto>
+/* 中文导读：
+ * Ring AllGather：将本 rank 的贡献放到按用户 rank 排列的输出位置，再沿环接收并转发其他贡献。
+ * 与 AllReduce 的结果传播阶段相似，但不执行跨 rank 的归约运算；输出按用户 rank 而非内部环顺序排列。
+ */
   __device__ __forceinline__ void runRing(ncclWorkElem *args) {
     const int tid = threadIdx.x;
     const int nthreads = args->header.nWarps*WARP_SIZE;
@@ -49,6 +53,13 @@ namespace {
       int rankDest;
 
       // step 0: push data to next GPU
+/* 中文精读：AllGather 的布局、分片与原地操作
+ * size 是本 rank 贡献长度，输出总长度 nranks*size。该复制 API 已归一化成 Int8，故单位为字节。
+ * channel 负责本地贡献的一段 chunkOffset，写入 output[用户rank*size + chunkOffset]。
+ * 之后每步把上游其他用户 rank 的同一段保存并转发，最终每个 rank 都有完整有序输出。
+ * 输入恰好等于自己在输出中的段时可直接发送；否则 copySend 兼顾本地写入和发下游。
+ * 例：4 rank 每人 8B，rank2 的贡献最终总在 output[16,24)，不随环顺序改变。
+ */
       rankDest = ringRanks[0];
       offset = chunkOffset + rankDest * size;
 

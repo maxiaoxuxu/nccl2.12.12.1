@@ -480,6 +480,12 @@ ncclResult_t ncclSocketGetTask(struct ncclSocketComm* comm, int op, void* data, 
   return ncclInternalError;
 }
 
+/* 中文精读：Socket 后端也实现异步 request/test 契约
+ * Test 先推进控制信息与任务分片，再检查各 socket 子任务的 offset 是否达到目标长度。
+ * read/write 可能只完成一部分，必须保留 offset 继续，不能把一次系统调用当成整条消息完成。
+ * 多 socket/线程用于并行推进 TCP 数据，最终 done 仍回到上层 Proxy 的相同接口。
+ * 该后端仅接受主机指针注册，不创建 verbs QP/MR，网络路径会使用可访问的主机通信缓冲。
+ */
 ncclResult_t ncclSocketTest(void* request, int* done, int* size) {
   *done = 0;
   struct ncclSocketRequest *r = (struct ncclSocketRequest*)request;
@@ -552,6 +558,10 @@ ncclResult_t ncclSocketTest(void* request, int* done, int* size) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * Socket 后端为适配统一接口提供的注册回调，不执行 ibv_reg_mr。
+ * 因此走 Socket 的同一上层任务不会按内置 IB 的公式消耗 RDMA QP/MR，但有 socket/线程/缓冲开销。
+ */
 ncclResult_t ncclSocketRegMr(void* comm, void* data, int size, int type, void** mhandle) {
   return (type != NCCL_PTR_HOST) ? ncclInternalError : ncclSuccess;
 }

@@ -46,6 +46,12 @@ struct ncclListElem {
 };
 
 template<typename T>
+/* 中文精读：排队链表为何 recycle 而非每轮 free
+ * head 保存已分配节点链，tail 是当前已用边界，cursor 是遍历进度；recycle 把使用状态归零。
+ * getNewElem 优先重用现有节点并清零 data，只在容量不够时扩展，减少高频通信调用的 malloc/free。
+ * 队列中保存的是任务/指针等元数据，复用节点不代表可以覆盖仍在 GPU/NIC 使用的用户数据。
+ * P2P 列表和 QueueElem 列表都复用此模板，注意 getNext 会移动 cursor。
+ */
 class ncclRecyclableList {
  private:
   struct ncclListElem<T>* head;

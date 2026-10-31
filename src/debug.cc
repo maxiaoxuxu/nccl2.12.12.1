@@ -15,6 +15,12 @@ uint64_t ncclDebugMask = NCCL_INIT; // Default debug sub-system mask is INIT
 FILE *ncclDebugFile = stdout;
 pthread_mutex_t ncclDebugLock = PTHREAD_MUTEX_INITIALIZER;
 
+/* 中文精读：日志开关如何帮助对应源码阶段
+ * NCCL_DEBUG 控制级别，NCCL_DEBUG_SUBSYS 选择 INIT/COLL/NET/GRAPH 等子系统。
+ * 同一个 INFO 日志调用带 subsystem 位掩码，过滤后才格式化输出，减少不必要开销。
+ * 日志含主机、进程、线程、设备等信息；多 rank 输出会交错，应按这些标识追踪同一路径。
+ * 初始化日志的 channel 数是配置结果，实际某次操作并行度还需结合调度代码与运行信息。
+ */
 void ncclDebugInit() {
   pthread_mutex_lock(&ncclDebugLock);
   if (ncclDebugLevel != -1) { pthread_mutex_unlock(&ncclDebugLock); return; }

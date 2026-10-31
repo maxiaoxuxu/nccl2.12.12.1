@@ -11,6 +11,12 @@
 
 namespace {
   template<typename T, typename RedOp>
+/* 中文精读：只有一个 rank 时仍可能需要 GPU 运算
+ * 普通内建操作在主机 SetupCollKernel 常可退化为 D2D copy 或无需操作。
+ * PreMulSum 即使只有一个 rank，也必须把每个输入乘标量，因此保留这条设备执行路径。
+ * 这里按 channel 计算局部范围，然后调用同一个 ReduceOrCopyMulti；没有跨 peer 通信。
+ * 阅读下面 packN/i0/i1 时请按本版实际表达式跟踪，不要把单 rank 分段公式代入多 rank Ring。
+ */
   __device__ __forceinline__ void oneRankReduce() {
     ncclWork *w = &ncclShmem.work;
     int tid = threadIdx.x;

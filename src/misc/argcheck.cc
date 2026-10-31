@@ -33,6 +33,11 @@ ncclResult_t PtrCheck(void* ptr, const char* opname, const char* ptrname) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 除参数检查外还统一计量：先计算 count*datatypeSize，将 AllGather/Broadcast 转成字节类型。
+ * AllGather/ReduceScatter 的 nBytes 再乘 nRanks，因为公开 count 是单 rank 的贡献/输出规模。
+ * 因此 nBytes、内部 count 与公开 API count 不能跨不同 collective 直接套同一解释。
+ */
 ncclResult_t ArgsCheck(struct ncclInfo* info) {
   // First, the easy ones
   if (info->root < 0 || info->root >= info->comm->nRanks) {
@@ -43,6 +48,14 @@ ncclResult_t ArgsCheck(struct ncclInfo* info) {
     WARN("%s : invalid type %d", info->opName, info->datatype);
     return ncclInvalidArgument;
   }
+/* 中文精读：API 参数归一化，分片公式从这里开始
+ * 输入 count 的单位是用户 datatype 元素；先乘类型大小得到 nBytes。
+ * AllGather/Broadcast 只复制，不需要按数值类型运算，因此 count 换成字节且 datatype 换成 Int8。
+ * AllGather 的 sendcount、ReduceScatter 的 recvcount 都是每 rank 的片段长度，
+ * 用于性能模型和 Proxy 循环的 nBytes 再乘 nRanks；设备 args->count 仍表示单段长度。
+ * 例：4 rank、每 rank 8 个 float，AG 的原始 count=8，归一后 count=32 字节、nBytes=128；
+ * RS 的 count=8 个 float、nBytes=128 字节。二者设备下标单位因此不同。
+ */
   // Type is OK, compute nbytes. Convert Allgather/Broadcast/P2P calls to chars.
   info->nBytes = info->count * ncclTypeSize(info->datatype);
   if (info->coll == ncclFuncAllGather || info->coll == ncclFuncBroadcast) {

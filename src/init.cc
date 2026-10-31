@@ -184,6 +184,16 @@ NCCL_PARAM(AggChannelSize, "AGG_CHANNEL_SIZE", -2);
 NCCL_PARAM(DisableGraphHelper, "GRAPH_HELPER_DISABLE", 0);
 NCCL_PARAM(GraphRegister, "GRAPH_REGISTER", 0);
 
+/* 中文导读：
+ * 创建一个 rank 的 communicator 基础状态，分配控制字段、队列及同步对象。
+ * 此阶段与后面的拓扑搜索/transport 建链分开；不能在此把 channels 数组大小解释为硬件连接数。
+ */
+/* 中文精读：总对象的分配不等于所有连接已建立
+ * 先分配 comm、peer 标记、事件、P2P 排队表与初始状态；通道 id 用 -1 表示尚未 init。
+ * 通信组中的每个 rank 各有一份 comm；同进程多 GPU 还会共享本地发射协调所需的某些对象。
+ * 后面要经历拓扑搜索、initChannel、transport setup/connect，才能拿到可用的设备连接指针。
+ * 读资源生命周期时，应把 comm 分配、channel 分配和 backend 连接分配分成三个阶段。
+ */
 static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   if (ndev < 1) {
     WARN("invalid device count (%d) requested", ndev);
@@ -271,6 +281,16 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 在连接与 channel 配置完成后，构造 GPU 端 communicator/channel 视图。
+ * GPU 后续从这些对象取 peer 连接和工作 FIFO；主机端与设备端对象有不同地址及职责。
+ */
+/* 中文精读：CPU 总对象怎样交给 GPU
+ * ncclComm 中有 pthread/socket/拓扑模型，GPU 无需也不能把它们当作设备对象使用。
+ * 这里构造 ncclDevCommAndChannels，复制 rank/nRanks/buffSizes/abortFlag 与 channel 设备视图。
+ * peers 要指向 devPeers，workFifoDev 要指向 GPU 可读取的位置；设备 kernel 再拷到共享内存。
+ * 因此调试 host 地址与 device 地址时必须辨认当前字段属于哪一侧，不能只看结构体名字相同。
+ */
 static ncclResult_t devCommSetup(ncclComm_t comm) {
   ncclDevCommAndChannels *devCommAndChans;
   NCCLCHECK(ncclCudaCalloc(&devCommAndChans, 1));
@@ -325,6 +345,12 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
   return ncclSuccess;
 }
 
+/* 中文精读：内部环顺序怎样映射回用户 rank
+ * 拓扑搜索可以把 GPU 排成任意有利于带宽的顺序，用户的 rank 编号不随之改变。
+ * setupChannel 把环顺序旋转到本 rank 开头，写入 userRanks/devUserRanks，并算 ring.index。
+ * AllGather/ReduceScatter 用用户 rank 决定输出/输入段位置；AllReduce 用内部环 index 排算法块。
+ * 物理相邻 GPU、用户 rank 相邻、环顺序相邻是三种关系，应分别跟踪。
+ */
 static ncclResult_t setupChannel(struct ncclComm* comm, int channelId, int rank, int nranks, int* ringRanks) {
   TRACE(NCCL_INIT, "rank %d nranks %d", rank, nranks);
   NCCLCHECK(initChannel(comm, channelId));
@@ -448,6 +474,19 @@ NCCL_PARAM(GraphDumpFileRank, "GRAPH_DUMP_FILE_RANK", 0);
 NCCL_PARAM(CollNetNodeThreshold, "COLLNET_NODE_THRESHOLD", 2);
 NCCL_PARAM(NvbPreconnect, "NVB_PRECONNECT", 1);
 
+/* 中文导读：
+ * 初始化主流程：bootstrap 元数据交换 → 硬件拓扑/路径 → 通信图搜索与全局拼接 → transport 建链。
+ * Ring/Tree 使用已选出的邻居连接；随后建立性能模型并计算 P2P channel 布局。
+ * 函数名中的 transport 不只代表 IB；同机 GPU 可以选择 P2P/SHM，跨机通常选择 NET。
+ */
+/* 中文精读：初始化主干，按下面的阶段阅读
+ * 1. Bootstrap 建立控制网络，交换 peerInfo，识别 host/process/device 和同机 rank。
+ * 2. 构造硬件拓扑，计算 P2P/GDR 路径，裁剪不可用节点，再计算实际通信域内路径。
+ * 3. 创建 Proxy 服务，搜索 Ring/Tree/CollNet 候选图；各 rank 交换结果并收敛到共同配置。
+ * 4. Preset/Postset 将机内顺序与机间端点拼成完整 ring/tree，分配 channel 并建立邻居连接。
+ * 5. 调优模型、P2P channel 映射、共享资源和启动参数就绪后，devCommSetup 复制设备视图。
+ * 这里的 bootstrapAllGather 是 CPU 控制信息交换，不是调用公开 ncclAllGather GPU API。
+ */
 static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* commId) {
   // We use 2 AllGathers
   // 1. { peerInfo, comm, compCap}
@@ -459,6 +498,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   TRACE(NCCL_INIT, "comm %p, commHash %lx, rank %d nranks %d - BEGIN", comm, commHash, rank, nranks);
   NCCLCHECK(bootstrapInit(commId, comm));
 
+/* 中文导读：
+ * 这一轮 AllGather 是 bootstrap 控制面操作，交换 peerInfo，而非用户调用的 GPU AllGather 集合通信。
+ * 使用 hostHash/pidHash/busId 等识别主机、进程和 GPU，为去重、路径选择和 IPC 建立依据。
+ */
   // AllGather1 - begin
   NCCLCHECK(ncclCalloc(&comm->peerInfo, nranks+1)); // Extra rank to represent CollNet root
   NCCLCHECK(fillInfo(comm, comm->peerInfo+rank, commHash));
@@ -473,6 +516,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 
   // AllGather1 - end
 
+/* 中文导读：
+ * 先算路径、裁剪不可达/无用节点，再重算路径；搜索器只在有效硬件子图上工作。
+ * GPU 物理互联能力、网卡亲和性与后端 GDR 支持共同影响最终路径。
+ */
   // Topo detection / System graph creation
   NCCLCHECK(ncclTopoGetSystem(comm, &comm->topo));
   // Compute paths between GPUs and NICs
@@ -499,6 +546,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Launch proxy service thread
   NCCLCHECK(ncclProxyCreate(comm));
 
+/* 中文导读：
+ * 分别搜索 Ring、Balanced Tree 和 CollNet 图。本版本 Ring 初始搜索上限是 MAXCHANNELS/2。
+ * 后续 Postset 会拼接节点并可能复制 channel；最终 comm->nChannels 不能只看这里的 maxChannels。
+ */
   // Get rings and trees
   struct ncclTopoGraph ringGraph;
   ringGraph.id = 0;
@@ -671,6 +722,12 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
     comm->collNetSupport = std::min(allGather3Data[i].collNetSupport, comm->collNetSupport);
   }
 
+/* 中文精读：跨 rank 收敛后的 channel 数
+ * 各 rank/节点的本地图搜索结果可能不同，前面的 AllGather 后用最小可用通道/速度收敛。
+ * 这里把 Ring/Tree 对齐到共同数量；后续 TopoPostset 还会复制通道并应用 MIN/MAX 约束。
+ * 所以 graph 搜索日志的 nChannels、最终 comm->nChannels、本次 API 的 info->nChannels
+ * 处于三个阶段，不能拿其中一个数代表另外两个。
+ */
   comm->nChannels = treeGraph.nChannels = ringGraph.nChannels = std::min(treeGraph.nChannels, ringGraph.nChannels);
   if (comm->nChannels < nChannelsOrig) {
     // We started duplicating channels during Preset(), so we need to move the
@@ -720,6 +777,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 
   NCCLCHECK(computeBuffSizes(comm));
 
+/* 中文导读：
+ * 每个 channel 先标记 Ring 前驱接收/后继发送，再统一 Setup 交换句柄并建链。
+ * connectSend/connectRecv 是待建链位图；已 connected 的同槽连接不重复创建。
+ */
   // Connect with prev/next for each ring
   for (int c=0; c<comm->nChannels; c++) {
     struct ncclChannel* channel = comm->channels+c;
@@ -731,6 +792,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   free(rings);
   INFO(NCCL_INIT, "Connected all rings");
 
+/* 中文导读：
+ * 在同一个连接索引 0 上补齐 Tree 的父子双向边。
+ * 若 Ring 已经连接了相同 channel/peer/方向，连接标记逻辑会复用该对象，不能简单相加 Ring 与 Tree 边数。
+ */
   // Connect Trees
   for (int c=0; c<comm->nChannels; c++) {
     struct ncclChannel* channel = comm->channels+c;
@@ -813,6 +878,10 @@ collnet_cleanup:
     NCCLCHECK(ncclTopoTuneModel(comm, minCompCap, maxCompCap, &treeGraph, &ringGraph, &collNetGraph));
   } while(0);
 
+/* 中文导读：
+ * 计算 P2P 总 channel 空间与每 peer channel 数，生成映射；这一步不等于对所有 rank 全互联。
+ * 普通 Send/Recv 还会在任务出现时记录待连接位图，由 GroupEnd 预连接路径处理。
+ */
   // Compute nChannels per peer for p2p
   NCCLCHECK(ncclTopoComputeP2pChannels(comm));
 
@@ -899,6 +968,10 @@ affinity_restore:
 
 NCCL_PARAM(SetStackSize, "SET_STACK_SIZE", 0);
 
+/* 中文导读：
+ * 真正执行单 rank 初始化的工作函数：切换 CUDA 设备，分配 communicator，建立拓扑/连接，配置设备视图。
+ * Sync 指这里执行初始化流程，不代表后续集合通信会同步等待 GPU 完成。
+ */
 ncclResult_t ncclCommInitRankSync(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
   ncclResult_t res;
 
@@ -923,6 +996,10 @@ cleanup:
   return res;
 }
 
+/* 中文导读：
+ * 公开初始化 API 与实际初始化之间的调度层。
+ * 处于 group 时记录异步初始化任务，最外层 GroupEnd 再启动线程，使同进程多 GPU 初始化能够相互握手。
+ */
 static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
   ncclResult_t res;
   char* env = getenv("NCCL_COMM_ID");
@@ -965,6 +1042,12 @@ ncclResult_t ncclCommInitRank(ncclComm_t* newcomm, int nranks, ncclUniqueId comm
 }
 
 NCCL_API(ncclResult_t, ncclCommInitAll, ncclComm_t* comms, int ndev, const int* devlist);
+/* 中文精读：单进程多 GPU 初始化的便捷接口
+ * 为 devlist 指定的各 GPU 生成同一个 uniqueId，并用 Group 包住多次 InitRankDev。
+ * 这样这些 rank 的初始化能够并行推进，避免第一个 rank 等待尚未开始初始化的其他 rank。
+ * 它面向单进程本地设备；多进程/多机器通常由应用分发 uniqueId 后各自调用 ncclCommInitRank。
+ * 这里 ndev 是 communicator 的 rank 数，不意味着创建一个覆盖整个集群的硬件对象。
+ */
 ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   NCCLCHECK(PtrCheck(comms, "CommInitAll", "comms"));
@@ -1000,6 +1083,10 @@ static ncclResult_t ncclGraphHelperDestroy(ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 销毁 communicator 的完整生命周期入口之一：协调后台服务与图辅助资源，再释放通道及主机/设备状态。
+ * 做资源统计时要区分单次操作完成、连接仍驻留和 communicator 最终销毁，三者释放范围不同。
+ */
 static ncclResult_t commDestroy(ncclComm_t comm) {
   // Try and prevent a double free of the comm struct (user error)
   if (comm->rank == -1 || comm->nRanks <= 0 || comm->cudaDev == -1 || comm->busId == -1) {
@@ -1049,6 +1136,12 @@ ncclResult_t ncclCommDestroy(ncclComm_t comm) {
 }
 
 NCCL_API(ncclResult_t, ncclCommAbort, ncclComm_t comm);
+/* 中文精读：异常中止与正常销毁的区别
+ * abortFlag 是映射给 GPU 的中止信号，设备原语在自旋中周期检查它以便退出异常等待。
+ * Proxy/socket 路径也有退出协调；Abort 随后进入资源清理。它不是一次正常的 collective 完成通知。
+ * 应用正常路径先确保相关 CUDA 工作生命周期正确，再 Destroy；异步错误可用 GetAsyncError 查询。
+ * 本版本不包含后来版本的 InitRankConfig/Split 等 API，不应套用新版对象生命周期。
+ */
 ncclResult_t ncclCommAbort(ncclComm_t comm) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   if (comm == NULL)

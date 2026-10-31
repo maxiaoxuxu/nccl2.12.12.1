@@ -486,6 +486,12 @@ ncclResult_t ncclSocketInit(struct ncclSocket* sock, union ncclSocketAddress* ad
   return ncclSuccess;
 }
 
+/* 中文精读：TCP 是字节流，必须保存部分完成的 offset
+ * 一次 send/recv 可能只推进一部分数据，非阻塞还可能返回 EAGAIN/EWOULDBLOCK。
+ * 这里按 offset 累积进度，block 参数区分尽力推进与持续等待，并检查连接关闭/中止状态。
+ * bootstrap 控制消息和 Socket 数据后端都复用这些基础函数，但二者上层消息语义不同。
+ * 读网络日志时，应先分清是控制 socket 建链失败，还是数据 socket 在传输中失败。
+ */
 static ncclResult_t ncclSocketProgressOpt(int op, struct ncclSocket* sock, void* ptr, int size, int* offset, int block, int* closed) {
   int bytes = 0;
   *closed = 0;

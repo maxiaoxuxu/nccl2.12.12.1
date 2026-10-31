@@ -28,6 +28,12 @@
  *    / \     / \     /  \     \
  *   1   3   5   7   9   11    13
  */
+/* 中文精读：用 rank 位模式生成二叉树
+ * 最低置位 bit 决定当前 rank 在树中的层级，翻转/提升该位构造父节点，bit/2 构造孩子。
+ * rank=0 单独作为根，-1 表示不存在的父/子；非 2 的幂规模要额外处理越界孩子。
+ * 这里处理的 rank 可是节点级别编号，由 connectTrees 再映射到实际 GPU rank。
+ * 它负责生成邻接关系，不分配通信缓冲，也不发起 GPU 归约。
+ */
 ncclResult_t ncclGetBtree(int nranks, int rank, int* u, int* d0, int* d1, int* parentChildType) {
   int up, down0, down1;
   int bit;
@@ -84,6 +90,12 @@ ncclResult_t ncclGetBtree(int nranks, int rank, int* u, int* d0, int* d1, int* p
  *     2       6       10           3       7       11
  *    / \     / \     /  \         / \     / \     /  \
  *   1   3   5   7   9   11       2   4   6   8  10   12
+ */
+/* 中文精读：互补树的生成方法
+ * 第一棵直接用 Btree；偶数规模把 rank 做镜像，奇数规模则循环平移，得到第二棵。
+ * 把变换后的父/子编号再映射回原 rank，保证两棵树都覆盖同一批节点。
+ * 这样第一棵中的叶节点可承担第二棵的中间节点工作，改善节点级负载分布。
+ * 第二棵不是把第一棵的数据方向反转；每棵在 AllReduce 中仍有向上归约和向下广播。
  */
 ncclResult_t ncclGetDtree(int nranks, int rank, int* s0, int* d0_0, int* d0_1, int* parentChildType0, int* s1, int* d1_0, int* d1_1, int* parentChildType1) {
   // First tree ... use a btree

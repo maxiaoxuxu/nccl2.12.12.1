@@ -74,3 +74,7 @@ $ ./build/all_reduce_perf -b 8 -e 256M -f 2 -g <ngpus>
 ## Copyright
 
 All source code and accompanying documentation is copyright (c) 2015-2020, NVIDIA CORPORATION. All rights reserved.
+
+## 中文源码导读
+
+本仓库的中文注释、调用流程与关键数据结构说明见 [NCCL 2.12.12 中文源码导读](docs/zh_CN/README.md)。其中包含 [初始化与 GPU 执行](docs/zh_CN/execution.md) 及 [Proxy、IB 和 QP/MR 核算](docs/zh_CN/rdma.md)。

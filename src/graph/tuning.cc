@@ -74,6 +74,16 @@ static const double ll128MaxBwPerCh = 20.0;
 static const double llMaxBws[2][3] = { /* Volta-N1/Intel-N2/Intel-N4) */ {39.0, 39.0, 20.4}, /* Ampere-N1/AMD-N2/AMD-N4) */ {87.7, 22.5 /*avg of ring & tree*/, 19.0} };
 static const double perChMaxTreeBws[2][3] = { /* Volta (N1/N2/N4) */ {26.5, 18.5, 10.0}, /* Ampere (N1/N2/N4) */ {24.0, 23.6, 17.8} };
 
+/* 中文导读：
+ * 按函数×算法×协议建立延迟、带宽和线程阈值模型，并应用 NCCL_ALGO/NCCL_PROTO 等筛选。
+ * 模型供每次操作选路使用；初始化支持的算法不意味着某次操作都会执行它们。
+ */
+/* 中文精读：从硬件图生成算法的性能模型
+ * 建立 coll × algorithm × protocol 的带宽和延迟表，结合 GPU 架构、节点数和图搜索结果。
+ * 某组合带宽为 0 表示不可用；NCCL_ALGO/NCCL_PROTO 等环境配置可进一步限制候选。
+ * 这里并不实际运行一次每种算法来测当前张量，而是使用经验模型指导后面的 getAlgoInfo。
+ * 选择算法与选择 transport 是两层决策：Ring 同样可以混合使用本地 P2P 与跨机 NET。
+ */
 ncclResult_t ncclTopoTuneModel(struct ncclComm* comm, int minCompCap, int maxCompCap, struct ncclTopoGraph* treeGraph, struct ncclTopoGraph* ringGraph, struct ncclTopoGraph* collNetGraph) {
   int simpleDefaultThreads = (ringGraph->speedIntra*ringGraph->nChannels <= PCI_WIDTH) ? 256 : NCCL_SIMPLE_MAX_NTHREADS;
   comm->maxThreads[NCCL_ALGO_RING][NCCL_PROTO_SIMPLE] =
@@ -270,6 +280,16 @@ static float treeCorrectionFactor[NCCL_NUM_PROTOCOLS][23] = {
   {  .9,  .9,  .9,  .9,  .9,  .9,  .9,  .8,  .7,  .6,  .6,  .5,  .5,  .5,  .5,  .6,  .7,  .8,  .7,  .7,  .8,  .9,  .9 }
 };
 
+/* 中文导读：
+ * 依据模型估计候选执行时间，核心形式为延迟项加消息字节数/带宽项，并有大小与拓扑修正。
+ * bw==0 表示该组合不可用。这里返回预测值，不是实测计时，也不是简单固定的小包/大包分界。
+ */
+/* 中文精读：为什么小消息和大消息可能选择不同算法
+ * 预测 time = latency*latCount + nBytes/(1000*bw)，带宽按 GB/s、延迟按微秒的约定换算。
+ * 小消息常由固定延迟主导，大消息更受有效带宽影响；Tree/Ring/协议各有不同参数和修正。
+ * 聚合时 numPipeOps 影响延迟计数，info->nChannels 非零时也要按所用通道比例调整带宽。
+ * 这是选路估计，不是本次运行的实测耗时，更不是对通信正确性的依赖条件。
+ */
 ncclResult_t ncclTopoGetAlgoTime(struct ncclInfo* info, int algorithm, int protocol, int numPipeOps, float* time) {
   float bw = info->comm->bandwidths[info->coll][algorithm][protocol];
   float lat = info->comm->latencies[info->coll][algorithm][protocol];

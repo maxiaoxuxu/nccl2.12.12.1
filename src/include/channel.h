@@ -10,6 +10,10 @@
 
 ncclResult_t initChannel(struct ncclComm* comm, int channelid);
 ncclResult_t freeChannel(struct ncclChannel* channel, int nRanks);
+/* 中文导读：
+ * 根据节点相对距离和节点内 rank 顺序计算 peer 的基准 channel。
+ * Send 与 Recv 的相反方向公式保证两端为匹配的通信选出一致通道，而非按 peer 独占一个 channel。
+ */
 static ncclResult_t ncclChannelComputeBase(struct ncclComm* comm, int peer, int coll, int*channelBase) {
   int p2pGroupSize = NCCL_MAX_WORK_ELEMENTS_P2P/2;
   int peerNode = comm->rankToNode[peer];
@@ -30,6 +34,10 @@ static ncclResult_t ncclChannelComputeBase(struct ncclComm* comm, int peer, int 
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 将基准值加上预先生成的 channel 偏移，再对 P2P 总 channel 数取模。
+ * 不同 peer 可以映射到相同 channel；其连接仍通过 peers[peer] 分开。
+ */
 static ncclResult_t ncclChannelComputeFromBase(struct ncclComm* comm, int base, int channelInc, int*channelId) {
   *channelId = (base+comm->p2pChannels[channelInc]) % comm->p2pnChannels;
   return ncclSuccess;

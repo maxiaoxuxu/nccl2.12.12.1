@@ -14,6 +14,12 @@
 #include <algorithm> // For std::min/std::max
 #include "nccl.h"
 
+/* 中文精读：公开符号与实现函数的关系
+ * NCCL_API 宏为导出的 C API 设置可见性，extern C 避免 C++ 名字改编。
+ * PROFAPI 模式还提供 pnccl 前缀别名/弱符号，供性能分析工具拦截常规 API。
+ * 这些是主机链接层机制，不是 GPU kernel 入口；kernel 由 collectives 的设备宏单独生成。
+ * ncclTypeSize 则是 count 元素数与物理字节数转换的统一小工具。
+ */
 #ifdef PROFAPI
 #define NCCL_API(ret, func, args...)        \
     __attribute__ ((visibility("default"))) \

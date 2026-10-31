@@ -69,6 +69,10 @@ class Primitives<
   }
 
   template <int DirectRecv, int DirectSend, int Recv, int Send, int Src, int Dst>
+/* 中文导读：
+ * 在真正读写数据前等待输入就绪或输出槽位有空闲，并根据 direct/shared 能力计算本次地址。
+ * 等待依据连接进度与 slot，而非每次都做一次全 communicator 同步；中止标志用于打破异常等待。
+ */
   __device__ __forceinline__ void waitPeer(intptr_t dstIx, intptr_t remoteIx, int offset, int nelts) {
     const bool isSendNotRecv = (Send && Recv) ? (flags & RoleWaitSend) : Send;
     const bool noRecvWait = DirectRecv && Src && (flags & DirectRead);        // no wait when directly reading from remote input
@@ -76,6 +80,12 @@ class Primitives<
     if (((flags & (Recv*RoleWaitRecv)) && !noRecvWait) ||
         ((flags & (Send*RoleWaitSend)) && !noSendWait)) {
       int spins = 0;
+/* 中文精读：把 waitPeer 的不等式读成人话
+ * 发送等待：消费者 head + 8 >= 本次结束 step，表示环形数据槽尚未被覆盖，可以写。
+ * 接收等待：生产者 tail >= 本次结束 step，表示所需数据已经发布，可以读。
+ * connStepCache 先用寄存器缓存，只有不足时才反复读取共享进度，减少热路径访存。
+ * DirectRead/Write 在满足协议契约时能跳过部分等待，但仍要遵守指针交换与生命周期约束。
+ */
       while (connStepCache + (isSendNotRecv ? NCCL_STEPS : 0) < step + StepPerSlice) {
         connStepCache = *connStepPtr;
         if (checkAbort(spins)) break;
@@ -116,6 +126,10 @@ class Primitives<
   }
 
   template<int Recv, int Send>
+/* 中文导读：
+ * 完成本 slice 后发布对应连接的进度，使远端/GPU/Proxy 能消费数据或回收槽位。
+ * 必须结合 genericOp 中的数据写入、线程同步和 fence 阅读，只有 volatile 不能单独保证所有可见性。
+ */
   inline __device__ void postPeer() {
     if (flags & (Recv*RolePostRecv | Send*RolePostSend)) {
       step += StepPerSlice;
@@ -124,6 +138,10 @@ class Primitives<
   }
 
   template <int DirectRecv1, int DirectSend1, int Recv, int Send, int SrcBuf, int DstBuf>
+/* 中文导读：
+ * Simple 协议的组合原语核心，模板参数选择收/发、本地输入/输出及 direct 访问。
+ * 按 slice 等待、装配源/目标指针、执行融合复制/归约、同步并发布进度，避免为每个步骤另启 kernel。
+ */
   __device__ __forceinline__ void genericOp(
       intptr_t srcIx, intptr_t dstIx, intptr_t remoteIx, int nelem, bool postOp
     ) {
@@ -132,6 +150,12 @@ class Primitives<
     constexpr int Src = SrcBuf != -1;
     constexpr int Dst = DstBuf != -1;
 
+/* 中文精读：尾块、空块与通信进度
+ * 某 channel 的尾部 offset 可能已经超出 size，算法会传入非正 nelem；这里归一到 0。
+ * 空数据仍须按固定 SlicePerChunk 推进同步和 step，不能简单 return 导致另一端永远等进度。
+ * sliceSize 根据 nelem、片数与 step 容量调小，并保留最小搬运粒度，改善小尾块的延迟。
+ * 它是有效元素数，乘 sizeof(T) 后才是 sizesFifo 中交给 Proxy 的字节数。
+ */
     nelem = nelem < 0 ? 0 : nelem;
     int sliceSize = stepSize*StepPerSlice;
     sliceSize = max(divUp(nelem, 16*SlicePerChunk)*16, sliceSize/32);
@@ -194,6 +218,12 @@ class Primitives<
              Dst, (T**)ncclShmem.groups[group].dsts,
              sliceSize);
         } else {
+/* 中文精读：多个原语怎样共享一个融合搬运内核
+ * srcs 合并“本地输入（如果有）+ 接收邻居”，dsts 合并“本地输出（如果有）+ 发送邻居”。
+ * ReduceOrCopyMulti 对同一批加载值执行归约并写入多个目标，避免先写临时结果再启动另一个 kernel。
+ * PreOpN 限定哪些源需要输入预处理；postOp 只在全局结果完成处执行，例如整数平均最后除法。
+ * 中间转发如果重复应用最终 postOp，会改变数学结果，因此算法层明确传 true/false。
+ */
           constexpr int PreOpN = SrcBuf != Input ? 0 :
                                  DirectRecv*MaxRecv == NCCL_MAX_DIRECT_ARITY ? (1+NCCL_MAX_DIRECT_ARITY) : 1;
           ReduceOrCopyMulti<Unroll, RedOp, T, Recv+Src, Recv*MaxRecv+Src, Send+Dst, Send*MaxSend+Dst, PreOpN>
@@ -211,6 +241,12 @@ class Primitives<
       } while (slice < SlicePerChunk && offset < nelem);
     }
 
+/* 中文精读：同步线程与复制线程必须走匹配的屏障
+ * worker 在上面的循环复制有效 slice，非 worker 直接进入这里参与同一组 barrier/postPeer。
+ * worker 遇到剩余空 slice 后也进入这里，确保所有参与线程的屏障次数一致。
+ * Send 发布 tail 之前先做系统级 fence，使数据写入对 GPU/CPU/NIC 协作路径可见。
+ * volatile 让进度被反复读取，barrier 协调本组线程，fence 约束可见性；三者职责不同。
+ */
     // Non-workers come straight here. Workers too but only once the remaining
     // slices are all empty. Since empty slices are the uncommon case, and
     // worker perf is the limiter, perf-wise this loop is effectively unentered,
@@ -303,6 +339,12 @@ class Primitives<
     }
   }
 
+/* 中文精读：把 connector 状态装入原语的线程角色
+ * 只有承担 WaitRecv/PostRecv 的特定线程加载对应连接和进度指针，其他线程负责搬运计算。
+ * 根据 direct/shared 能力选择指针交换、固定 FIFO 或 offsFifo 动态偏移。
+ * 接收一侧读 tail 等生产，写 head 释放消费；发送一侧读 head 等空间，写 tail 发布生产。
+ * 这里的 head/tail 是连接视图，具体位于哪一侧 CPU/GPU 内存由 transport connect 填好。
+ */
   __device__ __forceinline__ void loadRecvConn(ncclPeer *peer, int connIndex, struct ncclWorkElem* e) {
     if (flags & (RoleWaitRecv|RolePostRecv)) {
       auto *conn = &peer->recv[connIndex].conn;
@@ -387,6 +429,12 @@ class Primitives<
   }
 
  public:
+/* 中文精读：构造原语就是建立本次线程组的执行上下文
+ * tid/nthreads 是本原语线程组内编号，不一定等于整个 block 的线程数。
+ * 扫描有效 recvPeers/sendPeers 决定 fan；把部分线程指定为 Wait/Post/Input/Output 角色。
+ * group 的低位区分共享内存/命名 barrier 组，高位携带 connIndex，P2P 使用索引 1。
+ * 最后装载连接并交换 direct 指针；匹配双方必须执行相容构造路径，否则可能在交换阶段等待。
+ */
   __device__ Primitives(
       int tid, int nthreads, int const *recvPeers, int const *sendPeers,
       void const *inputBuf, void *outputBuf, uint64_t redOpArg, uint32_t group=0, struct ncclWorkElem* e = nullptr
@@ -434,6 +482,12 @@ class Primitives<
     setDataPtrs(inputBuf, outputBuf, redOpArg, (struct ncclWorkElemReg*)e);
   }
 
+/* 中文精读：step 必须跨原语对象和操作保留
+ * 原语内部推进的 step 先保存在各个角色线程的局部状态，析构时写回连接 conn->step。
+ * 下一个操作继续同一进度，避免旧 flag/旧槽位内容被误认为本次新数据。
+ * 析构还要保证线程同步满足协议要求，不仅仅是 C++ 对象释放内存。
+ * 这也是不能把一次原语调用解释为“重新创建一条连接”的原因。
+ */
   __device__ ~Primitives() {
     // Ensure ncclShmem.groups[].send/recvConns are available
     if (!(flags & ThreadsSynced))
@@ -533,6 +587,13 @@ class Primitives<
       userBuff += delta;
   }
 
+/* 中文精读：从原语名字反推源与目的
+ * send: 本地 input -> 下游；recv: 上游 -> 本地 output；copySend: input -> output 和下游。
+ * recvReduceSend: 上游 + 本地 input -> 下游；recvReduceCopy: 上游 + input -> output。
+ * recvCopySend: 上游 -> output 和下游；recvReduceCopySend: 上游 + input -> output 和下游。
+ * 下面每个包装仅选择 genericOp 的模板位，不会每次单独发射 CUDA kernel。
+ * Input/Output 下标都是 T 元素偏移；remoteOutIx 只在 direct 访问远端用户缓冲时需要。
+ */
   __device__ __forceinline__ void send(intptr_t inpIx, int eltN) {
     genericOp<0, 0, 0, 1, Input, -1>(inpIx, -1, -1, eltN, false);
   }

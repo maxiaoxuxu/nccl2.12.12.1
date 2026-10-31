@@ -301,6 +301,12 @@ ncclResult_t sharedListen(struct ncclComm* comm, int netDev, void* collNetHandle
   return ncclSuccess;
 }
 
+/* 中文精读：CollNet 连接共享的作用域
+ * 按 netDev 管理共享资源与引用计数，多个逻辑 channel 可引用同一 collNetComm。
+ * 首次建立时用参与者句柄数组和 rank 信息调用插件 connect；后续路径只增加引用。
+ * 最后一个使用者释放时才 closeColl，避免某条逻辑连接释放后破坏仍在使用的共享对象。
+ * 这里的共享是 NCCL/插件对象生命周期，内部有多少 QP/MR 必须继续看具体插件。
+ */
 static ncclResult_t sharedConnect(struct ncclComm* comm, int netDev, struct ncclConnect* connectInfos, int nranks, int rank, void** collNetComm) {
   struct sharedResources* resources = (struct sharedResources*)comm->proxyState.progressState.collNet.resources;
   if (resources->collNetComms[netDev] == NULL) {
@@ -555,6 +561,12 @@ static ncclResult_t recvProxyFree(struct ncclProxyConnection* connection, struct
 #define LAST_OF_GROUP(s) \
   (s % COLLNET_GROUP_NSUBS == COLLNET_GROUP_NSUBS-1 || s == args->nsubs-1)
 
+/* 中文精读：CollNet Proxy 与普通点对点 NET 的区别
+ * 普通 NET 提交 Isend/Irecv，CollNet 在 send 侧按准备好的槽位提交网络 Iallreduce 请求。
+ * recv 侧协同请求 FIFO、完成检查和 flush，再把结果可读进度发布给 GPU。
+ * 它需要插件承诺相同数据类型/归约操作语义；不是把任意一组 IB QP 自动变成硬件归约。
+ * 资源由 sharedConnect/sharedBuffers 等机制管理，不能把普通 net_ib 的每连接公式直接套过来。
+ */
 static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArgs* args) {
   if (args->protocol != NCCL_PROTO_SIMPLE) {
     WARN("CollNet does not support LL/LL128");
@@ -792,6 +804,10 @@ static ncclResult_t recvProxyProgress(struct ncclComm* comm, struct ncclProxyArg
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * CollNet transport 通过集合网络插件推进卸载通信，与普通 NET 的逐对 send/recv 连接模型不同。
+ * 其底层是否使用 SHARP、QP 如何复用由实际插件决定，不能套用 net_ib.cc 的 RC 连接公式。
+ */
 struct ncclTransport collNetTransport = {
   "COL",
   canConnect,

@@ -21,6 +21,12 @@ struct FuncNull {
 };
 
 template<typename T>
+/* 中文精读：数值操作层不负责通信
+ * FuncSum/Prod/Min/Max 只实现两个 T 数值如何结合，模板特化优化 int8、half2 等打包运算。
+ * 通信顺序与源/目标指针由算法和原语决定；这里没有网络请求，也不会创建新的 kernel。
+ * 改变 Ring/Tree 会改变浮点累加顺序，因此数学语义相同不意味着所有浮点结果逐位相同。
+ * preOp/postOp 把每个原始输入的预处理与最终输出的后处理分开，防止每个中间跳重复处理。
+ */
 struct FuncSum {
   __device__ FuncSum(uint64_t opArg=0) {}
   __device__ T operator()(const T x, const T y) const {
@@ -486,6 +492,12 @@ template<typename T, bool IsFloating=IsFloatingPoint<T>::value>
 struct FuncSumPostDiv;
 
 template<typename T>
+/* 中文精读：整数平均为何最后才做除法
+ * 先保持整数求和的组合运算，到结果完成的地方才对 n 做整数除法。
+ * 若每个 rank 先除 n，会提前截断小数，通常得不到 sum(x)/n 的整数结果。
+ * FuncTraits 把 postOp 暴露给 ReduceOrCopyMulti；算法仅在最终归约点传 postOp=true。
+ * 浮点平均使用另一种 PreMulSum 策略，不能把这里的整数实现泛化到所有数据类型。
+ */
 struct FuncSumPostDiv<T, /*IsFloating=*/false>: FuncSum<T> {
   static constexpr bool IsPreOpIdentity = true;
   static constexpr bool IsPostOpIdentity = false;
@@ -502,6 +514,12 @@ struct FuncSumPostDiv<T, /*IsFloating=*/true> {
 };
 
 template<typename T>
+/* 中文精读：标量值以位模式存入任务
+ * opArg 是 uint64_t 容器，这里按 T 重新解释其中位模式，并非把 uint64 整数数值转换成 T。
+ * 每个原始输入先乘 scale，之后仍使用继承的 Sum 归约；中间部分和不应重复乘 scale。
+ * 设备指针型标量已由 common.h 的 RedopPtrDeref 解引用，才走到这里构造函数。
+ * 因此调试 redOpArg 时，应同时查看 scalarArgIsPtr 和任务 datatype。
+ */
 struct FuncPreMulSum: FuncSum<T> { // integral T since all floats are specialized below
   static constexpr bool IsPreOpIdentity = false;
   static constexpr bool IsPostOpIdentity = true;

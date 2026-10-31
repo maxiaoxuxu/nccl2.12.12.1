@@ -40,6 +40,12 @@ struct ncclBuffRegInfo {
 };
 
 // Enqueue information (for kernel and proxy) for each operation
+/* 中文精读：一项操作为什么保存两份执行描述
+ * work 给 GPU，proxyOp 给 CPU 网络线程，buffRegInfo 保存特殊注册路径的地址信息。
+ * 主机只保存指针和尺寸等元数据，不在这里把整个用户张量复制进队列。
+ * 同一 QueueElem 展开到多个 channel 时，复制 work 模板并填写不同 bid/channelId。
+ * 这是一项 API 到多条 channel 任务的展开，不是一个 QueueElem 对应一个 RDMA 连接。
+ */
 struct ncclQueueElem {
   struct ncclWork work;
   struct ncclProxyOp proxyOp;
@@ -49,6 +55,12 @@ struct ncclQueueElem {
 typedef ncclRecyclableList<struct ncclQueueElem> ncclQueueElemList;
 
 // Structure passed to CUDA graph
+/* 中文精读：提交批次与 CUDA Graph 生命周期
+ * elemList 保存本批 API 生成的模板列表，maxChannels 保存本批最高 channel 范围。
+ * 普通路径 HostSetup 后可复用队列；Graph 路径必须把这个对象保留到图不再使用它。
+ * ret 记录 HostSetup 的错误，nRegBuffs 用来管理图注册缓冲的释放需求。
+ * 所以图 replay 的 HostSetup 不能假定捕获时 comm 的临时入队状态仍未改变。
+ */
 struct ncclQueueInfo {
   ncclComm_t comm;
   int maxChannels;    // Dynamic version of gridDim

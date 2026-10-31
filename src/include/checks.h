@@ -9,6 +9,12 @@
 
 #include "debug.h"
 
+/* 中文精读：阅读错误处理宏时要展开控制流
+ * CUDACHECK/NCCLCHECK 常在失败时立即 return；带 GOTO 的版本把错误保存在 res 并跳转清理标签。
+ * 因此同一函数里的 cleanup/end/cudaError 并非普通顺序执行，每条资源分配路径要配套分析。
+ * IGNORE 宏用于释放阶段尽力清理并继续，THREAD 宏用于把线程失败传回调用者。
+ * 错误处理宏本身不会替应用重试整个 collective；系统调用包装的临时 EINTR/EAGAIN 重试另有规则。
+ */
 // Check CUDA calls
 #define CUDACHECK(cmd) do {                                 \
     cudaError_t err = cmd;                                  \

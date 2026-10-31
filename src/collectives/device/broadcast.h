@@ -44,6 +44,13 @@ namespace {
       ssize_t offset = gridOffset + int(bid*realChunkSize);
       int nelem = min(realChunkSize, size-offset);
 
+/* 中文精读：Broadcast 如何把环变成从 root 开始的流水线
+ * 每个 channel 对相同张量不同区间并行；本 API 已归一化为 Int8，offset/nelem 用字节。
+ * root 发送，若输入输出不同则顺便本地复制；中间 rank recvCopySend；root 的前驱仅 recv。
+ * 这切断了最后一条回到 root 的边，防止重复发送和 root 等待并不需要的输入。
+ * 它不是先全量发完再由下一个 rank 发：slice 级别的原语使各 rank 能流水转发。
+ * 本文件提供的是 Ring 特化；看到调度器 pattern 有 TreeDown 不等于本文件实现了 Tree Broadcast。
+ */
       if (rank == root) {
         if (inputBuf == outputBuf) {
           prims.send(offset, nelem);

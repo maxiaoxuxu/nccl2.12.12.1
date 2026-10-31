@@ -170,6 +170,16 @@ ncclResult_t bootstrapCreateRoot(ncclUniqueId* id, bool idFromEnv) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 生成供所有 rank 共同使用的 bootstrap 标识，包含建立初始联络所需的信息。
+ * 应用仍需通过 MPI、socket 或其他机制分发此 ID；它不是 RDMA QPN，也不直接包含所有 GPU 数据连接。
+ */
+/* 中文精读：uniqueId 是引导会合信息
+ * 为初始化控制服务准备可分发的标识/地址信息；应用负责把同一份 id 发给所有参与 rank。
+ * 它不是全体数据 QP 的连接信息，也不装有每个 GPU 的用户张量地址。
+ * 各 rank 先联系 root 获取环邻居信息，再用 bootstrap 环交换设备、拓扑与 transport 建链摘要。
+ * 后续数据面可走 GPU P2P、SHM、IB 或 Socket，不受“bootstrap 使用 TCP”这一点限制。
+ */
 ncclResult_t bootstrapGetUniqueId(ncclUniqueId* id) {
   static_assert(sizeof(union ncclSocketAddress) < sizeof(ncclUniqueId), "NetId does not fit inside ncclUniqueId");
   memset(id, 0, sizeof(ncclUniqueId));
@@ -210,6 +220,10 @@ struct bootstrapState {
   volatile uint32_t *abortFlag;
 };
 
+/* 中文导读：
+ * 借助 root 联络各 rank，建立 bootstrap 的 socket 通道，并准备后续点对点元数据交换。
+ * 它解决如何先认识其他 rank；实际 P2P/SHM/NET 数据通路在后面另建。
+ */
 ncclResult_t bootstrapInit(ncclUniqueId * id, struct ncclComm* comm) {
   int rank = comm->rank;
   int nranks = comm->nRanks;
@@ -286,6 +300,10 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, struct ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文导读：
+ * 在 bootstrap 环上交换每个 rank 的固定大小元数据，供初始化阶段汇总信息。
+ * 此函数与 src/collectives/all_gather.cc 的用户数据集合通信是两套用途不同的实现。
+ */
 ncclResult_t bootstrapAllGather(void* commState, void* allData, int size) {
   struct bootstrapState* state = (struct bootstrapState*)commState;
   char* data = (char*)allData;
@@ -325,6 +343,12 @@ ncclResult_t bootstrapSend(void* commState, int peer, int tag, void* data, int s
   return ncclSuccess;
 }
 
+/* 中文精读：初始化屏障的范围和代价
+ * 用距离按 2 的幂增加的点对点控制交换完成所选 ranks 集合的会合。
+ * 参数 rank 是该集合中的局部下标，ranks 数组再把它映射到 communicator 的全局编号。
+ * 它用于初始化/资源协调，不是 CUDA stream 上用户计算的同步工具。
+ * 即使此函数返回，也不能推出之后排队的 GPU collective 已经执行完成。
+ */
 ncclResult_t bootstrapBarrier(void* commState, int *ranks, int rank, int nranks, int tag) {
   if (nranks == 1) return ncclSuccess;
   TRACE(NCCL_INIT, "rank %d nranks %d tag %x - ENTER", rank, nranks, tag);
@@ -403,6 +427,12 @@ ncclResult_t unexpectedDequeue(struct bootstrapState* state, int peer, int tag, 
 }
 
 // We can't know who we'll receive from, so we need to receive everything at once
+/* 中文精读：控制信息为什么也需要 peer/tag 匹配
+ * 监听 socket 到来的连接可能属于另一个 peer 或 tag，不能把先到的数据直接交给当前调用。
+ * 匹配的消息立即读取，不匹配的先放 unexpected 队列，留给之后对应的接收。
+ * 这是初始化控制消息的匹配机制；不要把此处 tag 当成公开 ncclSend/Recv 提供的用户 tag 参数。
+ * 公开 P2P API 没有显式用户 tag，应用应保证同 peer 的收发次序和长度一致。
+ */
 ncclResult_t bootstrapRecv(void* commState, int peer, int tag, void* data, int size) {
   struct bootstrapState* state = (struct bootstrapState*)commState;
 

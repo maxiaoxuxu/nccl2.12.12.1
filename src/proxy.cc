@@ -275,6 +275,12 @@ static ncclResult_t ProxyAppend(struct ncclProxyProgressState* state, struct ncc
   return ncclSuccess;
 }
 
+/* 中文精读：CPU 怎样唤醒数据面代理线程
+ * 生产者在互斥锁内把链表接到 opsPool；队列先前为空时用 pthread_cond_signal 唤醒等待线程。
+ * 不是每个 slice 都新建线程，也没有要求 GPU 主动发 CPU 中断。
+ * progress 线程活跃时会继续轮询网络请求与 GPU 进度，无任务时才在条件变量上睡眠。
+ * 任务发布的锁保护与数据缓冲的 head/tail/flag 协议不同，不能只保留其中一种同步。
+ */
 ncclResult_t ncclProxyPost(struct ncclProxyOpsPool* pool, int nextOps, int nextOpsEnd) {
   pthread_mutex_lock(&pool->mutex);
   if (pool->nextOps == -1) {
@@ -349,6 +355,12 @@ ncclResult_t ncclLocalOpAppend(struct ncclComm* comm, struct ncclProxyConnector*
   return ncclSuccess;
 }
 
+/* 中文精读：只有需要数据面 Proxy 的边才产生工作
+ * 先按 channel/peer/方向/connIndex 找 connector；peer=-1 是缺失邻居，可直接跳过。
+ * 若 transportComm->proxyProgress 为空，也直接返回：本地 GPU P2P/SHM 不必复制一份网络任务。
+ * 因此 API 即使调用 ProxySaveColl，也不意味着每个 channel 的每条边都启动 IB 传输。
+ * 实际追加的是连接上的元数据，数据仍由 GPU/协议缓冲/网络后端共同搬运。
+ */
 static ncclResult_t SaveProxy(struct ncclChannel* channel, int type, int peer, struct ncclProxyOp* op, int connIndex) {
   if (peer < 0) return ncclSuccess;
 
@@ -485,6 +497,12 @@ static ncclResult_t removeOp(struct ncclProxyProgressState* state, struct ncclPr
   return ncclSuccess;
 }
 
+/* 中文精读：Proxy 是反复调用的非阻塞状态机
+ * 遍历 active 操作，调用 args->progress（例如 NET 的 sendProxyProgress/recvProxyProgress）。
+ * 每次尽量推进若干阶段后返回；如果请求尚未完成，就保留 args 等下一轮，而非阻塞等待整个张量。
+ * 操作进入 None 后从活跃链移除，并推进同连接后继任务，维护连接上的顺序。
+ * 这种结构让一个线程交错服务多个 channel/peer，隐藏网络与 GPU 的等待时间。
+ */
 static ncclResult_t progressOps(struct ncclComm* comm, struct ncclProxyProgressState* state, struct ncclProxyArgs* opStart, int* idle) {
   struct ncclProxyArgs* prevOp = NULL;
   struct ncclProxyArgs* op = opStart;
@@ -594,6 +612,10 @@ void ncclDumpProxyState(int signal) {
   dumpProxyState(ncclLastProxyState);
 }
 
+/* 中文导读：
+ * 数据面后台推进循环：从共享任务池取得 ProxyOp，转成运行参数并轮询 active 操作的 progress 回调。
+ * 网络传输尚未完成时继续推进；空闲时让出 CPU。它不负责执行 GPU 上的逐元素归约。
+ */
 void* ncclProxyProgress(void *comm_) {
   struct ncclComm* comm = (struct ncclComm*)comm_;
   struct ncclProxyProgressState* state = &comm->proxyState.progressState;
@@ -634,6 +656,10 @@ void* ncclProxyProgress(void *comm_) {
   return NULL;
 }
 
+/* 中文导读：
+ * 将本批已记录的 Proxy 工作发布到对应代理的任务池，让 progress 线程能够开始推进。
+ * 它与 GPU FIFO 发布配合；Proxy 工作必须与 GPU 工作使用相同连接、协议和步数。
+ */
 ncclResult_t ncclProxyStart(struct ncclComm* comm) {
   struct ncclProxyOps* proxyOps = comm->proxyState.proxyOps;
   if (proxyOps == NULL) return ncclSuccess;
@@ -945,6 +971,16 @@ static ncclResult_t proxyConnSetupConnect(int type, struct ncclProxyLocalPeer* p
 
 #include <poll.h>
 
+/* 中文导读：
+ * 控制面服务循环：处理 Init/Setup/Connect/Close 等请求，并异步重试未完成的建链回调。
+ * 与 ncclProxyProgress 的数据面工作分开，因此看到 service 线程存在不代表当前一直有数据传输。
+ */
+/* 中文精读：服务线程与 Progress 线程是两类工作
+ * Service 监听控制 socket，处理连接初始化、共享初始化、setup/connect/free 等请求。
+ * Progress 轮询已建立连接上的数据传输；它在需要时创建，不是由每次 API 创建。
+ * PXN 等路径可让 GPU 使用同机另一 rank 的代理，因此 ProxyConnector 记录代理 rank/localRank。
+ * 排查卡住应分清是在建链控制请求阶段，还是已建链后的数据进度阶段。
+ */
 void* ncclProxyService(void* _args) {
   struct ncclComm* comm =  (struct ncclComm *) _args;
   if (cudaSetDevice(comm->cudaDev) != cudaSuccess) {

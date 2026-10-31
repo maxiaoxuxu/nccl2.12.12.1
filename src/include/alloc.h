@@ -16,6 +16,12 @@
 #include <string.h>
 
 template <typename T>
+/* 中文精读：三类常见内存的区别
+ * ncclCalloc 是普通 CPU 堆内存；ncclCudaHostCalloc 用 cudaHostAllocMapped 分配 GPU 可访问主机内存；
+ * ncclCudaCalloc 用 cudaMalloc 分配显存，并在专用 stream 上清零后等待完成。
+ * 模板参数 nelem 是元素数，内部乘 sizeof(T)，看调用时不要把元素数和字节数重复相乘。
+ * GPU 能访问主机内存不代表这块内存位于 SM 共享内存，更不代表访问成本等同于显存。
+ */
 static ncclResult_t ncclCudaHostCallocDebug(T** ptr, size_t nelem, const char *filefunc, int line) {
   CUDACHECK(cudaHostAlloc(ptr, nelem*sizeof(T), cudaHostAllocMapped));
   memset(*ptr, 0, nelem*sizeof(T));
@@ -85,6 +91,12 @@ static ncclResult_t ncclCudaMemcpy(T* dst, T* src, size_t nelem) {
 // Allocate memory to be potentially ibv_reg_mr'd. This needs to be
 // allocated on separate pages as those pages will be marked DONTFORK
 // and if they are shared, that could cause a crash in a child process
+/* 中文精读：为何为可能注册的缓冲单独按页分配
+ * verbs 的 fork 支持会对注册页施加 DONTFORK 等处理；若与普通小对象共用页，可能影响子进程。
+ * 这里按系统页尺寸对齐并独占所需页，随后具体后端才调用 reg_mr。
+ * 分配内存与创建 MR 是两个步骤，拥有一块缓冲不自动消耗一个 MR 注册项。
+ * 页对齐也与后端 MR 缓存键相关，但不意味着不同 PD/NIC 上的注册可任意共享。
+ */
 static ncclResult_t ncclIbMallocDebug(void** ptr, size_t size, const char *filefunc, int line) {
   size_t page_size = sysconf(_SC_PAGESIZE);
   void* p;

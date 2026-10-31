@@ -14,6 +14,12 @@
 /********************* Internode connection ***********************/
 /******************************************************************/
 
+/* 中文精读：先构造机内片段，再交换跨机拼接信息
+ * 搜索图 intra 给出每条 channel 的机内 GPU 顺序，inter 给出网络端点。
+ * Preset 把这些顺序写成局部 ring.prev/next 与 tree 上下关系，并导出 ncclTopoRanks。
+ * 各 rank 交换该摘要后，Postset 才知道每台机器应与哪些远端端点拼接。
+ * 先本地搜索、后全局拼接，避免每个 rank 独立猜测一个互不一致的完整集群拓扑。
+ */
 ncclResult_t ncclTopoPreset(struct ncclComm* comm,
     struct ncclTopoGraph* treeGraph, struct ncclTopoGraph* ringGraph,
     struct ncclTopoRanks* topoRanks) {
@@ -65,6 +71,12 @@ ncclResult_t ncclTopoPreset(struct ncclComm* comm,
   return ncclSuccess;
 }
 
+/* 中文精读：把多台机器的局部链串成全局环
+ * 每节点机内 ring 片段有入口 ringRecv 和出口 ringSend。
+ * 按节点顺序，把本节点出口接到下一节点入口，同时补全相应 prev/next。
+ * 每个 rank 最终只需要知道本 channel 的直接前驱和后继；完整顺序再由 BuildRings 检查生成。
+ * 环中节点很多并不意味着每个 rank 都直接连接所有 rank。
+ */
 static ncclResult_t connectRings(struct ncclComm* comm, int* ringRecv, int* ringSend, int* ringPrev, int* ringNext, int* firstRanks) {
   int nChannels = comm->nChannels;
   int nNodes = comm->nNodes;
@@ -120,6 +132,12 @@ static ncclResult_t setTreeDown(struct ncclTree* tree, int* indexes, int d) {
   return ncclSuccess;
 }
 
+/* 中文精读：双树为什么需要复制 channel
+ * 对节点级别构造两棵互补二叉树，再把跨节点父/子连接接到局部 GPU 树的端点。
+ * 把树的中间节点负载分摊到不同 GPU/节点，减少所有流量总压在同一组中间节点的问题。
+ * 两个 channel 集合承载两棵树的不同数据部分；这不是对同一个完整张量重复归约两次。
+ * 请同时阅读 graph/trees.cc 的 GetBtree/GetDtree，以及 device/all_reduce.h 的上下行线程拆分。
+ */
 static ncclResult_t connectTrees(struct ncclComm* comm, int* treeToParent, int* treeToChild0, int* treeToChild1, int* firstRanks, int* treePatterns) {
   const int nChannels = comm->nChannels, nNodes = comm->nNodes, node = comm->node;
   int* ranksToParent, *ranksToChild0, *ranksToChild1;
@@ -258,6 +276,10 @@ static int copyChannels(struct ncclComm* comm, int start, int end, int* ringPrev
   return c;
 }
 
+/* 中文导读：
+ * 把各节点的局部拓扑结果拼成全局 Ring/Tree，并应用 channel 数限制/复制策略。
+ * 这是硬件局部搜索结果变成每 rank 可执行邻居关系的关键阶段，随后才进入 transport 建链。
+ */
 ncclResult_t ncclTopoPostset(struct ncclComm* comm, int* firstRanks, int* treePatterns, struct ncclTopoRanks** allTopoRanks, int* rings, struct ncclTopoGraph* collNetGraph) {
   // Gather data from all ranks
   int *ringRecv, *ringSend, *ringPrev, *ringNext, *treeToParent, *treeToChild0, *treeToChild1;
@@ -290,6 +312,12 @@ ncclResult_t ncclTopoPostset(struct ncclComm* comm, int* firstRanks, int* treePa
   memcpy(ringPrev+nChannels*nranks, ringPrev, nChannels*nranks*sizeof(int));
   memcpy(ringNext+nChannels*nranks, ringNext, nChannels*nranks*sizeof(int));
 
+/* 中文精读：通道复制与最终 MIN/MAX 调整
+ * 这里 nChannels 翻倍配合前面树的复制，Ring 的前驱/后继表也同步复制。
+ * 若 CollNet 需要更多机内并行度，还可增加通道；最后先应用最大值，再按最小值复制补足。
+ * 复制的是逻辑执行上下文/通信图，后面会为相应 connector 建链；不是凭空增加物理带宽。
+ * 实际能否获益要看 NIC、NVLink、SM 占用和消息尺寸，不宜仅凭最终通道数判断性能。
+ */
   // Duplication should be complete now
   nChannels = comm->nChannels = std::min(MAXCHANNELS,nChannels*2);
 

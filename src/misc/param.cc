@@ -48,6 +48,12 @@ void setEnvFile(const char* fileName) {
   fclose(file);
 }
 
+/* 中文精读：配置文件与环境变量的优先级
+ * 先读用户目录 .nccl.conf，再读 /etc/nccl.conf；setEnvFile 用 setenv(...,0) 不覆盖已有值。
+ * 所以已存在的进程环境优先，用户配置先填入的键也不会被后读的系统配置覆盖。
+ * 数值参数由 ncclLoadParam 在锁内首次解析并保存缓存；不同线程不会同时重复写缓存。
+ * 配置加载属于进程初始化，不能按每个 communicator 重新读取全部配置来理解。
+ */
 void initEnv() {
   char confFilePath[1024];
   const char * userDir = userHomeDir();
