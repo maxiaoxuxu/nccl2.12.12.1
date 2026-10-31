@@ -9,16 +9,57 @@
 //#include <sys/stat.h>
 //#include <unistd.h>
 
+/* 中文逐项-变量 V3564：ncclNet
+ * ncclNet（ncclNet_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclNet = nets[i];。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
 ncclNet_t *ncclNet;
+/* 中文逐项-变量 V3565：ncclCollNet
+ * ncclCollNet（ncclCollNet_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclCollNet = collNets[i];。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
 ncclCollNet_t *ncclCollNet;
 
+/* 中文逐项-变量 V3566：ncclNet_v4_as_v5
+ * ncclNet_v4_as_v5（ncclNet_v5_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclNet_v4_as_v5.name = ncclNet_v4->name;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
 static ncclNet_v5_t ncclNet_v4_as_v5;
+/* 中文逐项-变量 V3567：ncclNet_v4
+ * ncclNet_v4（ncclNet_v4_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclResult_t ans = ncclNet_v4->getProperties(dev, &p4);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
 static ncclNet_v4_t *ncclNet_v4;
+/* 中文逐项-变量 V3568：ncclCollNet_v4_as_v5
+ * ncclCollNet_v4_as_v5（ncclCollNet_v5_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclCollNet_v4_as_v5.name = ncclCollNet_v4->name;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
 static ncclCollNet_v5_t ncclCollNet_v4_as_v5;
+/* 中文逐项-变量 V3569：ncclCollNet_v4
+ * ncclCollNet_v4（ncclCollNet_v4_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclResult_t ans = ncclCollNet_v4->getProperties(dev, &p4);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
 static ncclCollNet_v4_t *ncclCollNet_v4;
 
+/* 中文逐项-函数 F1003：ncclNet_v4_as_v5_getProperties
+ * 用途与位置：调用旧版插件属性接口并补上 v5 新增字段的兼容默认值，如 maxRecvs=1。
+ * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
+ * 参数 props（ncclNetProperties_v5_t* props）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：ncclNet_v4->getProperties。
+ * 需要对照的边界/推进条件：ans != ncclSuccess。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ans;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclNet_v4_as_v5_getProperties(int dev, ncclNetProperties_v5_t* props) {
+/* 中文逐项-变量 V3570：p4
+ * p4（ncclNetProperties_v4_t；函数 ncclNet_v4_as_v5_getProperties 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclResult_t ans = ncclNet_v4->getProperties(dev, &p4);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   ncclNetProperties_v4_t p4;
+/* 中文逐项-变量 V3571：ans
+ * ans（ncclResult_t；函数 ncclNet_v4_as_v5_getProperties 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ans = ncclNet_v4->getProperties(dev, &p4)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   ncclResult_t ans = ncclNet_v4->getProperties(dev, &p4);
   if (ans != ncclSuccess) return ans;
   props->name = p4.name;
@@ -33,16 +74,57 @@ static ncclResult_t ncclNet_v4_as_v5_getProperties(int dev, ncclNetProperties_v5
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1004：ncclNet_v4_as_v5_isend
+ * 用途与位置：把 v5 发送调用转成 v4 签名，旧接口没有 v5 tag 参数。
+ * 参数 sendComm（void* sendComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
+ * 参数 data（void* data）：当前对象的数据区或固定布局填充；看宿主类型区分用户条目、控制句柄和对齐空间。
+ * 参数 size（int size）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ * 参数 tag（int tag）：控制消息或NET请求的匹配标签；公开ncclSend/Recv没有用户tag参数，此值由内部组织。
+ * 参数 mhandle（void* mhandle）：网络接口返回的注册句柄，本版内置IB通常可转成 ibv_mr；插件内部表示可不同。
+ * 参数 request（void** request）：输出句柄地址，成功/已接受后由被调用实现写入有效对象；调用成功但输出仍为空时须按异步建链/请求契约继续推进。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：ncclNet_v4->isend。
+ * 源码返回表达式：return ncclNet_v4->isend(sendComm, data, size, mhandle, request);。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclNet_v4_as_v5_isend(void* sendComm, void* data, int size, int tag, void* mhandle, void** request) {
   return ncclNet_v4->isend(sendComm, data, size, mhandle, request);
 }
 
+/* 中文逐项-函数 F1005：ncclNet_v4_as_v5_irecv
+ * 用途与位置：校验 v5 批量请求只有一个元素后转调旧 v4 单请求接口，避免错误模拟多接收能力。
+ * 参数 recvComm（void* recvComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
+ * 参数 n（int n）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 参数 data（void** data）：当前对象的数据区或固定布局填充；看宿主类型区分用户条目、控制句柄和对齐空间。
+ * 参数 sizes（int* sizes）：聚合接收各项的有效字节长度结果，网络Test和立即数解码后更新。
+ * 参数 tags（int* tags）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 mhandles（void** mhandles）：网络接口返回的注册句柄，本版内置IB通常可转成 ibv_mr；插件内部表示可不同。
+ * 参数 request（void** request）：输出句柄地址，成功/已接受后由被调用实现写入有效对象；调用成功但输出仍为空时须按异步建链/请求契约继续推进。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：ncclNet_v4->irecv。
+ * 需要对照的边界/推进条件：n == 0；n != 1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;；return ncclInvalidArgument;；return ncclNet_v4->irecv(recvComm, data[0], sizes[0],
+ * mhandles[0], request);。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclNet_v4_as_v5_irecv(void* recvComm, int n, void** data, int* sizes, int* tags, void** mhandles, void** request) {
   if (n == 0) return ncclSuccess;
   if (n != 1) return ncclInvalidArgument;
   return ncclNet_v4->irecv(recvComm, data[0], sizes[0], mhandles[0], request);
 }
 
+/* 中文逐项-函数 F1006：ncclNet_v4_as_v5_iflush
+ * 用途与位置：校验 v5 批量请求只有一个元素后转调旧 v4 单请求接口，避免错误模拟多接收能力。
+ * 参数 recvComm（void* recvComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
+ * 参数 n（int n）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 参数 data（void** data）：当前对象的数据区或固定布局填充；看宿主类型区分用户条目、控制句柄和对齐空间。
+ * 参数 sizes（int* sizes）：聚合接收各项的有效字节长度结果，网络Test和立即数解码后更新。
+ * 参数 mhandles（void** mhandles）：网络接口返回的注册句柄，本版内置IB通常可转成 ibv_mr；插件内部表示可不同。
+ * 参数 request（void** request）：输出句柄地址，成功/已接受后由被调用实现写入有效对象；调用成功但输出仍为空时须按异步建链/请求契约继续推进。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：ncclNet_v4->iflush。
+ * 需要对照的边界/推进条件：n == 0；n != 1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;；return ncclInvalidArgument;；return ncclNet_v4->iflush(recvComm, data[0], sizes[0],
+ * mhandles[0], request);。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclNet_v4_as_v5_iflush(void* recvComm, int n, void** data, int* sizes, void** mhandles, void** request) {
   if (n == 0) return ncclSuccess;
   if (n != 1) return ncclInvalidArgument;
@@ -51,6 +133,13 @@ static ncclResult_t ncclNet_v4_as_v5_iflush(void* recvComm, int n, void** data, 
 
 // We use a wrapper around the v4 init to copy over the struct contents
 // post-init since they may not be initialized before hand.
+/* 中文逐项-函数 F1007：ncclNet_v4_as_v5_init
+ * 用途与位置：初始化旧插件后构造 v5 适配函数表，保持旧插件可在本版本网络层使用。
+ * 参数 logfn（ncclDebugLogger_t logfn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclNet_v4->init。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclNet_v4_as_v5_init(ncclDebugLogger_t logfn) {
   NCCLCHECK(ncclNet_v4->init(logfn));
   ncclNet_v4_as_v5.name = ncclNet_v4->name;
@@ -71,8 +160,25 @@ static ncclResult_t ncclNet_v4_as_v5_init(ncclDebugLogger_t logfn) {
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1008：ncclCollNet_v4_as_v5_getProperties
+ * 用途与位置：调用旧版插件属性接口并补上 v5 新增字段的兼容默认值，如 maxRecvs=1。
+ * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
+ * 参数 props（ncclNetProperties_v5_t* props）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：ncclCollNet_v4->getProperties。
+ * 需要对照的边界/推进条件：ans != ncclSuccess。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ans;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclCollNet_v4_as_v5_getProperties(int dev, ncclNetProperties_v5_t* props) {
+/* 中文逐项-变量 V3572：p4
+ * p4（ncclNetProperties_v4_t；函数 ncclCollNet_v4_as_v5_getProperties 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ncclResult_t ans = ncclCollNet_v4->getProperties(dev, &p4);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   ncclNetProperties_v4_t p4;
+/* 中文逐项-变量 V3573：ans
+ * ans（ncclResult_t；函数 ncclCollNet_v4_as_v5_getProperties 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ans = ncclCollNet_v4->getProperties(dev, &p4)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   ncclResult_t ans = ncclCollNet_v4->getProperties(dev, &p4);
   if (ans != ncclSuccess) return ans;
   props->name = p4.name;
@@ -89,6 +195,13 @@ static ncclResult_t ncclCollNet_v4_as_v5_getProperties(int dev, ncclNetPropertie
 
 // We use a wrapper around the v4 init to copy over the struct contents
 // post-init since they may not be initialized before hand.
+/* 中文逐项-函数 F1009：ncclCollNet_v4_as_v5_init
+ * 用途与位置：初始化旧插件后构造 v5 适配函数表，保持旧插件可在本版本网络层使用。
+ * 参数 logfn（ncclDebugLogger_t logfn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclCollNet_v4->init。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclCollNet_v4_as_v5_init(ncclDebugLogger_t logfn) {
   NCCLCHECK(ncclCollNet_v4->init(logfn));
   ncclCollNet_v4_as_v5.name = ncclCollNet_v4->name;
@@ -113,8 +226,26 @@ static ncclResult_t ncclCollNet_v4_as_v5_init(ncclDebugLogger_t logfn) {
  * 这允许外部网络后端实现不同传输协议；本文件不强制插件必须是 UCX 或某种 RDMA 库。
  * 函数指针多一层调用不等于多复制一遍载荷，主要传输成本仍取决于后端实现。
  */
+/* 中文逐项-函数 F1010：initPlugin
+ * 用途与位置：动态装载命名网络插件，优先找 v5 符号，必要时适配 v4，并独立发现 CollNet 接口。
+ * 参数 net（ncclNet_v5_t** net）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 参数 collnet（ncclCollNet_v5_t** collnet）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/net.cc::ncclNetInit。
+ * 本体直接出现的调用/包装：dlclose；dlerror；dlopen；dlsym；getenv；snprintf；sprintf；strlen。
+ * 需要对照的边界/推进条件：envPluginName && strlen(envPluginName；netPluginLib == nullptr；errno == ENOENT；*net ==
+ * nullptr。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return;。CHECK类宏还可能提前返回/跳转。
+ */
 static void initPlugin(ncclNet_v5_t** net, ncclCollNet_v5_t** collnet) {
+/* 中文逐项-变量 V3574：ncclNetPluginName
+ * ncclNetPluginName（char；函数 initPlugin 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：snprintf(ncclNetPluginName, 128, "libnccl-net-%s.so", envPluginName);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   char ncclNetPluginName[128];
+/* 中文逐项-变量 V3575：envPluginName
+ * envPluginName（char；函数 initPlugin 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 envPluginName = getenv("NCCL_NET_PLUGIN")；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   const char* envPluginName = getenv("NCCL_NET_PLUGIN");
   if (envPluginName && strlen(envPluginName)) {
     snprintf(ncclNetPluginName, 128, "libnccl-net-%s.so", envPluginName);
@@ -122,6 +253,10 @@ static void initPlugin(ncclNet_v5_t** net, ncclCollNet_v5_t** collnet) {
   } else {
     sprintf(ncclNetPluginName, "libnccl-net.so");
   }
+/* 中文逐项-变量 V3576：netPluginLib
+ * netPluginLib（void；函数 initPlugin 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 netPluginLib = dlopen(ncclNetPluginName, RTLD_NOW | RTLD_LOCAL)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   void* netPluginLib = dlopen(ncclNetPluginName, RTLD_NOW | RTLD_LOCAL);
   if (netPluginLib == nullptr) {
     // dlopen does not guarantee to set errno, but dlerror only gives us a
@@ -168,22 +303,55 @@ static void initPlugin(ncclNet_v5_t** net, ncclCollNet_v5_t** collnet) {
  * NCCL_NET 可按后端名筛选。外部插件通过 libnccl-net*.so 的 v5/v4 函数表接入；不是必须使用 UCX。
  * 真正的 GPU/Proxy 网络传输通过统一 ncclNet 接口调用已选后端。
  */
+/* 中文逐项-函数 F1011：ncclNetInit
+ * 用途与位置：总是初始化 bootstrap，再按外部插件、内置 IB、内置 Socket 顺序选可用数据后端，支持显式名字筛选。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclInit。
+ * 本体直接出现的调用/包装：NCCLCHECK；bootstrapNetInit；collNets[i]->devices；collNets[i]->init；getenv；initPlugin；nets[i]->devices；nets[i]->init；strcmp。
+ * 需要对照的边界/推进条件：i<3；nets[i] == nullptr；netName && strcmp(netName, nets[i]->name) != 0；nets[i]->init(ncclDebugLog) !=
+ * ncclSuccess。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInvalidUsage;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclNetInit() {
   // Always initialize bootstrap network
   NCCLCHECK(bootstrapNetInit());
 
   // Initialize main communication network
+/* 中文逐项-变量 V3577：nets
+ * nets（ncclNet_t；函数 ncclNetInit 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 nets = { nullptr, &ncclNetIb, &ncclNetSocket }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
   ncclNet_t* nets[3] = { nullptr, &ncclNetIb, &ncclNetSocket };
+/* 中文逐项-变量 V3578：collNets
+ * collNets（ncclCollNet_t；函数 ncclNetInit 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 collNets = { nullptr, nullptr, nullptr }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
   ncclCollNet_t* collNets[3] = { nullptr, nullptr, nullptr };
   initPlugin(&nets[0], &collNets[0]);
+/* 中文逐项-变量 V3579：netName
+ * netName（char；函数 ncclNetInit 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 netName = getenv("NCCL_NET")；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   char* netName = getenv("NCCL_NET");
+/* 中文逐项-变量 V3580：ok
+ * ok（bool；函数 ncclNetInit 内）：本作用域条件状态；为真时启用下面受它保护的分支，不独立创建硬件资源。
+ * 初值/来源 ok = false；布尔初态为false，后续条件决定是否切换。
+ */
   bool ok = false;
 
-  for (int i=0; i<3; i++) {
+  for (/* 中文逐项-变量 V3581：i
+ * i（int；函数 ncclNetInit 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<3；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<3; i++) {
     if (nets[i] == nullptr) continue;
     if (netName && strcmp(netName, nets[i]->name) != 0) continue;
 
     // net plugin is already initialized
+/* 中文逐项-变量 V3582：ndev
+ * ndev（int；函数 ncclNetInit 内）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 此处未显式给初值；后续首个文本使用点：if (nets[i]->devices(&ndev) != ncclSuccess) continue;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int ndev;
     if (nets[i]->init(ncclDebugLog) != ncclSuccess) continue;
     if (nets[i]->devices(&ndev) != ncclSuccess) continue;
@@ -209,13 +377,35 @@ ncclResult_t ncclNetInit() {
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1012：ncclGpuGdrSupport
+ * 用途与位置：优先查询 CUDA GDR 属性；旧运行时通过临时连接和 GPU 缓冲注册探测，探测资源用后回收。
+ * 参数 gdrSupport（int* gdrSupport）：设备能否注册GPU内存、进行网络集合归约及接受哪种指针类型的能力描述。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::fillInfo。
+ * 本体直接出现的调用/包装：CUDACHECK；CUDACHECKGOTO；NCCLCHECK；NCCLCHECKGOTO；cudaDeviceGetAttribute；cudaDriverGetVersion；cudaFree；cudaGetDevice；cudaMalloc；ncclNetAccept；ncclNetCloseListen；ncclNetCloseRecv；ncclNetCloseSend；ncclNetConnect；ncclNetDeregMr；ncclNetDevices；ncclNetGetProperties；ncclNetListen；更多调用保留在函数体。
+ * 需要对照的边界/推进条件：driverVersion >= 11030；dev<netDevs；props.ptrSupport & NCCL_PTR_CUDA) == 0；sComm == NULL。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclGpuGdrSupport(int* gdrSupport) {
+/* 中文逐项-变量 V3583：GPU_BUF_SIZE
+ * GPU_BUF_SIZE（int；函数 ncclGpuGdrSupport 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 GPU_BUF_SIZE = 2*1024*1024；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   constexpr int GPU_BUF_SIZE = 2*1024*1024;
 #if CUDART_VERSION >= 11030
   // In CUDA 11.3 and later we can now query the cudaDevAttrGPUDirectRDMASupported attribute
+/* 中文逐项-变量 V3584：driverVersion
+ * driverVersion（int；函数 ncclGpuGdrSupport 内）：CUDA 驱动版本与分配范围查询入口，用于判断图/IPC注册优化能力。
+ * 此处未显式给初值；后续首个文本使用点：CUDACHECK(cudaDriverGetVersion(&driverVersion));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int driverVersion;
   CUDACHECK(cudaDriverGetVersion(&driverVersion));
   if (driverVersion >= 11030) {
+/* 中文逐项-变量 V3585：cudaDev、attr
+ * cudaDev（int；函数 ncclGpuGdrSupport 内）：本进程 CUDA 可见设备序号，供切换设备上下文使用。
+ * 此处未显式给初值；后续首个文本使用点：CUDACHECK(cudaGetDevice(&cudaDev));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * attr（int；函数 ncclGpuGdrSupport 内）：创建/修改资源所需属性集合，具体布局由所属srq/qp等对象决定。
+ * 初值/来源 attr = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int cudaDev, attr = 0;
     CUDACHECK(cudaGetDevice(&cudaDev));
     CUDACHECK(cudaDeviceGetAttribute(&attr, cudaDevAttrGPUDirectRDMASupported, cudaDev));
@@ -223,20 +413,56 @@ ncclResult_t ncclGpuGdrSupport(int* gdrSupport) {
     return ncclSuccess;
   }
 #endif
+/* 中文逐项-变量 V3586：netDevs
+ * netDevs（int；函数 ncclGpuGdrSupport 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclNetDevices(&netDevs));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int netDevs;
   NCCLCHECK(ncclNetDevices(&netDevs));
   *gdrSupport = 0;
-  for (int dev=0; dev<netDevs; dev++) {
+  for (/* 中文逐项-变量 V3587：dev
+ * dev（int；函数 ncclGpuGdrSupport 内）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
+ * 初值/来源 dev = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：dev<netDevs；循环体与增量表达式决定每轮如何推进。
+ */int dev=0; dev<netDevs; dev++) {
     // Find a net device which is GDR-capable
+/* 中文逐项-变量 V3588：props
+ * props（ncclNetProperties_t；函数 ncclGpuGdrSupport 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclNetGetProperties(dev, &props));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     ncclNetProperties_t props;
     NCCLCHECK(ncclNetGetProperties(dev, &props));
     if ((props.ptrSupport & NCCL_PTR_CUDA) == 0) continue;
 
     // Allocate memory on the GPU and try to register it on the NIC.
+/* 中文逐项-变量 V3589：lComm、sComm、rComm
+ * lComm（void；函数 ncclGpuGdrSupport 内）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
+ * 初值/来源 lComm = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ * sComm（void；函数 ncclGpuGdrSupport 内）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
+ * 初值/来源 sComm = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ * rComm（void；函数 ncclGpuGdrSupport 内）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
+ * 初值/来源 rComm = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ */
     void *lComm = NULL, *sComm = NULL, *rComm = NULL;
+/* 中文逐项-变量 V3590：handle
+ * handle（ncclNetHandle_t；函数 ncclGpuGdrSupport 内）：库/内核资源句柄或可交换连接句柄，不能当作通用可直接解引用指针。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECKGOTO(ncclNetListen(dev, &handle, &lComm), ret, cleanup1);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     ncclNetHandle_t handle;
+/* 中文逐项-变量 V3591：gpuPtr
+ * gpuPtr（void；函数 ncclGpuGdrSupport 内）：同一后端缓冲的CPU/GPU地址视图，是否能直接使用取决于映射和GDR配置。
+ * 初值/来源 gpuPtr = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ */
     void* gpuPtr = NULL;
+/* 中文逐项-变量 V3592：mHandle
+ * mHandle（void；函数 ncclGpuGdrSupport 内）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
+ * 初值/来源 mHandle = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ */
     void* mHandle = NULL;
+/* 中文逐项-变量 V3593：ret
+ * ret（ncclResult_t；函数 ncclGpuGdrSupport 内）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECKGOTO(ncclNetListen(dev, &handle, &lComm), ret, cleanup1);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     ncclResult_t ret;
     ncclDebugNoWarn = NCCL_NET;
     NCCLCHECKGOTO(ncclNetListen(dev, &handle, &lComm), ret, cleanup1);
@@ -267,6 +493,13 @@ cleanup1:
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1013：ncclNetVersion
+ * 用途与位置：报告当前选中网络函数表是 v4 兼容还是原生 v5，供依赖接口能力的策略判断。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclPxnDisable。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return (ncclNet == &ncclNet_v4_as_v5) ? 4 : 5;。CHECK类宏还可能提前返回/跳转。
+ */
 int ncclNetVersion() {
   return (ncclNet == &ncclNet_v4_as_v5) ? 4 : 5;
 }

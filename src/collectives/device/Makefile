@@ -4,12 +4,14 @@
 # See LICENSE.txt for license information
 #
 
+# 中文构建：此处编译GPU实现。gen_rules.sh生成每API/归约/类型组合的规则；nvcc -dc保留可重定位设备代码，再由-dlink解析跨对象设备函数表。
 include ../../../makefiles/common.mk
 include ../../../makefiles/version.mk
 
 BUILDDIR ?= $(abspath ../../../build)
 OBJDIR := $(BUILDDIR)/obj/collectives/device
 
+# 中文构建：LIBSRCFILES列原始.cu，GENOBJS来自自动规则，functions.o放设备分派表，onerank_reduce.o处理单rank自定义缩放。
 LIBSRCFILES := all_reduce.cu broadcast.cu reduce.cu all_gather.cu reduce_scatter.cu sendrecv.cu onerank_reduce.cu
 
 LIBSRCFILES += functions.cu
@@ -40,6 +42,7 @@ LIBOBJ     := $(GENOBJS) $(OBJDIR)/functions.o $(OBJDIR)/onerank_reduce.o
 
 -include $(DEPFILES)
 
+# 中文构建：STATICLIB将所有GPU对象和devlink.o打包；设备算法.h在不同宏参数下实例化，并非只有一个all_reduce.o即可覆盖所有情况。
 $(STATICLIB): $(LIBOBJ) $(DEVOBJ)
 	@printf "Archiving  %-35s > %s\n" objects $@
 	ar cr $@ $^

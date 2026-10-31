@@ -1,3 +1,14 @@
+<!-- NCCL-BEGINNER-ANNOTATED-V2 -->
+# 中文逐项注释版：先看这里
+
+**源码内已包含中文分析。请先打开 [START_HERE_ZH.md](START_HERE_ZH.md)。**
+
+当前注释分支：`codex/nccl-2.12.12-full-source-walkthrough`。默认 `master` 尚未合并这些注释；直接从默认分支下载会得到原版。
+
+[全部函数/类型索引](docs/zh_CN/symbol-index.md) · [按问题阅读](docs/zh_CN/source-map.md) · [本地完整性检查](tools/verify_annotations.py)
+
+---
+
 # NCCL
 
 Optimized primitives for inter-GPU communication.

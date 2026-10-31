@@ -4,9 +4,11 @@
 # See LICENSE.txt for license information
 #
 
+# 中文构建：主机库构建入口。common.mk提供CUDA/编译选项，version.mk提供版本，下面把主机对象与设备静态库链接为共享/静态NCCL库。
 include ../makefiles/common.mk
 include ../makefiles/version.mk
 
+# 中文构建：INCEXPORTS是安装的公开头；LIBSRCFILES列出主机实现；OBJDIR下按原路径生成.o/.d，依赖文件使头文件改动能触发重建。
 ##### src files
 INCEXPORTS  := nccl.h nccl_net.h
 LIBSRCFILES := init.cc channel.cc bootstrap.cc transport.cc enqueue.cc group.cc debug.cc proxy.cc enhcompat.cc net.cc \
@@ -20,12 +22,14 @@ LIBNAME     := libnccl.so
 STATICLIBNAME := libnccl_static.a
 ##### pkgconfig files
 PKGCONFIGFILE := nccl.pc
+# 中文构建：BUILDDIR是产物根目录；INCDIR导出头，LIBDIR库文件，OBJDIR中间对象，PKGDIR pkg-config文件。源码分析无需先成功编译。
 ##### dirs
 BUILDDIR ?= $(abspath ../build)
 INCDIR := $(BUILDDIR)/include
 LIBDIR := $(BUILDDIR)/lib
 OBJDIR := $(BUILDDIR)/obj
 PKGDIR := $(BUILDDIR)/lib/pkgconfig
+# 中文构建：LIBSONAME保留主版本兼容名；LIBTARGET包含完整版本；CUDARTLIB选择CUDA runtime链接形式；DEVICELIB含设备函数与device-link对象。
 ##### target files
 CUDARTLIB  ?= cudart_static
 INCTARGETS := $(INCEXPORTS:%=$(INCDIR)/%)

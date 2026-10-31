@@ -5,6 +5,10 @@
  ************************************************************************/
 
 #ifndef NCCL_CORE_H_
+/* 中文逐项-常量 X0185：NCCL_CORE_H_
+ * 编译期定义：NCCL_CORE_H_ = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_CORE_H_
 
 #include <pthread.h>
@@ -21,6 +25,10 @@
  * ncclTypeSize 则是 count 元素数与物理字节数转换的统一小工具。
  */
 #ifdef PROFAPI
+/* 中文逐项-宏 M0081：NCCL_API
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NCCL_API；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NCCL_API(ret, func, args...)        \
     __attribute__ ((visibility("default"))) \
     __attribute__ ((alias(#func)))          \
@@ -30,12 +38,23 @@
     __attribute__ ((weak))                  \
     ret func(args)
 #else
+/* 中文逐项-宏 M0082：NCCL_API
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NCCL_API；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NCCL_API(ret, func, args...)        \
     extern "C"                              \
     __attribute__ ((visibility("default"))) \
     ret func(args)
 #endif // end PROFAPI
 
+/* 中文逐项-函数 F0628：ncclTypeSize
+ * 用途与位置：把 NCCL 数据类型枚举映射到每元素字节数，用于尺寸换算；未知类型返回 -1。
+ * 参数 type（ncclDataType_t type）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/enqueue.cc::computeColl；src/enqueue.cc::ncclSaveP2p；src/enqueue.cc::ncclEnqueueCollKernel；src/enqueue.cc::ncclRedOpCreatePreMulSum；src/misc/argcheck.cc::ArgsCheck；src/transport/coll_net.cc::sendProxyProgress。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return 1;；return 2;；return 4;；return 8;；return -1;。CHECK类宏还可能提前返回/跳转。
+ */
 static __inline__ int ncclTypeSize(ncclDataType_t type) {
   switch (type) {
     case ncclInt8:

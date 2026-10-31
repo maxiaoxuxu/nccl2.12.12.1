@@ -152,13 +152,29 @@
 
 /* Header guard */
 #if !defined(NVTX_VERSION)
+/* 中文逐项-常量 X0694：NVTX_VERSION
+ * 编译期定义：NVTX_VERSION = 3。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_VERSION 3
 
 #if defined(_MSC_VER)
+/* 中文逐项-常量 X0695：__stdcall
+ * 编译期定义：__stdcall = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_API __stdcall
+/* 中文逐项-常量 X0696：NVTX_INLINE_STATIC
+ * 编译期定义：NVTX_INLINE_STATIC = __inline static。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_INLINE_STATIC __inline static
 #else /*defined(__GNUC__)*/
 #define NVTX_API
+/* 中文逐项-常量 X0697：NVTX_INLINE_STATIC
+ * 编译期定义：NVTX_INLINE_STATIC = inline static。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_INLINE_STATIC inline static
 #endif /* Platform */
 
@@ -175,13 +191,29 @@
 #else
 /* Normal NVTX usage defines the NVTX API inline with static */
 /* (internal) linkage. */
+/* 中文逐项-常量 X0698：NVTX_INLINE_STATIC
+ * 编译期定义：NVTX_INLINE_STATIC = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_DECLSPEC NVTX_INLINE_STATIC
 #endif
 
 #include "nvtxDetail/nvtxLinkOnce.h"
 
+/* 中文逐项-宏 M0095：NVTX_VERSIONED_IDENTIFIER_L3
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_VERSIONED_IDENTIFIER_L3；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_VERSIONED_IDENTIFIER_L3(NAME, VERSION) NAME##_v##VERSION
+/* 中文逐项-宏 M0096：NVTX_VERSIONED_IDENTIFIER_L2
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_VERSIONED_IDENTIFIER_L2；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_VERSIONED_IDENTIFIER_L2(NAME, VERSION) NVTX_VERSIONED_IDENTIFIER_L3(NAME, VERSION)
+/* 中文逐项-宏 M0097：NVTX_VERSIONED_IDENTIFIER
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_VERSIONED_IDENTIFIER；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_VERSIONED_IDENTIFIER(NAME) NVTX_VERSIONED_IDENTIFIER_L2(NAME, NVTX_VERSION)
 
 /**
@@ -216,20 +248,60 @@ extern "C" {
 * Result Codes
 */
 
+/* 中文逐项-常量 X0699：NVTX_SUCCESS
+ * 编译期定义：NVTX_SUCCESS = 0。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_SUCCESS 0
+/* 中文逐项-常量 X0700：NVTX_FAIL
+ * 编译期定义：NVTX_FAIL = 1。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_FAIL 1
+/* 中文逐项-常量 X0701：NVTX_ERR_INIT_LOAD_PROPERTY
+ * 编译期定义：NVTX_ERR_INIT_LOAD_PROPERTY = 2。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_ERR_INIT_LOAD_PROPERTY 2
+/* 中文逐项-常量 X0702：NVTX_ERR_INIT_ACCESS_LIBRARY
+ * 编译期定义：NVTX_ERR_INIT_ACCESS_LIBRARY = 3。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_ERR_INIT_ACCESS_LIBRARY 3
+/* 中文逐项-常量 X0703：NVTX_ERR_INIT_LOAD_LIBRARY
+ * 编译期定义：NVTX_ERR_INIT_LOAD_LIBRARY = 4。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_ERR_INIT_LOAD_LIBRARY 4
+/* 中文逐项-常量 X0704：NVTX_ERR_INIT_MISSING_LIBRARY_ENTRY_POINT
+ * 编译期定义：NVTX_ERR_INIT_MISSING_LIBRARY_ENTRY_POINT = 5。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_ERR_INIT_MISSING_LIBRARY_ENTRY_POINT 5
+/* 中文逐项-常量 X0705：NVTX_ERR_INIT_FAILED_LIBRARY_ENTRY_POINT
+ * 编译期定义：NVTX_ERR_INIT_FAILED_LIBRARY_ENTRY_POINT = 6。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_ERR_INIT_FAILED_LIBRARY_ENTRY_POINT 6
+/* 中文逐项-常量 X0706：NVTX_ERR_NO_INJECTION_LIBRARY_AVAILABLE
+ * 编译期定义：NVTX_ERR_NO_INJECTION_LIBRARY_AVAILABLE = 7。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_ERR_NO_INJECTION_LIBRARY_AVAILABLE 7
 
 /**
  * Size of the nvtxEventAttributes_t structure.
  */
+/* 中文逐项-常量 X0707：NVTX_EVENT_ATTRIB_STRUCT_SIZE
+ * 编译期定义：NVTX_EVENT_ATTRIB_STRUCT_SIZE = ( (uint16_t)( sizeof(nvtxEventAttributes_t) ) )。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_EVENT_ATTRIB_STRUCT_SIZE ( (uint16_t)( sizeof(nvtxEventAttributes_t) ) )
 
+/* 中文逐项-常量 X0708：NVTX_NO_PUSH_POP_TRACKING
+ * 编译期定义：NVTX_NO_PUSH_POP_TRACKING = ((int)-2)。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_NO_PUSH_POP_TRACKING ((int)-2)
 
 typedef uint64_t nvtxRangeId_t;
@@ -270,31 +342,74 @@ typedef nvtxStringRegistration* nvtxStringHandle_t;
 /** ---------------------------------------------------------------------------
  * Color Types
  * ------------------------------------------------------------------------- */
-typedef enum nvtxColorType_t
+typedef /* 中文逐项-类型 T0319：nvtxColorType_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum nvtxColorType_t
 {
+/* 中文逐项-枚举项 X0709：NVTX_COLOR_UNKNOWN
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */
     NVTX_COLOR_UNKNOWN  = 0,                 /**< Color attribute is unused. */
+/* 中文逐项-枚举项 X0710：NVTX_COLOR_ARGB
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：1
+ */
     NVTX_COLOR_ARGB     = 1                  /**< An ARGB color is provided. */
 } nvtxColorType_t;
 
 /** ---------------------------------------------------------------------------
  * Message Types
  * ------------------------------------------------------------------------- */
-typedef enum nvtxMessageType_t
+typedef /* 中文逐项-类型 T0320：nvtxMessageType_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum nvtxMessageType_t
 {
+/* 中文逐项-枚举项 X0711：NVTX_MESSAGE_UNKNOWN
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */
     NVTX_MESSAGE_UNKNOWN          = 0,    /**< Message payload is unused. */
+/* 中文逐项-枚举项 X0712：NVTX_MESSAGE_TYPE_ASCII
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：1
+ */
     NVTX_MESSAGE_TYPE_ASCII       = 1,    /**< A character sequence is used as payload. */
+/* 中文逐项-枚举项 X0713：NVTX_MESSAGE_TYPE_UNICODE
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：2
+ */
     NVTX_MESSAGE_TYPE_UNICODE     = 2,     /**< A wide character sequence is used as payload. */
     /* NVTX_VERSION_2 */
+/* 中文逐项-枚举项 X0714：NVTX_MESSAGE_TYPE_REGISTERED
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：3
+ */
     NVTX_MESSAGE_TYPE_REGISTERED  = 3,    /**< A unique string handle that was registered
                                                 with \ref nvtxDomainRegisterStringA() or 
                                                 \ref nvtxDomainRegisterStringW(). */
 } nvtxMessageType_t;
 
-typedef union nvtxMessageValue_t
+typedef /* 中文逐项-类型 T0321：nvtxMessageValue_t
+ * 类型职责：动态管理/映射库所需的ABI类型，保存该接口返回的属性/句柄；先看外层调用确定设备身份和生命周期。
+ * 声明内可见成员（含嵌套成员）：ascii、unicode、registered。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ * 存储规则：成员共享同一段存储；写一种视图后应按本协议约定解释另一视图，不能把所有成员当作独立有效对象。
+ */union nvtxMessageValue_t
 {
+/* 中文逐项-变量 V2792：ascii
+ * ascii（char；成员 nvtxMessageValue_t）：消息union中的ASCII/Unicode文本地址或已注册字符串句柄，只使用type指定的视图。
+ */
     const char* ascii;
+/* 中文逐项-变量 V2793：unicode
+ * unicode（wchar_t；成员 nvtxMessageValue_t）：消息union中的ASCII/Unicode文本地址或已注册字符串句柄，只使用type指定的视图。
+ */
     const wchar_t* unicode;
     /* NVTX_VERSION_2 */
+/* 中文逐项-变量 V2794：registered
+ * registered（nvtxStringHandle_t；成员 nvtxMessageValue_t）：消息union中的ASCII/Unicode文本地址或已注册字符串句柄，只使用type指定的视图。
+ */
     nvtxStringHandle_t registered;
 } nvtxMessageValue_t;
 
@@ -322,7 +437,10 @@ typedef union nvtxMessageValue_t
 * \param reserved - must be zero or NULL.
 *
 * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxInitialize(const void* reserved);
+NVTX_DECLSPEC /* 中文逐项-接口 X0715：nvtxInitialize
+ * 接口职责：显式触发NVTX工具初始化，通常API首次调用也能惰性触发；不创建NCCL通信资源。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxInitialize(const void* reserved);
+ */void NVTX_API nvtxInitialize(const void* reserved);
 /** @} */
 
 
@@ -336,15 +454,46 @@ NVTX_DECLSPEC void NVTX_API nvtxInitialize(const void* reserved);
 /** ---------------------------------------------------------------------------
 * Payload Types
 * ------------------------------------------------------------------------- */
-typedef enum nvtxPayloadType_t
+typedef /* 中文逐项-类型 T0322：nvtxPayloadType_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum nvtxPayloadType_t
 {
+/* 中文逐项-枚举项 X0716：NVTX_PAYLOAD_UNKNOWN
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */
     NVTX_PAYLOAD_UNKNOWN = 0,   /**< Color payload is unused. */
+/* 中文逐项-枚举项 X0717：NVTX_PAYLOAD_TYPE_UNSIGNED_INT64
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：1
+ */
     NVTX_PAYLOAD_TYPE_UNSIGNED_INT64 = 1,   /**< A 64 bit unsigned integer value is used as payload. */
+/* 中文逐项-枚举项 X0718：NVTX_PAYLOAD_TYPE_INT64
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：2
+ */
     NVTX_PAYLOAD_TYPE_INT64 = 2,   /**< A 64 bit signed integer value is used as payload. */
+/* 中文逐项-枚举项 X0719：NVTX_PAYLOAD_TYPE_DOUBLE
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：3
+ */
     NVTX_PAYLOAD_TYPE_DOUBLE = 3,   /**< A 64 bit floating point value is used as payload. */
     /* NVTX_VERSION_2 */
+/* 中文逐项-枚举项 X0720：NVTX_PAYLOAD_TYPE_UNSIGNED_INT32
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：4
+ */
     NVTX_PAYLOAD_TYPE_UNSIGNED_INT32 = 4,   /**< A 32 bit floating point value is used as payload. */
+/* 中文逐项-枚举项 X0721：NVTX_PAYLOAD_TYPE_INT32
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：5
+ */
     NVTX_PAYLOAD_TYPE_INT32 = 5,   /**< A 32 bit floating point value is used as payload. */
+/* 中文逐项-枚举项 X0722：NVTX_PAYLOAD_TYPE_FLOAT
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：6
+ */
     NVTX_PAYLOAD_TYPE_FLOAT = 6    /**< A 32 bit floating point value is used as payload. */
 } nvtxPayloadType_t;
 
@@ -425,7 +574,10 @@ typedef enum nvtxPayloadType_t
  * ::nvtxDomainRangeStartEx
  * ::nvtxDomainRangePushEx
  */
-typedef struct nvtxEventAttributes_v2
+typedef /* 中文逐项-类型 T0323：nvtxEventAttributes_v2
+ * 类型职责：动态管理/映射库所需的ABI类型，保存该接口返回的属性/句柄；先看外层调用确定设备身份和生命周期。
+ * 声明内可见成员（含嵌套成员）：version、size、category、colorType、color、payloadType、reserved0、payload、ullValue、llValue、dValue、uiValue、iValue、fValue、messageType、message。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */struct nvtxEventAttributes_v2
 {
     /**
     * \brief Version flag of the structure.
@@ -434,6 +586,9 @@ typedef struct nvtxEventAttributes_v2
     * supported in this header file. This can optionally be overridden to
     * another version of the tools extension library.
     */
+/* 中文逐项-变量 V2795：version
+ * version（uint16_t；成员 nvtxEventAttributes_v2）：外部库事件/导出结构的布局大小与版本号，接收方据此判断可安全读取哪些字段。
+ */
     uint16_t version;
 
     /**
@@ -442,6 +597,9 @@ typedef struct nvtxEventAttributes_v2
     * Needs to be set to the size in bytes of the event attribute
     * structure used to specify the event.
     */
+/* 中文逐项-变量 V2796：size
+ * size（uint16_t；成员 nvtxEventAttributes_v2）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ */
     uint16_t size;
 
     /**
@@ -455,6 +613,9 @@ typedef struct nvtxEventAttributes_v2
      *
      * Default Value is 0
      */
+/* 中文逐项-变量 V2797：category
+ * category（uint32_t；成员 nvtxEventAttributes_v2）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ */
     uint32_t category;
 
     /** \brief Color type specified in this attribute structure.
@@ -464,12 +625,18 @@ typedef struct nvtxEventAttributes_v2
      *
      * Default Value is NVTX_COLOR_UNKNOWN
      */
+/* 中文逐项-变量 V2798：colorType
+ * colorType（int32_t；成员 nvtxEventAttributes_v2）：NVTX颜色/消息/载荷的union类型标签，读取值前先看对应标签。
+ */
     int32_t colorType;              /* nvtxColorType_t */
 
     /** \brief Color assigned to this event. \anchor COLOR_FIELD
      *
      * The color that the tool should use to visualize the event.
      */
+/* 中文逐项-变量 V2799：color
+ * color（uint32_t；成员 nvtxEventAttributes_v2）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ */
     uint32_t color;
 
     /**
@@ -480,8 +647,14 @@ typedef struct nvtxEventAttributes_v2
      *
      * Default Value is NVTX_PAYLOAD_UNKNOWN
      */
+/* 中文逐项-变量 V2800：payloadType
+ * payloadType（int32_t；成员 nvtxEventAttributes_v2）：NVTX颜色/消息/载荷的union类型标签，读取值前先看对应标签。
+ */
     int32_t payloadType;            /* nvtxPayloadType_t */
 
+/* 中文逐项-变量 V2801：reserved0
+ * reserved0（int32_t；成员 nvtxEventAttributes_v2）：ABI/硬件位域保留空间，保留大小和对齐，不能擅自解释为有效配置。
+ */
     int32_t reserved0;
 
     /**
@@ -490,14 +663,41 @@ typedef struct nvtxEventAttributes_v2
      * A numerical value that can be used to annotate an event. The tool could
      * use the payload data to reconstruct graphs and diagrams.
      */
+/* 中文逐项-变量 V2802：payload
+ * payload（union payload_t { uint64_t ullValue; int64_t llValue; double dValue; / * NVTX_VERSION_2 * / uint32_t
+ * uiValue; …（完整表达式见紧邻源码）；成员 nvtxEventAttributes_v2）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ */
+/* 中文逐项-类型 T0324：payload_t
+ * 类型职责：本文件的union类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：payload、ullValue、llValue、dValue、uiValue、iValue、fValue。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ * 存储规则：成员共享同一段存储；写一种视图后应按本协议约定解释另一视图，不能把所有成员当作独立有效对象。
+ */
     union payload_t
     {
+/* 中文逐项-变量 V2803：ullValue
+ * ullValue（uint64_t；成员 nvtxEventAttributes_v2::payload_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         uint64_t ullValue;
+/* 中文逐项-变量 V2804：llValue
+ * llValue（int64_t；成员 nvtxEventAttributes_v2::payload_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         int64_t llValue;
+/* 中文逐项-变量 V2805：dValue
+ * dValue（double；成员 nvtxEventAttributes_v2::payload_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         double dValue;
         /* NVTX_VERSION_2 */
+/* 中文逐项-变量 V2806：uiValue
+ * uiValue（uint32_t；成员 nvtxEventAttributes_v2::payload_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         uint32_t uiValue;
+/* 中文逐项-变量 V2807：iValue
+ * iValue（int32_t；成员 nvtxEventAttributes_v2::payload_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         int32_t iValue;
+/* 中文逐项-变量 V2808：fValue
+ * fValue（float；成员 nvtxEventAttributes_v2::payload_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         float fValue;
     } payload;
 
@@ -508,12 +708,18 @@ typedef struct nvtxEventAttributes_v2
      *
      * Default Value is NVTX_MESSAGE_UNKNOWN
      */
+/* 中文逐项-变量 V2809：messageType
+ * messageType（int32_t；成员 nvtxEventAttributes_v2）：NVTX颜色/消息/载荷的union类型标签，读取值前先看对应标签。
+ */
     int32_t messageType;            /* nvtxMessageType_t */
 
     /** \brief Message assigned to this attribute structure. \anchor MESSAGE_FIELD
      *
      * The text message that is attached to an event.
      */
+/* 中文逐项-变量 V2810：message
+ * message（nvtxMessageValue_t；成员 nvtxEventAttributes_v2）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ */
     nvtxMessageValue_t message;
 
 } nvtxEventAttributes_v2;
@@ -551,7 +757,11 @@ typedef struct nvtxEventAttributes_v2 nvtxEventAttributes_t;
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxDomainMarkEx(nvtxDomainHandle_t domain, const nvtxEventAttributes_t* eventAttrib);
+NVTX_DECLSPEC /* 中文逐项-接口 X0723：nvtxDomainMarkEx
+ * 接口职责：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxDomainMarkEx(nvtxDomainHandle_t domain, const
+ * nvtxEventAttributes_t* eventAttrib);
+ */void NVTX_API nvtxDomainMarkEx(nvtxDomainHandle_t domain, const nvtxEventAttributes_t* eventAttrib);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -587,7 +797,10 @@ NVTX_DECLSPEC void NVTX_API nvtxDomainMarkEx(nvtxDomainHandle_t domain, const nv
  *
  * \version \NVTX_VERSION_1
  * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxMarkEx(const nvtxEventAttributes_t* eventAttrib);
+NVTX_DECLSPEC /* 中文逐项-接口 X0724：nvtxMarkEx
+ * 接口职责：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxMarkEx(const nvtxEventAttributes_t* eventAttrib);
+ */void NVTX_API nvtxMarkEx(const nvtxEventAttributes_t* eventAttrib);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -610,8 +823,14 @@ NVTX_DECLSPEC void NVTX_API nvtxMarkEx(const nvtxEventAttributes_t* eventAttrib)
  *
  * \version \NVTX_VERSION_0
  * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxMarkA(const char* message);
-NVTX_DECLSPEC void NVTX_API nvtxMarkW(const wchar_t* message);
+NVTX_DECLSPEC /* 中文逐项-接口 X0725：nvtxMarkA
+ * 接口职责：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxMarkA(const char* message);
+ */void NVTX_API nvtxMarkA(const char* message);
+NVTX_DECLSPEC /* 中文逐项-接口 X0726：nvtxMarkW
+ * 接口职责：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxMarkW(const wchar_t* message);
+ */void NVTX_API nvtxMarkW(const wchar_t* message);
 /** @} */
 
 
@@ -646,7 +865,11 @@ NVTX_DECLSPEC void NVTX_API nvtxMarkW(const wchar_t* message);
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC nvtxRangeId_t NVTX_API nvtxDomainRangeStartEx(nvtxDomainHandle_t domain, const nvtxEventAttributes_t* eventAttrib);
+NVTX_DECLSPEC /* 中文逐项-接口 X0727：nvtxDomainRangeStartEx
+ * 接口职责：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxRangeId_t NVTX_API nvtxDomainRangeStartEx(nvtxDomainHandle_t domain, const
+ * nvtxEventAttributes_t* eventAttrib);
+ */nvtxRangeId_t NVTX_API nvtxDomainRangeStartEx(nvtxDomainHandle_t domain, const nvtxEventAttributes_t* eventAttrib);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -680,7 +903,10 @@ NVTX_DECLSPEC nvtxRangeId_t NVTX_API nvtxDomainRangeStartEx(nvtxDomainHandle_t d
  *
  * \version \NVTX_VERSION_1
  * @{ */
-NVTX_DECLSPEC nvtxRangeId_t NVTX_API nvtxRangeStartEx(const nvtxEventAttributes_t* eventAttrib);
+NVTX_DECLSPEC /* 中文逐项-接口 X0728：nvtxRangeStartEx
+ * 接口职责：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxRangeId_t NVTX_API nvtxRangeStartEx(const nvtxEventAttributes_t* eventAttrib);
+ */nvtxRangeId_t NVTX_API nvtxRangeStartEx(const nvtxEventAttributes_t* eventAttrib);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -707,8 +933,14 @@ NVTX_DECLSPEC nvtxRangeId_t NVTX_API nvtxRangeStartEx(const nvtxEventAttributes_
  *
  * \version \NVTX_VERSION_0
  * @{ */
-NVTX_DECLSPEC nvtxRangeId_t NVTX_API nvtxRangeStartA(const char* message);
-NVTX_DECLSPEC nvtxRangeId_t NVTX_API nvtxRangeStartW(const wchar_t* message);
+NVTX_DECLSPEC /* 中文逐项-接口 X0729：nvtxRangeStartA
+ * 接口职责：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxRangeId_t NVTX_API nvtxRangeStartA(const char* message);
+ */nvtxRangeId_t NVTX_API nvtxRangeStartA(const char* message);
+NVTX_DECLSPEC /* 中文逐项-接口 X0730：nvtxRangeStartW
+ * 接口职责：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxRangeId_t NVTX_API nvtxRangeStartW(const wchar_t* message);
+ */nvtxRangeId_t NVTX_API nvtxRangeStartW(const wchar_t* message);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -738,7 +970,10 @@ NVTX_DECLSPEC nvtxRangeId_t NVTX_API nvtxRangeStartW(const wchar_t* message);
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxDomainRangeEnd(nvtxDomainHandle_t domain, nvtxRangeId_t id);
+NVTX_DECLSPEC /* 中文逐项-接口 X0731：nvtxDomainRangeEnd
+ * 接口职责：按id结束显式NVTX时间范围。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxDomainRangeEnd(nvtxDomainHandle_t domain, nvtxRangeId_t id);
+ */void NVTX_API nvtxDomainRangeEnd(nvtxDomainHandle_t domain, nvtxRangeId_t id);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -754,7 +989,10 @@ NVTX_DECLSPEC void NVTX_API nvtxDomainRangeEnd(nvtxDomainHandle_t domain, nvtxRa
  *
  * \version \NVTX_VERSION_0
  * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxRangeEnd(nvtxRangeId_t id);
+NVTX_DECLSPEC /* 中文逐项-接口 X0732：nvtxRangeEnd
+ * 接口职责：按id结束显式NVTX时间范围。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxRangeEnd(nvtxRangeId_t id);
+ */void NVTX_API nvtxRangeEnd(nvtxRangeId_t id);
 /** @} */
 
 /** \name Thread Ranges */
@@ -795,7 +1033,11 @@ NVTX_DECLSPEC void NVTX_API nvtxRangeEnd(nvtxRangeId_t id);
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC int NVTX_API nvtxDomainRangePushEx(nvtxDomainHandle_t domain, const nvtxEventAttributes_t* eventAttrib);
+NVTX_DECLSPEC /* 中文逐项-接口 X0733：nvtxDomainRangePushEx
+ * 接口职责：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：int NVTX_API nvtxDomainRangePushEx(nvtxDomainHandle_t domain, const
+ * nvtxEventAttributes_t* eventAttrib);
+ */int NVTX_API nvtxDomainRangePushEx(nvtxDomainHandle_t domain, const nvtxEventAttributes_t* eventAttrib);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -833,7 +1075,10 @@ NVTX_DECLSPEC int NVTX_API nvtxDomainRangePushEx(nvtxDomainHandle_t domain, cons
  *
  * \version \NVTX_VERSION_1
  * @{ */
-NVTX_DECLSPEC int NVTX_API nvtxRangePushEx(const nvtxEventAttributes_t* eventAttrib);
+NVTX_DECLSPEC /* 中文逐项-接口 X0734：nvtxRangePushEx
+ * 接口职责：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：int NVTX_API nvtxRangePushEx(const nvtxEventAttributes_t* eventAttrib);
+ */int NVTX_API nvtxRangePushEx(const nvtxEventAttributes_t* eventAttrib);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -858,8 +1103,14 @@ NVTX_DECLSPEC int NVTX_API nvtxRangePushEx(const nvtxEventAttributes_t* eventAtt
  *
  * \version \NVTX_VERSION_0
  * @{ */
-NVTX_DECLSPEC int NVTX_API nvtxRangePushA(const char* message);
-NVTX_DECLSPEC int NVTX_API nvtxRangePushW(const wchar_t* message);
+NVTX_DECLSPEC /* 中文逐项-接口 X0735：nvtxRangePushA
+ * 接口职责：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：int NVTX_API nvtxRangePushA(const char* message);
+ */int NVTX_API nvtxRangePushA(const char* message);
+NVTX_DECLSPEC /* 中文逐项-接口 X0736：nvtxRangePushW
+ * 接口职责：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：int NVTX_API nvtxRangePushW(const wchar_t* message);
+ */int NVTX_API nvtxRangePushW(const wchar_t* message);
 /** @} */
 
 
@@ -885,7 +1136,10 @@ NVTX_DECLSPEC int NVTX_API nvtxRangePushW(const wchar_t* message);
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC int NVTX_API nvtxDomainRangePop(nvtxDomainHandle_t domain);
+NVTX_DECLSPEC /* 中文逐项-接口 X0737：nvtxDomainRangePop
+ * 接口职责：从当前线程NVTX范围栈pop结束最近区间。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：int NVTX_API nvtxDomainRangePop(nvtxDomainHandle_t domain);
+ */int NVTX_API nvtxDomainRangePop(nvtxDomainHandle_t domain);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -909,7 +1163,10 @@ NVTX_DECLSPEC int NVTX_API nvtxDomainRangePop(nvtxDomainHandle_t domain);
  *
  * \version \NVTX_VERSION_0
  * @{ */
-NVTX_DECLSPEC int NVTX_API nvtxRangePop(void);
+NVTX_DECLSPEC /* 中文逐项-接口 X0738：nvtxRangePop
+ * 接口职责：从当前线程NVTX范围栈pop结束最近区间。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：int NVTX_API nvtxRangePop(void);
+ */int NVTX_API nvtxRangePop(void);
 /** @} */
 
 
@@ -934,7 +1191,15 @@ NVTX_DECLSPEC int NVTX_API nvtxRangePop(void);
 * Classes are used to make it easy to create a series of resource types 
 * per API without collisions 
 */
+/* 中文逐项-宏 M0098：NVTX_RESOURCE_MAKE_TYPE
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_RESOURCE_MAKE_TYPE；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_RESOURCE_MAKE_TYPE(CLASS, INDEX) ((((uint32_t)(NVTX_RESOURCE_CLASS_ ## CLASS))<<16)|((uint32_t)(INDEX)))
+/* 中文逐项-常量 X0739：NVTX_RESOURCE_CLASS_GENERIC
+ * 编译期定义：NVTX_RESOURCE_CLASS_GENERIC = 1。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_RESOURCE_CLASS_GENERIC 1
 /** \endcond */
 
@@ -946,12 +1211,35 @@ NVTX_DECLSPEC int NVTX_API nvtxRangePop(void);
 *
 * \version \NVTX_VERSION_2
 */
-typedef enum nvtxResourceGenericType_t
+typedef /* 中文逐项-类型 T0325：nvtxResourceGenericType_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum nvtxResourceGenericType_t
 {
+/* 中文逐项-枚举项 X0740：NVTX_RESOURCE_TYPE_UNKNOWN
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */
     NVTX_RESOURCE_TYPE_UNKNOWN = 0,
+/* 中文逐项-枚举项 X0741：NVTX_RESOURCE_TYPE_GENERIC_POINTER
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：NVTX_RESOURCE_MAKE_TYPE(GENERIC, 1)
+ */
     NVTX_RESOURCE_TYPE_GENERIC_POINTER = NVTX_RESOURCE_MAKE_TYPE(GENERIC, 1), /**< Generic pointer assumed to have no collisions with other pointers. */
+/* 中文逐项-枚举项 X0742：NVTX_RESOURCE_TYPE_GENERIC_HANDLE
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：NVTX_RESOURCE_MAKE_TYPE(GENERIC, 2)
+ */
     NVTX_RESOURCE_TYPE_GENERIC_HANDLE = NVTX_RESOURCE_MAKE_TYPE(GENERIC, 2), /**< Generic handle assumed to have no collisions with other handles. */
+/* 中文逐项-枚举项 X0743：NVTX_RESOURCE_TYPE_GENERIC_THREAD_NATIVE
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：NVTX_RESOURCE_MAKE_TYPE(GENERIC, 3)
+ */
     NVTX_RESOURCE_TYPE_GENERIC_THREAD_NATIVE = NVTX_RESOURCE_MAKE_TYPE(GENERIC, 3), /**< OS native thread identifier. */
+/* 中文逐项-枚举项 X0744：NVTX_RESOURCE_TYPE_GENERIC_THREAD_POSIX
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：NVTX_RESOURCE_MAKE_TYPE(GENERIC, 4)
+ */
     NVTX_RESOURCE_TYPE_GENERIC_THREAD_POSIX = NVTX_RESOURCE_MAKE_TYPE(GENERIC, 4) /**< POSIX pthread identifier. */
 } nvtxResourceGenericType_t;
 
@@ -1032,7 +1320,10 @@ typedef enum nvtxResourceGenericType_t
 * \sa
 * ::nvtxDomainResourceCreate
 */
-typedef struct nvtxResourceAttributes_v0
+typedef /* 中文逐项-类型 T0326：nvtxResourceAttributes_v0
+ * 类型职责：动态管理/映射库所需的ABI类型，保存该接口返回的属性/句柄；先看外层调用确定设备身份和生命周期。
+ * 声明内可见成员（含嵌套成员）：version、size、identifierType、identifier、pValue、ullValue、messageType、message。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */struct nvtxResourceAttributes_v0
 {
     /**
     * \brief Version flag of the structure.
@@ -1041,6 +1332,9 @@ typedef struct nvtxResourceAttributes_v0
     * supported in this header file. This can optionally be overridden to
     * another version of the tools extension library.
     */
+/* 中文逐项-变量 V2811：version
+ * version（uint16_t；成员 nvtxResourceAttributes_v0）：外部库事件/导出结构的布局大小与版本号，接收方据此判断可安全读取哪些字段。
+ */
     uint16_t version;
 
     /**
@@ -1049,6 +1343,9 @@ typedef struct nvtxResourceAttributes_v0
     * Needs to be set to the size in bytes of this attribute
     * structure.
     */
+/* 中文逐项-变量 V2812：size
+ * size（uint16_t；成员 nvtxResourceAttributes_v0）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ */
     uint16_t size;
 
     /**
@@ -1059,6 +1356,9 @@ typedef struct nvtxResourceAttributes_v0
     *
     * Default Value is NVTX_RESOURCE_TYPE_UNKNOWN
     */
+/* 中文逐项-变量 V2813：identifierType
+ * identifierType（int32_t；成员 nvtxResourceAttributes_v0）：NVTX资源标识union及类型，描述可被工具命名/关联的操作系统或CUDA资源。
+ */
     int32_t identifierType;            /* values from enums following the pattern nvtxResource[name]Type_t */
 
     /**
@@ -1068,9 +1368,24 @@ typedef struct nvtxResourceAttributes_v0
     * An identifier may be a pointer or a handle to an OS or middleware API object.
     * The resource type will assist in avoiding collisions where handles values may collide.
     */
+/* 中文逐项-变量 V2814：identifier
+ * identifier（union identifier_t { const void* pValue; uint64_t ullValue; }；成员
+ * nvtxResourceAttributes_v0）：NVTX资源标识union及类型，描述可被工具命名/关联的操作系统或CUDA资源。
+ */
+/* 中文逐项-类型 T0327：identifier_t
+ * 类型职责：本文件的union类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：identifier、pValue、ullValue。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ * 存储规则：成员共享同一段存储；写一种视图后应按本协议约定解释另一视图，不能把所有成员当作独立有效对象。
+ */
     union identifier_t
     {
+/* 中文逐项-变量 V2815：pValue
+ * pValue（void；成员 nvtxResourceAttributes_v0::identifier_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         const void* pValue;
+/* 中文逐项-变量 V2816：ullValue
+ * ullValue（uint64_t；成员 nvtxResourceAttributes_v0::identifier_t）：NVTX事件payload的双精度、浮点、整型、64位或指针视图，读取前核对payloadType。
+ */
         uint64_t ullValue;
     } identifier;
 
@@ -1081,12 +1396,18 @@ typedef struct nvtxResourceAttributes_v0
     *
     * Default Value is NVTX_MESSAGE_UNKNOWN
     */
+/* 中文逐项-变量 V2817：messageType
+ * messageType（int32_t；成员 nvtxResourceAttributes_v0）：NVTX颜色/消息/载荷的union类型标签，读取值前先看对应标签。
+ */
     int32_t messageType;            /* nvtxMessageType_t */
 
     /** \brief Message assigned to this attribute structure. \anchor RESOURCE_MESSAGE_FIELD
     *
     * The text message that is attached to a resource.
     */
+/* 中文逐项-变量 V2818：message
+ * message（nvtxMessageValue_t；成员 nvtxResourceAttributes_v0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ */
     nvtxMessageValue_t message;
 
 } nvtxResourceAttributes_v0;
@@ -1096,6 +1417,10 @@ typedef struct nvtxResourceAttributes_v0 nvtxResourceAttributes_t;
 /* \cond SHOW_HIDDEN 
 * \version \NVTX_VERSION_2
 */
+/* 中文逐项-常量 X0745：NVTX_RESOURCE_ATTRIB_STRUCT_SIZE
+ * 编译期定义：NVTX_RESOURCE_ATTRIB_STRUCT_SIZE = ( (uint16_t)( sizeof(nvtxResourceAttributes_v0) ) )。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_RESOURCE_ATTRIB_STRUCT_SIZE ( (uint16_t)( sizeof(nvtxResourceAttributes_v0) ) )
 typedef struct nvtxResourceHandle* nvtxResourceHandle_t;
 /** \endcond */
@@ -1132,7 +1457,11 @@ typedef struct nvtxResourceHandle* nvtxResourceHandle_t;
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC nvtxResourceHandle_t NVTX_API nvtxDomainResourceCreate(nvtxDomainHandle_t domain, nvtxResourceAttributes_t* attribs);
+NVTX_DECLSPEC /* 中文逐项-接口 X0746：nvtxDomainResourceCreate
+ * 接口职责：在NVTX域中登记一个可被工具识别的资源属性对象。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxResourceHandle_t NVTX_API nvtxDomainResourceCreate(nvtxDomainHandle_t domain,
+ * nvtxResourceAttributes_t* attribs);
+ */nvtxResourceHandle_t NVTX_API nvtxDomainResourceCreate(nvtxDomainHandle_t domain, nvtxResourceAttributes_t* attribs);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -1161,7 +1490,10 @@ NVTX_DECLSPEC nvtxResourceHandle_t NVTX_API nvtxDomainResourceCreate(nvtxDomainH
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxDomainResourceDestroy(nvtxResourceHandle_t resource);
+NVTX_DECLSPEC /* 中文逐项-接口 X0747：nvtxDomainResourceDestroy
+ * 接口职责：结束域内资源标记的生命周期。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxDomainResourceDestroy(nvtxResourceHandle_t resource);
+ */void NVTX_API nvtxDomainResourceDestroy(nvtxResourceHandle_t resource);
 /** @} */
 
 
@@ -1195,8 +1527,16 @@ NVTX_DECLSPEC void NVTX_API nvtxDomainResourceDestroy(nvtxResourceHandle_t resou
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxDomainNameCategoryA(nvtxDomainHandle_t domain, uint32_t category, const char* name);
-NVTX_DECLSPEC void NVTX_API nvtxDomainNameCategoryW(nvtxDomainHandle_t domain, uint32_t category, const wchar_t* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0748：nvtxDomainNameCategoryA
+ * 接口职责：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxDomainNameCategoryA(nvtxDomainHandle_t domain, uint32_t category,
+ * const char* name);
+ */void NVTX_API nvtxDomainNameCategoryA(nvtxDomainHandle_t domain, uint32_t category, const char* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0749：nvtxDomainNameCategoryW
+ * 接口职责：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxDomainNameCategoryW(nvtxDomainHandle_t domain, uint32_t category,
+ * const wchar_t* name);
+ */void NVTX_API nvtxDomainNameCategoryW(nvtxDomainHandle_t domain, uint32_t category, const wchar_t* name);
 /** @} */
 
 /** \brief Annotate an NVTX category.
@@ -1220,8 +1560,14 @@ NVTX_DECLSPEC void NVTX_API nvtxDomainNameCategoryW(nvtxDomainHandle_t domain, u
  *
  * \version \NVTX_VERSION_1
  * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxNameCategoryA(uint32_t category, const char* name);
-NVTX_DECLSPEC void NVTX_API nvtxNameCategoryW(uint32_t category, const wchar_t* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0750：nvtxNameCategoryA
+ * 接口职责：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxNameCategoryA(uint32_t category, const char* name);
+ */void NVTX_API nvtxNameCategoryA(uint32_t category, const char* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0751：nvtxNameCategoryW
+ * 接口职责：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxNameCategoryW(uint32_t category, const wchar_t* name);
+ */void NVTX_API nvtxNameCategoryW(uint32_t category, const wchar_t* name);
 /** @} */
 
 /** \name Functions for OS Threads Naming*/
@@ -1287,8 +1633,14 @@ NVTX_DECLSPEC void NVTX_API nvtxNameCategoryW(uint32_t category, const wchar_t* 
  *
  * \version \NVTX_VERSION_1
  * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxNameOsThreadA(uint32_t threadId, const char* name);
-NVTX_DECLSPEC void NVTX_API nvtxNameOsThreadW(uint32_t threadId, const wchar_t* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0752：nvtxNameOsThreadA
+ * 接口职责：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxNameOsThreadA(uint32_t threadId, const char* name);
+ */void NVTX_API nvtxNameOsThreadA(uint32_t threadId, const char* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0753：nvtxNameOsThreadW
+ * 接口职责：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxNameOsThreadW(uint32_t threadId, const wchar_t* name);
+ */void NVTX_API nvtxNameOsThreadW(uint32_t threadId, const wchar_t* name);
 /** @} */
 
 
@@ -1336,8 +1688,16 @@ NVTX_DECLSPEC void NVTX_API nvtxNameOsThreadW(uint32_t threadId, const wchar_t* 
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC nvtxStringHandle_t NVTX_API nvtxDomainRegisterStringA(nvtxDomainHandle_t domain, const char* string);
-NVTX_DECLSPEC nvtxStringHandle_t NVTX_API nvtxDomainRegisterStringW(nvtxDomainHandle_t domain, const wchar_t* string);
+NVTX_DECLSPEC /* 中文逐项-接口 X0754：nvtxDomainRegisterStringA
+ * 接口职责：注册域内可复用字符串并返回句柄，降低重复消息处理开销。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxStringHandle_t NVTX_API nvtxDomainRegisterStringA(nvtxDomainHandle_t domain,
+ * const char* string);
+ */nvtxStringHandle_t NVTX_API nvtxDomainRegisterStringA(nvtxDomainHandle_t domain, const char* string);
+NVTX_DECLSPEC /* 中文逐项-接口 X0755：nvtxDomainRegisterStringW
+ * 接口职责：注册域内可复用字符串并返回句柄，降低重复消息处理开销。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxStringHandle_t NVTX_API nvtxDomainRegisterStringW(nvtxDomainHandle_t domain,
+ * const wchar_t* string);
+ */nvtxStringHandle_t NVTX_API nvtxDomainRegisterStringW(nvtxDomainHandle_t domain, const wchar_t* string);
 /** @} */
 
 /** @} */ /*END defgroup*/
@@ -1398,8 +1758,14 @@ NVTX_DECLSPEC nvtxStringHandle_t NVTX_API nvtxDomainRegisterStringW(nvtxDomainHa
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC nvtxDomainHandle_t NVTX_API nvtxDomainCreateA(const char* name);
-NVTX_DECLSPEC nvtxDomainHandle_t NVTX_API nvtxDomainCreateW(const wchar_t* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0756：nvtxDomainCreateA
+ * 接口职责：创建带名字的NVTX标记域，隔离不同组件的事件/类别。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxDomainHandle_t NVTX_API nvtxDomainCreateA(const char* name);
+ */nvtxDomainHandle_t NVTX_API nvtxDomainCreateA(const char* name);
+NVTX_DECLSPEC /* 中文逐项-接口 X0757：nvtxDomainCreateW
+ * 接口职责：创建带名字的NVTX标记域，隔离不同组件的事件/类别。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：nvtxDomainHandle_t NVTX_API nvtxDomainCreateW(const wchar_t* name);
+ */nvtxDomainHandle_t NVTX_API nvtxDomainCreateW(const wchar_t* name);
 /** @} */
 
 /* ------------------------------------------------------------------------- */
@@ -1421,7 +1787,10 @@ NVTX_DECLSPEC nvtxDomainHandle_t NVTX_API nvtxDomainCreateW(const wchar_t* name)
 *
 * \version \NVTX_VERSION_2
 * @{ */
-NVTX_DECLSPEC void NVTX_API nvtxDomainDestroy(nvtxDomainHandle_t domain);
+NVTX_DECLSPEC /* 中文逐项-接口 X0758：nvtxDomainDestroy
+ * 接口职责：释放NVTX域句柄及工具相关引用。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：void NVTX_API nvtxDomainDestroy(nvtxDomainHandle_t domain);
+ */void NVTX_API nvtxDomainDestroy(nvtxDomainHandle_t domain);
 /** @} */
 
 
@@ -1430,24 +1799,88 @@ NVTX_DECLSPEC void NVTX_API nvtxDomainDestroy(nvtxDomainHandle_t domain);
 /** \cond SHOW_HIDDEN */
 
 #ifdef UNICODE
+/* 中文逐项-常量 X0759：nvtxMark
+ * 编译期定义：nvtxMark = nvtxMarkW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxMark            nvtxMarkW
+/* 中文逐项-常量 X0760：nvtxRangeStart
+ * 编译期定义：nvtxRangeStart = nvtxRangeStartW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxRangeStart      nvtxRangeStartW
+/* 中文逐项-常量 X0761：nvtxRangePush
+ * 编译期定义：nvtxRangePush = nvtxRangePushW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxRangePush       nvtxRangePushW
+/* 中文逐项-常量 X0762：nvtxNameCategory
+ * 编译期定义：nvtxNameCategory = nvtxNameCategoryW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxNameCategory    nvtxNameCategoryW
+/* 中文逐项-常量 X0763：nvtxNameOsThread
+ * 编译期定义：nvtxNameOsThread = nvtxNameOsThreadW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxNameOsThread    nvtxNameOsThreadW
     /* NVTX_VERSION_2 */
+/* 中文逐项-常量 X0764：nvtxDomainCreate
+ * 编译期定义：nvtxDomainCreate = nvtxDomainCreateW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxDomainCreate         nvtxDomainCreateW
+/* 中文逐项-常量 X0765：nvtxDomainRegisterString
+ * 编译期定义：nvtxDomainRegisterString = nvtxDomainRegisterStringW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxDomainRegisterString nvtxDomainRegisterStringW
+/* 中文逐项-常量 X0766：nvtxDomainNameCategory
+ * 编译期定义：nvtxDomainNameCategory = nvtxDomainNameCategoryW。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxDomainNameCategory   nvtxDomainNameCategoryW
 #else
+/* 中文逐项-常量 X0767：nvtxMark
+ * 编译期定义：nvtxMark = nvtxMarkA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxMark            nvtxMarkA
+/* 中文逐项-常量 X0768：nvtxRangeStart
+ * 编译期定义：nvtxRangeStart = nvtxRangeStartA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxRangeStart      nvtxRangeStartA
+/* 中文逐项-常量 X0769：nvtxRangePush
+ * 编译期定义：nvtxRangePush = nvtxRangePushA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxRangePush       nvtxRangePushA
+/* 中文逐项-常量 X0770：nvtxNameCategory
+ * 编译期定义：nvtxNameCategory = nvtxNameCategoryA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxNameCategory    nvtxNameCategoryA
+/* 中文逐项-常量 X0771：nvtxNameOsThread
+ * 编译期定义：nvtxNameOsThread = nvtxNameOsThreadA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxNameOsThread    nvtxNameOsThreadA
     /* NVTX_VERSION_2 */
+/* 中文逐项-常量 X0772：nvtxDomainCreate
+ * 编译期定义：nvtxDomainCreate = nvtxDomainCreateA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxDomainCreate         nvtxDomainCreateA
+/* 中文逐项-常量 X0773：nvtxDomainRegisterString
+ * 编译期定义：nvtxDomainRegisterString = nvtxDomainRegisterStringA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxDomainRegisterString nvtxDomainRegisterStringA
+/* 中文逐项-常量 X0774：nvtxDomainNameCategory
+ * 编译期定义：nvtxDomainNameCategory = nvtxDomainNameCategoryA。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define nvtxDomainNameCategory   nvtxDomainNameCategoryA
 #endif
 
@@ -1457,6 +1890,10 @@ NVTX_DECLSPEC void NVTX_API nvtxDomainDestroy(nvtxDomainHandle_t domain);
 } /* extern "C" */
 #endif /* __cplusplus */
 
+/* 中文逐项-常量 X0775：NVTX_IMPL_GUARD
+ * 编译期定义：NVTX_IMPL_GUARD = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_IMPL_GUARD /* Ensure other headers cannot included directly */
 
 #include "nvtxDetail/nvtxTypes.h"

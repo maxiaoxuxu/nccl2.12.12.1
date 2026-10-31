@@ -9,6 +9,16 @@
 #include "primitives.h"
 
 namespace {
+/* 中文逐项-函数 F0058：runRing
+ * 用途与位置：执行当前文件对应 API 的设备端环算法：各 channel 按 bid 计算地址，沿 prev/next 用协议原语流水推进；当前API文件为 all_reduce。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_gather.h::run；src/collectives/device/all_reduce.h::run；src/collectives/device/broadcast.h::run；src/collectives/device/reduce.h::run；src/collectives/device/reduce_scatter.h::run。
+ * 本体直接出现的调用/包装：Proto::calcBytePerGrain；Proto::calcBytePerStep；calcOffset；divUp；int；min；modRanks；prims.directRecv；prims.directRecvCopySend；prims.directRecvReduceCopySend；prims.recvReduceSend；prims.send；roundUp。
+ * 需要对照的边界/推进条件：Proto::Id == NCCL_PROTO_LL；Proto::Id == NCCL_PROTO_LL128；gridOffset < size；Proto::Id ==
+ * NCCL_PROTO_SIMPLE。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return gridOffset + bid*nranks*realChunkSize + chunk*realChunkSize;；return gridOffset + (chunk*nChannels +
+ * bid)*realChunkSize;；return r - (r >= nranks ? nranks : 0);。CHECK类宏还可能提前返回/跳转。
+ */
   template<typename T, typename RedOp, typename Proto>
 /* 中文导读：
  * Ring AllReduce 的设备端主循环。每个 channel/block 负责输入的一部分，沿 prev/next 传递分块。
@@ -16,17 +26,62 @@ namespace {
  * 这里的 direct 仍受连接能力约束，不能据函数名判断为 GPU 直接提交 RDMA WQE。
  */
   __device__ __forceinline__ void runRing(ncclWorkElem *args) {
+/* 中文逐项-变量 V0113：tid
+ * tid（int；函数 runRing 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
+ * 初值/来源 tid = threadIdx.x；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int tid = threadIdx.x;
+/* 中文逐项-变量 V0114：nthreads
+ * nthreads（int；函数 runRing 内）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
+ * 初值/来源 nthreads = args->header.nWarps*WARP_SIZE；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nthreads = args->header.nWarps*WARP_SIZE;
+/* 中文逐项-变量 V0115：bid
+ * bid（int；函数 runRing 内）：当前任务内部的 channel 分片编号，参与张量地址计算；不是网卡或全局 rank 编号。
+ * 初值/来源 bid = args->bid；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int bid = args->bid;
+/* 中文逐项-变量 V0116：nChannels
+ * nChannels（int；函数 runRing 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = args->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nChannels = args->nChannels;
+/* 中文逐项-变量 V0117：ring
+ * ring（ncclRing；函数 runRing 内）：本 channel 的环邻居和内部顺序，决定前驱接收与后继发送。
+ * 初值/来源 ring = &ncclShmem.channel.ring；取得已有对象/数组元素地址，不在这一表达式中创建新分配。
+ */
     ncclRing *ring = &ncclShmem.channel.ring;
+/* 中文逐项-变量 V0118：ringIx
+ * ringIx（int；函数 runRing 内）：当前分段或表项的相对位置，精确单位由下面赋值式和指针元素类型确定。
+ * 初值/来源 ringIx = ring->index；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int ringIx = ring->index;
+/* 中文逐项-变量 V0119：chunkSize
+ * chunkSize（ssize_t；函数 runRing 内）：算法/协议块容量；主机 NET 调度多用字节，设备 T 算法通常已除 sizeof(T) 变成元素数。
+ * 初值/来源 chunkSize = int(Proto::calcBytePerStep()/sizeof(T) * (Proto::Id == NCCL_PROTO_SIMPLE ? ALLREDUCE_CHUNKSTEPS :
+ * 1))；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
     const ssize_t chunkSize = int(Proto::calcBytePerStep()/sizeof(T) * (Proto::Id == NCCL_PROTO_SIMPLE ? ALLREDUCE_CHUNKSTEPS : 1));
+/* 中文逐项-变量 V0120：nranks
+ * nranks（int；函数 runRing 内）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 初值/来源 nranks = ncclShmem.comm.nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nranks = ncclShmem.comm.nRanks;
+/* 中文逐项-变量 V0121：loopSize
+ * loopSize（ssize_t；函数 runRing 内）：一轮全部 channel（以及 Ring ranks/CollNet heads）覆盖的逻辑数据范围。
+ * 初值/来源 loopSize = nChannels*nranks*chunkSize；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const ssize_t loopSize = nChannels*nranks*chunkSize;
+/* 中文逐项-变量 V0122：size
+ * size（ssize_t；函数 runRing 内）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ * 初值/来源 size = args->count；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const ssize_t size = args->count;
 
+/* 中文逐项-变量 V0123：minChunkSize
+ * minChunkSize（int；函数 runRing 内）：当前对象或片段的容量，初始化式中的sizeof/乘除关系确定字节或元素单位。
+ * 此处未显式给初值；后续首个文本使用点：minChunkSize = nthreads*(Proto::calcBytePerGrain()/sizeof(T));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int minChunkSize;
     if (Proto::Id == NCCL_PROTO_LL)
       minChunkSize = nthreads*(Proto::calcBytePerGrain()/sizeof(T));
@@ -35,10 +90,24 @@ namespace {
       minChunkSize = nthreads*(Proto::calcBytePerGrain()/sizeof(T))/2;
     }
 
+/* 中文逐项-变量 V0124：prims
+ * prims（Primitives<T, RedOp, FanSymmetric<1>, 1, Proto, 0>；函数 runRing 内）：当前 GPU 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid, nthreads, &ring->prev, &ring->next, args->sendbuff, args->recvbuff,
+ * args->redOpArg)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     Primitives<T, RedOp, FanSymmetric<1>, 1, Proto, 0> prims
       (tid, nthreads, &ring->prev, &ring->next, args->sendbuff, args->recvbuff, args->redOpArg);
 
-    for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+    for (/* 中文逐项-变量 V0125：gridOffset
+ * gridOffset（ssize_t；函数 runRing 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0126：realChunkSize
+ * realChunkSize（ssize_t；函数 runRing 内）：结合剩余数据、并行通道和对齐粒度计算的本轮块容量，不保证每块都填满。
+ * 此处未显式给初值；后续首个文本使用点：realChunkSize = min(chunkSize, divUp(size-gridOffset,
+ * nChannels*nranks));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       ssize_t realChunkSize;
       if (Proto::Id == NCCL_PROTO_SIMPLE) {
         realChunkSize = min(chunkSize, divUp(size-gridOffset, nChannels*nranks));
@@ -57,18 +126,41 @@ namespace {
  * LL/LL128 用 (chunk*nChannels+bid)*realChunkSize 交错布局；不能把 Simple 公式套到所有协议。
  * 注意 realChunkSize 是对齐后的容量，不保证每个块都有这么多有效元素。
  */
+/* 中文逐项-变量 V0127：calcOffset
+ * calcOffset（auto；函数 runRing 内）：当前分段或表项的相对位置，精确单位由下面赋值式和指针元素类型确定。
+ * 初值/来源 calcOffset = [&]__device__(int chunk)->ssize_t { if (Proto::Id == NCCL_PROTO_SIMPLE) return gridOffset +
+ * bid*nranks*realChunkSize + chunk*realChunkSize; else return gridOffset + (chunk*nChannels + bid)*realChunkSize;
+ * }；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       auto calcOffset = [&]__device__(int chunk)->ssize_t {
         if (Proto::Id == NCCL_PROTO_SIMPLE)
           return gridOffset + bid*nranks*realChunkSize + chunk*realChunkSize;
         else
           return gridOffset + (chunk*nChannels + bid)*realChunkSize;
       };
+/* 中文逐项-变量 V0128：modRanks
+ * modRanks（auto；函数 runRing 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 modRanks = [&]__device__(int r)->int { return r - (r >= nranks ? nranks : 0);
+ * }；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       auto modRanks = [&]__device__(int r)->int {
         return r - (r >= nranks ? nranks : 0);
       };
 
+/* 中文逐项-变量 V0129：offset
+ * offset（ssize_t；函数 runRing 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 此处未显式给初值；后续首个文本使用点：offset = calcOffset(chunk);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       ssize_t offset;
+/* 中文逐项-变量 V0130：nelem
+ * nelem（int；函数 runRing 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 此处未显式给初值；后续首个文本使用点：nelem = min(realChunkSize, size-offset);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int nelem;
+/* 中文逐项-变量 V0131：chunk
+ * chunk（int；函数 runRing 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：chunk = modRanks(ringIx + nranks-1);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int chunk;
 
 /* 中文导读：
@@ -82,7 +174,11 @@ namespace {
       prims.send(offset, nelem);
 
       // k-2 steps: reduce and copy to next GPU
-      for (int j=2; j<nranks; ++j) {
+      for (/* 中文逐项-变量 V0132：j
+ * j（int；函数 runRing 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 j = 2；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ * 所在for循环的继续条件：j<nranks；循环体与增量表达式决定每轮如何推进。
+ */int j=2; j<nranks; ++j) {
         chunk = modRanks(ringIx + nranks-j);
         offset = calcOffset(chunk);
         nelem = min(realChunkSize, size-offset);
@@ -108,7 +204,11 @@ namespace {
  * 最后 directRecv 收齐本 rank 缺少的最后一个块，整段完成 ReduceScatter+AllGather 语义。
  */
       // k-2 steps: copy to next GPU
-      for (int j=1; j<nranks-1; ++j) {
+      for (/* 中文逐项-变量 V0133：j
+ * j（int；函数 runRing 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 j = 1；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ * 所在for循环的继续条件：j<nranks-1；循环体与增量表达式决定每轮如何推进。
+ */int j=1; j<nranks-1; ++j) {
         chunk = modRanks(ringIx + nranks-j);
         offset = calcOffset(chunk);
         nelem = min(realChunkSize, size-offset);
@@ -123,49 +223,136 @@ namespace {
     }
   }
 
+/* 中文逐项-函数 F0059：runTreeUpDown
+ * 用途与位置：先向树根归约再向下广播结果，同一个线程组先后执行两个阶段。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_reduce.h::run。
+ * 本体直接出现的调用/包装：Proto::calcBytePerGrain；Proto::calcBytePerStep；divUp；int；min；prims.directRecv；prims.directRecvCopySend；prims.directSendFromOutput；prims.recvReduceCopy；prims.recvReduceSend；prims.send。
+ * 需要对照的边界/推进条件：loopSize > size；tree->up == -1；gridOffset < size；tree->down[0] == -1。各条件所属分支见紧邻函数体。
+ */
   template<typename T, typename RedOp, typename Proto>
 /* 中文导读：
  * Tree 的先向上归约、再向下广播实现；根/叶/中间节点使用不同原语。
  * root 把孩子与自身输入归约成结果，之后沿反向边传播。所需邻居由初始化时的 tree.up/down 给出。
  */
   __device__ __forceinline__ void runTreeUpDown(ncclWorkElem *args) {
+/* 中文逐项-变量 V0134：tid
+ * tid（int；函数 runTreeUpDown 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
+ * 初值/来源 tid = threadIdx.x；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int tid = threadIdx.x;
+/* 中文逐项-变量 V0135：nthreads
+ * nthreads（int；函数 runTreeUpDown 内）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
+ * 初值/来源 nthreads = args->header.nWarps*WARP_SIZE；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nthreads = args->header.nWarps*WARP_SIZE;
+/* 中文逐项-变量 V0136：bid
+ * bid（int；函数 runTreeUpDown 内）：当前任务内部的 channel 分片编号，参与张量地址计算；不是网卡或全局 rank 编号。
+ * 初值/来源 bid = args->bid；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int bid = args->bid;
+/* 中文逐项-变量 V0137：nChannels
+ * nChannels（int；函数 runTreeUpDown 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = args->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nChannels = args->nChannels;
+/* 中文逐项-变量 V0138：tree
+ * tree（ncclTree；函数 runTreeUpDown 内）：本 channel 的树邻接关系，up/down 决定向上归约和向下广播。
+ * 初值/来源 tree = &ncclShmem.channel.tree；取得已有对象/数组元素地址，不在这一表达式中创建新分配。
+ */
     ncclTree *tree = &ncclShmem.channel.tree;
+/* 中文逐项-变量 V0139：chunkSize
+ * chunkSize（ssize_t；函数 runTreeUpDown 内）：算法/协议块容量；主机 NET 调度多用字节，设备 T 算法通常已除 sizeof(T) 变成元素数。
+ * 初值/来源 chunkSize = int( Proto::Id == NCCL_PROTO_SIMPLE ? args->lastChunkSize / * LL & LL128 * / :
+ * Proto::calcBytePerStep()/sizeof(T))；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
     ssize_t chunkSize = int(
       Proto::Id == NCCL_PROTO_SIMPLE ? args->lastChunkSize
                    /* LL & LL128 */  : Proto::calcBytePerStep()/sizeof(T));
+/* 中文逐项-变量 V0140：minChunkSize
+ * minChunkSize（ssize_t；函数 runTreeUpDown 内）：当前对象或片段的容量，初始化式中的sizeof/乘除关系确定字节或元素单位。
+ * 初值/来源 minChunkSize = int( Proto::Id == NCCL_PROTO_SIMPLE ? (nthreads-2*WARP_SIZE)*8*(sizeof(uint64_t)/sizeof(T)) /
+ * * LL & LL128 * / : nthreads*(Proto::calcBytePerGrain()/sizeof(T)))；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
     const ssize_t minChunkSize = int(
       Proto::Id == NCCL_PROTO_SIMPLE ? (nthreads-2*WARP_SIZE)*8*(sizeof(uint64_t)/sizeof(T))
                    /* LL & LL128 */  : nthreads*(Proto::calcBytePerGrain()/sizeof(T)));
+/* 中文逐项-变量 V0141：loopSize
+ * loopSize（ssize_t；函数 runTreeUpDown 内）：一轮全部 channel（以及 Ring ranks/CollNet heads）覆盖的逻辑数据范围。
+ * 初值/来源 loopSize = int(nChannels*chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const ssize_t loopSize = int(nChannels*chunkSize);
+/* 中文逐项-变量 V0142：size
+ * size（ssize_t；函数 runTreeUpDown 内）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ * 初值/来源 size = args->count；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const ssize_t size = args->count;
 
     if (loopSize > size)
       chunkSize = divUp((int)size, int(nChannels*minChunkSize))*int(minChunkSize);
 
     { // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
+/* 中文逐项-变量 V0143：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DEV_ARITY, 1>, / *Direct=* /0, Proto, 0>；函数 runTreeUpDown 内）：当前
+ * GPU 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid, nthreads, tree->down, &tree->up, args->sendbuff, args->recvbuff,
+ * args->redOpArg)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DEV_ARITY, 1>, /*Direct=*/0, Proto, 0> prims
         (tid, nthreads, tree->down, &tree->up, args->sendbuff, args->recvbuff, args->redOpArg);
       if (tree->up == -1) {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0144：gridOffset
+ * gridOffset（ssize_t；函数 runTreeUpDown 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0145：offset
+ * offset（ssize_t；函数 runTreeUpDown 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0146：nelem
+ * nelem（int；函数 runTreeUpDown 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.recvReduceCopy(offset, offset, nelem, /*postOp=*/true);
         }
       }
       else if (tree->down[0] == -1) {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0147：gridOffset
+ * gridOffset（ssize_t；函数 runTreeUpDown 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0148：offset
+ * offset（ssize_t；函数 runTreeUpDown 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0149：nelem
+ * nelem（int；函数 runTreeUpDown 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.send(offset, nelem);
         }
       }
       else {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0150：gridOffset
+ * gridOffset（ssize_t；函数 runTreeUpDown 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0151：offset
+ * offset（ssize_t；函数 runTreeUpDown 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0152：nelem
+ * nelem（int；函数 runTreeUpDown 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.recvReduceSend(offset, nelem);
         }
@@ -173,25 +360,67 @@ namespace {
     }
 
     { // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
+/* 中文逐项-变量 V0153：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DEV_ARITY>, / *Direct=* /1, Proto, 0>；函数 runTreeUpDown 内）：当前
+ * GPU 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid, nthreads, &tree->up, tree->down, args->sendbuff, args->recvbuff,
+ * args->redOpArg)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DEV_ARITY>, /*Direct=*/1, Proto, 0> prims
         (tid, nthreads, &tree->up, tree->down, args->sendbuff, args->recvbuff, args->redOpArg);
       if (tree->up == -1) {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0154：gridOffset
+ * gridOffset（ssize_t；函数 runTreeUpDown 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0155：offset
+ * offset（ssize_t；函数 runTreeUpDown 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0156：nelem
+ * nelem（int；函数 runTreeUpDown 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.directSendFromOutput(offset, offset, nelem);
         }
       }
       else if (tree->down[0] == -1) {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0157：gridOffset
+ * gridOffset（ssize_t；函数 runTreeUpDown 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0158：offset
+ * offset（ssize_t；函数 runTreeUpDown 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0159：nelem
+ * nelem（int；函数 runTreeUpDown 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.directRecv(offset, nelem);
         }
       }
       else {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0160：gridOffset
+ * gridOffset（ssize_t；函数 runTreeUpDown 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0161：offset
+ * offset（ssize_t；函数 runTreeUpDown 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0162：nelem
+ * nelem（int；函数 runTreeUpDown 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.directRecvCopySend(offset, offset, nelem);
         }
@@ -199,25 +428,71 @@ namespace {
     }
   }
 
+/* 中文逐项-函数 F0060：runTreeSplit
+ * 用途与位置：把非根 block 线程分成上行归约与下行广播两组，用不同 barrier/group 形成重叠流水。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_reduce.h::run。
+ * 本体直接出现的调用/包装：Proto::calcBytePerGrain；Proto::calcBytePerStep；divUp；int；min；prims.directRecv；prims.directRecvCopySend；prims.directRecvReduceCopySend；prims.recvReduceSend；prims.send。
+ * 需要对照的边界/推进条件：Proto::Id == NCCL_PROTO_SIMPLE；nthreadsSplit >= 256；loopSize > size；tree->up == -1。各条件所属分支见紧邻函数体。
+ */
   template<typename T, typename RedOp, typename Proto>
 /* 中文导读：
  * 在同一 block 中分配不同线程组推进向上归约与向下广播，以改善流水重叠。
  * 这是设备端线程执行拆分；不要与 graph.h 中决定跨节点流量端点的 SPLIT_TREE 搜索模式混为一谈。
  */
   __device__ __forceinline__ void runTreeSplit(ncclWorkElem *args) {
+/* 中文逐项-变量 V0163：tid
+ * tid（int；函数 runTreeSplit 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
+ * 初值/来源 tid = threadIdx.x；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int tid = threadIdx.x;
+/* 中文逐项-变量 V0164：nthreads
+ * nthreads（int；函数 runTreeSplit 内）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
+ * 初值/来源 nthreads = args->header.nWarps*WARP_SIZE；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nthreads = args->header.nWarps*WARP_SIZE;
+/* 中文逐项-变量 V0165：bid
+ * bid（int；函数 runTreeSplit 内）：当前任务内部的 channel 分片编号，参与张量地址计算；不是网卡或全局 rank 编号。
+ * 初值/来源 bid = args->bid；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int bid = args->bid;
+/* 中文逐项-变量 V0166：nChannels
+ * nChannels（int；函数 runTreeSplit 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = args->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nChannels = args->nChannels;
+/* 中文逐项-变量 V0167：tree
+ * tree（ncclTree；函数 runTreeSplit 内）：本 channel 的树邻接关系，up/down 决定向上归约和向下广播。
+ * 初值/来源 tree = &ncclShmem.channel.tree；取得已有对象/数组元素地址，不在这一表达式中创建新分配。
+ */
     ncclTree *tree = &ncclShmem.channel.tree;
+/* 中文逐项-变量 V0168：chunkSize
+ * chunkSize（ssize_t；函数 runTreeSplit 内）：算法/协议块容量；主机 NET 调度多用字节，设备 T 算法通常已除 sizeof(T) 变成元素数。
+ * 初值/来源 chunkSize = int( Proto::Id != NCCL_PROTO_LL ? args->lastChunkSize :
+ * Proto::calcBytePerStep()/sizeof(T))；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
     ssize_t chunkSize = int(
       Proto::Id != NCCL_PROTO_LL ? args->lastChunkSize
                                  : Proto::calcBytePerStep()/sizeof(T));
+/* 中文逐项-变量 V0169：minChunkSize
+ * minChunkSize（ssize_t；函数 runTreeSplit 内）：当前对象或片段的容量，初始化式中的sizeof/乘除关系确定字节或元素单位。
+ * 初值/来源 minChunkSize = int( Proto::Id == NCCL_PROTO_SIMPLE ? (nthreads - 2*WARP_SIZE)*8*(sizeof(uint64_t)/sizeof(T))
+ * : Proto::Id == NCCL_PROTO_LL ? nthreads*(Proto::calcBytePerGrain()/sizeof(T)) / * LL128 * / :
+ * nthreads*(Proto::calcBytePerGrain()/sizeof …（完整表达式见紧邻源码）；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
     const ssize_t minChunkSize = int(
       Proto::Id == NCCL_PROTO_SIMPLE ? (nthreads - 2*WARP_SIZE)*8*(sizeof(uint64_t)/sizeof(T)) :
       Proto::Id == NCCL_PROTO_LL     ? nthreads*(Proto::calcBytePerGrain()/sizeof(T))
                    /* LL128 */       : nthreads*(Proto::calcBytePerGrain()/sizeof(T))/8);
+/* 中文逐项-变量 V0170：loopSize
+ * loopSize（ssize_t；函数 runTreeSplit 内）：一轮全部 channel（以及 Ring ranks/CollNet heads）覆盖的逻辑数据范围。
+ * 初值/来源 loopSize = int(nChannels*chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const ssize_t loopSize = int(nChannels*chunkSize);
+/* 中文逐项-变量 V0171：size
+ * size（ssize_t；函数 runTreeSplit 内）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ * 初值/来源 size = args->count；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const ssize_t size = args->count;
 
 /* 中文精读：Tree 分线程组的流水线
@@ -225,6 +500,10 @@ namespace {
  * Simple 大致均分后对归约组作调整，LL/LL128 约 70% 线程给更重的多输入归约。
  * 根用融合原语同时完成收集、归约、保存、向下分发；叶子没有有效 child，原语自动简化。
  * 线程组分割是设备执行优化，拓扑 SPLIT_TREE 则是选择跨机端点，两者不能混作一个开关。
+ */
+/* 中文逐项-变量 V0172：nthreadsSplit
+ * nthreadsSplit（int；函数 runTreeSplit 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：nthreadsSplit = nthreads/2;。若由输出参数填入，必须先检查填充调用成功再读值。
  */
     int nthreadsSplit;
     if (Proto::Id == NCCL_PROTO_SIMPLE) {
@@ -241,10 +520,28 @@ namespace {
 
     if (tree->up == -1) {
       // Reduce and broadcast. Max number of recv is 3, max number of send is 3
+/* 中文逐项-变量 V0173：prims
+ * prims（Primitives<T, RedOp, FanSymmetric<NCCL_MAX_DEV_ARITY>, / *Direct=* /1, Proto, 0>；函数 runTreeSplit 内）：当前 GPU
+ * 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid, nthreads, tree->down, tree->down, args->sendbuff, args->recvbuff,
+ * args->redOpArg)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       Primitives<T, RedOp, FanSymmetric<NCCL_MAX_DEV_ARITY>, /*Direct=*/1, Proto, 0>
         prims(tid, nthreads, tree->down, tree->down, args->sendbuff, args->recvbuff, args->redOpArg);
-      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+      for (/* 中文逐项-变量 V0174：gridOffset
+ * gridOffset（ssize_t；函数 runTreeSplit 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0175：offset
+ * offset（ssize_t；函数 runTreeSplit 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
         ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0176：nelem
+ * nelem（int；函数 runTreeSplit 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
         int nelem = min(chunkSize, size-offset);
         prims.directRecvReduceCopySend(offset, offset, offset, nelem, /*doPost=*/true);
       }
@@ -258,18 +555,48 @@ namespace {
        * into DirectRecv and DirectSend capabilities, this ctor would have both=0,
        * but the ctor above for tree roots would be DirectRecv=0 DirectSend=1.
        */
+/* 中文逐项-变量 V0177：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DEV_ARITY, 1>, / *Direct=* /1, Proto, 0>；函数 runTreeSplit 内）：当前
+ * GPU 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid, nthreadsSplit, tree->down, &tree->up, args->sendbuff, args->recvbuff, args->redOpArg,
+ * 0*Proto::MaxGroupWidth)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DEV_ARITY, 1>, /*Direct=*/1, Proto, 0>
         prims(tid, nthreadsSplit, tree->down, &tree->up, args->sendbuff, args->recvbuff, args->redOpArg, 0*Proto::MaxGroupWidth);
       if (tree->down[0] == -1) {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0178：gridOffset
+ * gridOffset（ssize_t；函数 runTreeSplit 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0179：offset
+ * offset（ssize_t；函数 runTreeSplit 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0180：nelem
+ * nelem（int；函数 runTreeSplit 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.send(offset, nelem);
         }
       }
       else {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0181：gridOffset
+ * gridOffset（ssize_t；函数 runTreeSplit 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0182：offset
+ * offset（ssize_t；函数 runTreeSplit 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0183：nelem
+ * nelem（int；函数 runTreeSplit 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.recvReduceSend(offset, nelem);
         }
@@ -277,18 +604,48 @@ namespace {
     }
     else {
       // Broadcast down. Max number of recv is 1, max number of send is 3 (binary tree + local)
+/* 中文逐项-变量 V0184：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DEV_ARITY>, / *Direct=* /1, Proto, 0>；函数 runTreeSplit 内）：当前
+ * GPU 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid-nthreadsSplit, nthreads-nthreadsSplit, &tree->up, tree->down, args->sendbuff, args->recvbuff,
+ * args->redOpArg, 1*Proto::MaxGroupWidth)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DEV_ARITY>, /*Direct=*/1, Proto, 0>
         prims(tid-nthreadsSplit, nthreads-nthreadsSplit, &tree->up, tree->down, args->sendbuff, args->recvbuff, args->redOpArg, 1*Proto::MaxGroupWidth);
       if (tree->down[0] == -1) {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0185：gridOffset
+ * gridOffset（ssize_t；函数 runTreeSplit 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0186：offset
+ * offset（ssize_t；函数 runTreeSplit 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0187：nelem
+ * nelem（int；函数 runTreeSplit 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.directRecv(offset, nelem);
         }
       }
       else {
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0188：gridOffset
+ * gridOffset（ssize_t；函数 runTreeSplit 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0189：offset
+ * offset（ssize_t；函数 runTreeSplit 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*int(chunkSize)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
           ssize_t offset = gridOffset + bid*int(chunkSize);
+/* 中文逐项-变量 V0190：nelem
+ * nelem（int；函数 runTreeSplit 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.directRecvCopySend(offset, offset, nelem);
         }
@@ -297,17 +654,35 @@ namespace {
   }
 }
 
+/* 中文逐项-类型 T0008：RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE>
+ * 类型职责：具体API×算法×协议的设备模板特化，run转入同文件算法循环，模板实参决定本块执行哪种实现。
+ */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
-  __device__ __forceinline__ void run(ncclWorkElem *args) {
+  __device__ __forceinline__ /* 中文逐项-函数 F0061：run
+ * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
+ * RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE>。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：runRing<T, RedOp, Proto>。
+ */void run(ncclWorkElem *args) {
     using Proto = ProtoSimple<ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS>;
     runRing<T, RedOp, Proto>(args);
   }
 };
 
+/* 中文逐项-类型 T0009：RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SIMPLE>
+ * 类型职责：具体API×算法×协议的设备模板特化，run转入同文件算法循环，模板实参决定本块执行哪种实现。
+ */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SIMPLE> {
-  __device__ __forceinline__ void run(ncclWorkElem *args) {
+  __device__ __forceinline__ /* 中文逐项-函数 F0062：run
+ * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
+ * RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SIMPLE>。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：runTreeSplit<T, RedOp, ProtoSimple<1, 1>>；runTreeUpDown<T, RedOp, ProtoSimple<1, 1>>。
+ */void run(ncclWorkElem *args) {
     #if CUDART_VERSION >= 11020 && CUDART_VERSION < 11040 && __CUDA_ARCH__ >= 800
       runTreeUpDown<T, RedOp, ProtoSimple<1, 1>>(args);
     #else
@@ -316,9 +691,20 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SI
   }
 };
 
+/* 中文逐项-类型 T0010：RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO_SIMPLE>
+ * 类型职责：具体API×算法×协议的设备模板特化，run转入同文件算法循环，模板实参决定本块执行哪种实现。
+ */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO_SIMPLE> {
-  __device__ __forceinline__ void run(ncclWorkElem *args) {
+  __device__ __forceinline__ /* 中文逐项-函数 F0063：run
+ * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
+ * RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO_SIMPLE>。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：int；min；prims.directGather；prims.directRecvReduceSend；prims.directScatter；prims.recv；prims.recvCopyDirectSend；prims.recvReduceSend；prims.scatter；prims.send。
+ * 需要对照的边界/推进条件：tid >= tidStartScatter && tid < tidStartReduce && hasUp；gridOffset < size；args->regUsed；tid >=
+ * tidStartReduce && tree->out != -1。各条件所属分支见紧邻函数体。
+ */void run(ncclWorkElem *args) {
 /* 中文精读：CollNet 把一次 AllReduce 分成四组协作流水
  * Scatter 把本机输入分配给多个 head；Reduce 组在 head 聚合机内贡献并发往网络。
  * Broadcast 组把网络归约结果分发到机内参与者；Gather 组收齐各个 head 负责的片段。
@@ -326,34 +712,128 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO
  * 网络端点 tree->out 对应特殊 peer，Proxy 调插件 Iallreduce；GPU 不直接在交换机上执行归约。
  * 本版此特化只支持 Simple，启用需要 CollNet 插件与对应硬件/数据类型支持。
  */
+/* 中文逐项-变量 V0191：COLLNET_COPY_THREADS
+ * COLLNET_COPY_THREADS（int；函数 run 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 COLLNET_COPY_THREADS = 96；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     static constexpr int COLLNET_COPY_THREADS = 96;
+/* 中文逐项-变量 V0192：tid
+ * tid（int；函数 run 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
+ * 初值/来源 tid = threadIdx.x；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int tid = threadIdx.x;
+/* 中文逐项-变量 V0193：bid
+ * bid（int；函数 run 内）：当前任务内部的 channel 分片编号，参与张量地址计算；不是网卡或全局 rank 编号。
+ * 初值/来源 bid = args->bid；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int bid = args->bid;
+/* 中文逐项-变量 V0194：nChannels
+ * nChannels（int；函数 run 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = args->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nChannels = args->nChannels;
+/* 中文逐项-变量 V0195：tree
+ * tree（struct ncclDirect；函数 run 内）：本 channel 的树邻接关系，up/down 决定向上归约和向下广播。
+ * 初值/来源 tree = &ncclShmem.channel.collTree；取得已有对象/数组元素地址，不在这一表达式中创建新分配。
+ */
     struct ncclDirect* tree = &ncclShmem.channel.collTree;
+/* 中文逐项-变量 V0196：chunkSize
+ * chunkSize（ssize_t；函数 run 内）：算法/协议块容量；主机 NET 调度多用字节，设备 T 算法通常已除 sizeof(T) 变成元素数。
+ * 初值/来源 chunkSize = int(args->lastChunkSize)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const ssize_t chunkSize = int(args->lastChunkSize);
+/* 中文逐项-变量 V0197：size
+ * size（ssize_t；函数 run 内）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ * 初值/来源 size = args->count；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const ssize_t size = args->count;
+/* 中文逐项-变量 V0198：loopSize
+ * loopSize（ssize_t；函数 run 内）：一轮全部 channel（以及 Ring ranks/CollNet heads）覆盖的逻辑数据范围。
+ * 初值/来源 loopSize = nChannels*tree->nHeads*chunkSize；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const ssize_t loopSize = nChannels*tree->nHeads*chunkSize;
 
+/* 中文逐项-变量 V0199：hasUp
+ * hasUp（int；函数 run 内）：本作用域条件状态；为真时启用下面受它保护的分支，不独立创建硬件资源。
+ * 初值/来源 hasUp = (tree->up[0] >= 0) ? 1 : 0；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int hasUp = (tree->up[0] >= 0) ? 1 : 0;
+/* 中文逐项-变量 V0200：hasDn
+ * hasDn（int；函数 run 内）：本作用域条件状态；为真时启用下面受它保护的分支，不独立创建硬件资源。
+ * 初值/来源 hasDn = (tree->down[0] >= 0) ? 1 : 0；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int hasDn = (tree->down[0] >= 0) ? 1 : 0;
+/* 中文逐项-变量 V0201：nThreadsScatter
+ * nThreadsScatter（int；函数 run 内）：对应对象/条目的数量，用于限制后续循环、数组容量或并行度。
+ * 初值/来源 nThreadsScatter = WARP_SIZE + ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 3*COLLNET_COPY_THREADS :
+ * 0)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const int nThreadsScatter = WARP_SIZE + ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 3*COLLNET_COPY_THREADS : 0);
+/* 中文逐项-变量 V0202：nThreadsGather
+ * nThreadsGather（int；函数 run 内）：对应对象/条目的数量，用于限制后续循环、数组容量或并行度。
+ * 初值/来源 nThreadsGather = ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 2*COLLNET_COPY_THREADS :
+ * 0)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const int nThreadsGather  =             ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 2*COLLNET_COPY_THREADS : 0);
+/* 中文逐项-变量 V0203：nThreadsBcast
+ * nThreadsBcast（int；函数 run 内）：对应对象/条目的数量，用于限制后续循环、数组容量或并行度。
+ * 初值/来源 nThreadsBcast = WARP_SIZE + ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 0 :
+ * 2*COLLNET_COPY_THREADS)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const int nThreadsBcast   = WARP_SIZE + ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 0 : 2*COLLNET_COPY_THREADS);
+/* 中文逐项-变量 V0204：nThreadsReduce
+ * nThreadsReduce（int；函数 run 内）：对应对象/条目的数量，用于限制后续循环、数组容量或并行度。
+ * 初值/来源 nThreadsReduce = args->header.nWarps*WARP_SIZE - nThreadsScatter - nThreadsGather -
+ * nThreadsBcast；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     const int nThreadsReduce = args->header.nWarps*WARP_SIZE - nThreadsScatter - nThreadsGather - nThreadsBcast;
+/* 中文逐项-变量 V0205：tidStartBcast
+ * tidStartBcast（int；函数 run 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 tidStartBcast = nThreadsGather；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     const int tidStartBcast = nThreadsGather;
+/* 中文逐项-变量 V0206：tidStartScatter
+ * tidStartScatter（int；函数 run 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 tidStartScatter = tidStartBcast + nThreadsBcast；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const int tidStartScatter = tidStartBcast + nThreadsBcast;
+/* 中文逐项-变量 V0207：tidStartReduce
+ * tidStartReduce（int；函数 run 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 tidStartReduce = tidStartScatter + nThreadsScatter；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     const int tidStartReduce = tidStartScatter + nThreadsScatter;
 
     using Proto = ProtoSimple<1, 1>;
 
     if (tid >= tidStartScatter && tid < tidStartReduce && hasUp) {
       // Scatter
+/* 中文逐项-变量 V0208：group
+ * group（int；函数 run 内）：线程组/命名屏障及共享指针表索引；Simple 构造参数高16位还可携带 connIndex。
+ * 初值/来源 group = (2*Proto::MaxGroupWidth) | (1<<16)；按位移编码/提取标志或二次幂容量，区别于普通字节地址加法。
+ */
       int group = (2*Proto::MaxGroupWidth) | (1<<16);
+/* 中文逐项-变量 V0209：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<0, NCCL_MAX_DIRECT_ARITY>, / *Direct=* /1, Proto, 0>；函数 run 内）：当前 GPU
+ * 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid-tidStartScatter, nThreadsScatter, NULL, tree->up, args->sendbuff, args->recvbuff,
+ * args->redOpArg, group, args)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       Primitives<T, RedOp, FanAsymmetric<0, NCCL_MAX_DIRECT_ARITY>, /*Direct=*/1, Proto, 0>
         prims(tid-tidStartScatter, nThreadsScatter, NULL, tree->up, args->sendbuff, args->recvbuff, args->redOpArg, group, args);
-      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+      for (/* 中文逐项-变量 V0210：gridOffset
+ * gridOffset（ssize_t；函数 run 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0211：offset
+ * offset（ssize_t；函数 run 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*tree->nHeads*chunkSize；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         ssize_t offset = gridOffset + bid*tree->nHeads*chunkSize;
+/* 中文逐项-变量 V0212：nelem
+ * nelem（int；函数 run 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(tree->nHeads*chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
         int nelem = min(tree->nHeads*chunkSize, size-offset);
         if (args->regUsed) {
           prims.directScatter(offset, nelem, chunkSize, tree->headRank, tree->shift);
@@ -362,13 +842,35 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO
         }
       }
     } else if (tid >= tidStartReduce && tree->out != -1) {
+/* 中文逐项-变量 V0213：group
+ * group（int；函数 run 内）：线程组/命名屏障及共享指针表索引；Simple 构造参数高16位还可携带 connIndex。
+ * 初值/来源 group = (3*Proto::MaxGroupWidth) | (1<<16)；按位移编码/提取标志或二次幂容量，区别于普通字节地址加法。
+ */
       int group = (3*Proto::MaxGroupWidth) | (1<<16);
       if (hasDn) {
         // Reduce, send to network
+/* 中文逐项-变量 V0214：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DIRECT_ARITY, 1>, / *Direct=* /1, Proto, 0>；函数 run 内）：当前 GPU
+ * 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid-tidStartReduce, nThreadsReduce, tree->down, &tree->out, args->sendbuff, args->recvbuff,
+ * args->redOpArg, group, args)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DIRECT_ARITY, 1>, /*Direct=*/1, Proto, 0>
           prims(tid-tidStartReduce, nThreadsReduce, tree->down, &tree->out, args->sendbuff, args->recvbuff, args->redOpArg, group, args);
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0215：gridOffset
+ * gridOffset（ssize_t；函数 run 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0216：offset
+ * offset（ssize_t；函数 run 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
           ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;
+/* 中文逐项-变量 V0217：nelem
+ * nelem（int；函数 run 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           if (args->regUsed) {
             prims.directRecvReduceSend(offset, offset, nelem);
@@ -378,41 +880,121 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO
         }
       } else {
         // Directly send to network
+/* 中文逐项-变量 V0218：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<0, 1>, / *Direct=* /0, Proto, 0>；函数 run 内）：当前 GPU
+ * 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid-tidStartReduce, nThreadsReduce, nullptr, &tree->out, args->sendbuff, args->recvbuff,
+ * args->redOpArg, group)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         Primitives<T, RedOp, FanAsymmetric<0, 1>, /*Direct=*/0, Proto, 0>
           prims(tid-tidStartReduce, nThreadsReduce, nullptr, &tree->out, args->sendbuff, args->recvbuff, args->redOpArg, group);
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0219：gridOffset
+ * gridOffset（ssize_t；函数 run 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0220：offset
+ * offset（ssize_t；函数 run 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
           ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;
+/* 中文逐项-变量 V0221：nelem
+ * nelem（int；函数 run 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.send(offset, nelem);
         }
       }
     } else if (tid < tidStartBcast && hasUp) {
       // Gather
+/* 中文逐项-变量 V0222：group
+ * group（int；函数 run 内）：线程组/命名屏障及共享指针表索引；Simple 构造参数高16位还可携带 connIndex。
+ * 初值/来源 group = (0*Proto::MaxGroupWidth) | (0<<16)；按位移编码/提取标志或二次幂容量，区别于普通字节地址加法。
+ */
       int group = (0*Proto::MaxGroupWidth) | (0<<16);
+/* 中文逐项-变量 V0223：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DIRECT_ARITY, 0>, / *Direct=* /1, Proto, 0>；函数 run 内）：当前 GPU
+ * 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid, nThreadsGather, tree->up, NULL, args->sendbuff, args->recvbuff, args->redOpArg, group,
+ * args)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DIRECT_ARITY, 0>, /*Direct=*/1, Proto, 0>
         prims(tid, nThreadsGather, tree->up, NULL, args->sendbuff, args->recvbuff, args->redOpArg, group, args);
-      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+      for (/* 中文逐项-变量 V0224：gridOffset
+ * gridOffset（ssize_t；函数 run 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0225：offset
+ * offset（ssize_t；函数 run 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + bid*tree->nHeads*chunkSize；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         ssize_t offset = gridOffset + bid*tree->nHeads*chunkSize;
+/* 中文逐项-变量 V0226：nelem
+ * nelem（int；函数 run 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(tree->nHeads*chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
         int nelem = min(tree->nHeads*chunkSize, size-offset);
         prims.directGather(offset, nelem, chunkSize, tree->headRank, tree->shift);
       }
     } else if (tid >= tidStartBcast && tid < tidStartScatter && tree->out != -1) {
+/* 中文逐项-变量 V0227：group
+ * group（int；函数 run 内）：线程组/命名屏障及共享指针表索引；Simple 构造参数高16位还可携带 connIndex。
+ * 初值/来源 group = (1*Proto::MaxGroupWidth) | (0<<16)；按位移编码/提取标志或二次幂容量，区别于普通字节地址加法。
+ */
       int group = (1*Proto::MaxGroupWidth) | (0<<16);
       if (hasDn) {
         // Recv from network, broadcast
+/* 中文逐项-变量 V0228：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DIRECT_ARITY>, / *Direct=* /1, Proto, 0>；函数 run 内）：当前 GPU
+ * 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid-tidStartBcast, nThreadsBcast, &tree->out, tree->down, args->sendbuff, args->recvbuff,
+ * args->redOpArg, group, args)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DIRECT_ARITY>, /*Direct=*/1, Proto, 0>
           prims(tid-tidStartBcast, nThreadsBcast, &tree->out, tree->down, args->sendbuff, args->recvbuff, args->redOpArg, group, args);
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0229：gridOffset
+ * gridOffset（ssize_t；函数 run 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0230：offset
+ * offset（ssize_t；函数 run 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
           ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;
+/* 中文逐项-变量 V0231：nelem
+ * nelem（int；函数 run 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.recvCopyDirectSend(offset, offset, nelem, /*postOp=*/true);
         }
       } else {
         // Recv from network (no post thread needed)
+/* 中文逐项-变量 V0232：prims
+ * prims（Primitives<T, RedOp, FanAsymmetric<1, 0>, / *Direct=* /0, Proto, 0>；函数 run 内）：当前 GPU
+ * 线程组的协议原语对象，持有连接、缓冲和进度，不是单独的一次 kernel。
+ * 初值/来源 prims = (tid-tidStartBcast, nThreadsBcast, &tree->out, nullptr, args->sendbuff, args->recvbuff,
+ * args->redOpArg, group)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         Primitives<T, RedOp, FanAsymmetric<1, 0>, /*Direct=*/0, Proto, 0>
           prims(tid-tidStartBcast, nThreadsBcast, &tree->out, nullptr, args->sendbuff, args->recvbuff, args->redOpArg, group);
-        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        for (/* 中文逐项-变量 V0233：gridOffset
+ * gridOffset（ssize_t；函数 run 内）：所有通道共同的当前轮起点，通常以设备元素数计，每轮增加 loopSize。
+ * 初值/来源 gridOffset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：gridOffset < size；循环体与增量表达式决定每轮如何推进。
+ */ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+/* 中文逐项-变量 V0234：offset
+ * offset（ssize_t；函数 run 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
           ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;
+/* 中文逐项-变量 V0235：nelem
+ * nelem（int；函数 run 内）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
+ * 初值/来源 nelem = min(chunkSize, size-offset)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
           int nelem = min(chunkSize, size-offset);
           prims.recv(offset, nelem, /*postOp=*/true);
         }
@@ -421,30 +1003,66 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO
   }
 };
 
+/* 中文逐项-类型 T0011：RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL>
+ * 类型职责：具体API×算法×协议的设备模板特化，run转入同文件算法循环，模板实参决定本块执行哪种实现。
+ */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL> {
-  __device__ __forceinline__ void run(ncclWorkElem *args) {
+  __device__ __forceinline__ /* 中文逐项-函数 F0064：run
+ * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
+ * RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL>。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：runRing<T, RedOp, ProtoLL>。
+ */void run(ncclWorkElem *args) {
     runRing<T, RedOp, ProtoLL>(args);
   }
 };
 
+/* 中文逐项-类型 T0012：RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL>
+ * 类型职责：具体API×算法×协议的设备模板特化，run转入同文件算法循环，模板实参决定本块执行哪种实现。
+ */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL> {
-  __device__ __forceinline__ void run(ncclWorkElem *args) {
+  __device__ __forceinline__ /* 中文逐项-函数 F0065：run
+ * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
+ * RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL>。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：runTreeSplit<T, RedOp, ProtoLL>。
+ */void run(ncclWorkElem *args) {
     runTreeSplit<T, RedOp, ProtoLL>(args);
   }
 };
 
+/* 中文逐项-类型 T0013：RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL128>
+ * 类型职责：具体API×算法×协议的设备模板特化，run转入同文件算法循环，模板实参决定本块执行哪种实现。
+ */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL128> {
-  __device__ __forceinline__ void run(ncclWorkElem *args) {
+  __device__ __forceinline__ /* 中文逐项-函数 F0066：run
+ * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
+ * RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL128>。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：runRing<T, RedOp, ProtoLL128>。
+ */void run(ncclWorkElem *args) {
     runRing<T, RedOp, ProtoLL128>(args);
   }
 };
 
+/* 中文逐项-类型 T0014：RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL128>
+ * 类型职责：具体API×算法×协议的设备模板特化，run转入同文件算法循环，模板实参决定本块执行哪种实现。
+ */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL128> {
-  __device__ __forceinline__ void run(ncclWorkElem *args) {
+  __device__ __forceinline__ /* 中文逐项-函数 F0067：run
+ * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
+ * RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL128>。
+ * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：runTreeSplit<T, RedOp, ProtoLL128>。
+ */void run(ncclWorkElem *args) {
     runTreeSplit<T, RedOp, ProtoLL128>(args);
   }
 };

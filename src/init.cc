@@ -25,33 +25,92 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/* 中文逐项-宏 M0131：STR2
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 STR2；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define STR2(v) #v
+/* 中文逐项-宏 M0132：STR
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 STR；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define STR(v) STR2(v)
 
 #ifdef ENABLE_TRACE
+/* 中文逐项-变量 V3211：ncclEpoch
+ * ncclEpoch（std::chrono::high_resolution_clock::time_point；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ */
 std::chrono::high_resolution_clock::time_point ncclEpoch;
 #endif
 
 #if CUDART_VERSION >= 9020
+/* 中文逐项-常量 X1152：NCCL_GROUP_CUDA_STREAM
+ * 编译期定义：NCCL_GROUP_CUDA_STREAM = 0 // CGMD: CUDA 9.2,10.X Don't need to use an internal CUDA stream。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_GROUP_CUDA_STREAM 0 // CGMD: CUDA 9.2,10.X Don't need to use an internal CUDA stream
 #else
+/* 中文逐项-常量 X1153：NCCL_GROUP_CUDA_STREAM
+ * 编译期定义：NCCL_GROUP_CUDA_STREAM = 1 // CGMD: CUDA 9.0,9.1 Need to use an internal CUDA stream。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_GROUP_CUDA_STREAM 1 // CGMD: CUDA 9.0,9.1 Need to use an internal CUDA stream
 #endif
 
+/* 中文逐项-变量 V3212：ncclFuncStr
+ * ncclFuncStr（char；文件/静态存储作用域）：内部操作/算法/协议枚举对应的可读名字表，供日志和配置匹配使用。
+ * 初值/来源 ncclFuncStr = { "Broadcast", "Reduce", "AllGather", "ReduceScatter", "AllReduce"
+ * }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
 const char* ncclFuncStr[NCCL_NUM_FUNCTIONS] = { "Broadcast", "Reduce", "AllGather", "ReduceScatter", "AllReduce" };
+/* 中文逐项-变量 V3213：ncclAlgoStr
+ * ncclAlgoStr（char；文件/静态存储作用域）：内部操作/算法/协议枚举对应的可读名字表，供日志和配置匹配使用。
+ * 初值/来源 ncclAlgoStr = { "Tree", "Ring", "CollNet" }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
 const char* ncclAlgoStr[NCCL_NUM_ALGORITHMS] = { "Tree", "Ring", "CollNet" };
+/* 中文逐项-变量 V3214：ncclProtoStr
+ * ncclProtoStr（char；文件/静态存储作用域）：内部操作/算法/协议枚举对应的可读名字表，供日志和配置匹配使用。
+ * 初值/来源 ncclProtoStr = { "LL", "LL128", "Simple" }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
 const char* ncclProtoStr[NCCL_NUM_PROTOCOLS] = { "LL", "LL128", "Simple" };
 
+/* 中文逐项-参数getter P0020：GroupCudaStream
+ * 生成函数 ncclParamGroupCudaStream()，读取 NCCL_GROUP_CUDA_STREAM，编译默认值为 NCCL_GROUP_CUDA_STREAM。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(GroupCudaStream, "GROUP_CUDA_STREAM", NCCL_GROUP_CUDA_STREAM);
 
+/* 中文逐项-参数getter P0021：CheckPointers
+ * 生成函数 ncclParamCheckPointers()，读取 NCCL_CHECK_POINTERS，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(CheckPointers, "CHECK_POINTERS", 0);
 
 // GDRCOPY support: Off by default
+/* 中文逐项-参数getter P0022：GdrCopyEnable
+ * 生成函数 ncclParamGdrCopyEnable()，读取 NCCL_GDRCOPY_ENABLE，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(GdrCopyEnable, "GDRCOPY_ENABLE", 0);
 
 // GDRCOPY support
+/* 中文逐项-变量 V3215：ncclGdrCopy
+ * ncclGdrCopy（gdr_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ncclGdrCopy = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ */
 gdr_t ncclGdrCopy = NULL;
 
+/* 中文逐项-函数 F0881：initGdrCopy
+ * 用途与位置：按编译支持及运行环境尝试初始化 GDRCopy，供小量显存映射访问优化使用。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclInit。
+ * 本体直接出现的调用/包装：ncclGdrInit；ncclParamGdrCopyEnable。
+ * 需要对照的边界/推进条件：ncclParamGdrCopyEnable() == 1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t initGdrCopy() {
   if (ncclParamGdrCopyEnable() == 1) {
     ncclGdrCopy = ncclGdrInit();
@@ -60,11 +119,37 @@ ncclResult_t initGdrCopy() {
 }
 
 
+/* 中文逐项-参数getter P0023：L1SharedMemoryCarveout
+ * 生成函数 ncclParamL1SharedMemoryCarveout()，读取 NCCL_L1_SHARED_MEMORY_CARVEOUT，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(L1SharedMemoryCarveout, "L1_SHARED_MEMORY_CARVEOUT", 0);
 
+/* 中文逐项-变量 V3216：initLock
+ * initLock（pthread_mutex_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 initLock = PTHREAD_MUTEX_INITIALIZER；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
 pthread_mutex_t initLock = PTHREAD_MUTEX_INITIALIZER;
+/* 中文逐项-变量 V3217：initialized
+ * initialized（bool；文件/静态存储作用域）：本作用域条件状态；为真时启用下面受它保护的分支，不独立创建硬件资源。
+ * 初值/来源 initialized = false；布尔初态为false，后续条件决定是否切换。
+ */
 static bool initialized = false;
+/* 中文逐项-变量 V3218：maxLocalSizeBytes
+ * maxLocalSizeBytes（size_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 maxLocalSizeBytes = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
 static size_t maxLocalSizeBytes = 0;
+/* 中文逐项-函数 F0882：ncclInit
+ * 用途与位置：进程级单次初始化配置、网络与相关支持库，避免每个 communicator 重复初始化全局组件。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclGetUniqueId；src/init.cc::ncclCommInitRankDev。
+ * 本体直接出现的调用/包装：NCCLCHECK；initEnv；initGdrCopy；ncclKernMaxLocalSize；ncclKernSetSharedMemoryCarveout；ncclNetInit；ncclNetName；ncclParamL1SharedMemoryCarveout；pthread_mutex_lock；pthread_mutex_unlock。
+ * 需要对照的边界/推进条件：initialized；!initialized；carveout。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ * 同步阅读点：本函数含屏障、fence或CPU锁/条件变量；它们分别约束参与线程、可见性或元数据互斥，不能互相替代。
+ */
 static ncclResult_t ncclInit() {
   if (initialized) return ncclSuccess;
   pthread_mutex_lock(&initLock);
@@ -72,6 +157,10 @@ static ncclResult_t ncclInit() {
     initEnv();
     initGdrCopy();
     maxLocalSizeBytes = ncclKernMaxLocalSize();
+/* 中文逐项-变量 V3219：carveout
+ * carveout（int；函数 ncclInit 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 carveout = ncclParamL1SharedMemoryCarveout()；调用对应接口取得结果；成功、容量与生命周期要按该接口返回契约判断。
+ */
     int carveout = ncclParamL1SharedMemoryCarveout();
     if (carveout) ncclKernSetSharedMemoryCarveout(carveout);
     NCCLCHECK(ncclNetInit());
@@ -83,6 +172,14 @@ static ncclResult_t ncclInit() {
 }
 
 NCCL_API(ncclResult_t, ncclGetVersion, int* version);
+/* 中文逐项-函数 F0883：ncclGetVersion
+ * 用途与位置：把本库编译版本写到用户输出参数，帮助应用确认实际链接的 NCCL 版本。
+ * 参数 version（int* version）：外部库事件/导出结构的布局大小与版本号，接收方据此判断可安全读取哪些字段。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：version == NULL。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInvalidArgument;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclGetVersion(int* version) {
   if (version == NULL) return ncclInvalidArgument;
   *version = NCCL_VERSION_CODE;
@@ -90,6 +187,13 @@ ncclResult_t ncclGetVersion(int* version) {
 }
 
 NCCL_API(ncclResult_t, ncclGetUniqueId, ncclUniqueId* out);
+/* 中文逐项-函数 F0884：ncclGetUniqueId
+ * 用途与位置：先完成库级初始化，再生成应用需要分发给全组 rank 的 bootstrap 标识。
+ * 参数 out（ncclUniqueId* out）：CollNet 连接网络的特殊对端槽位，-1 表示当前 GPU 非对应网络出口。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitAll。
+ * 本体直接出现的调用/包装：NCCLCHECK；PtrCheck；bootstrapGetUniqueId；ncclInit。
+ * 源码返回表达式：return bootstrapGetUniqueId(out);。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclGetUniqueId(ncclUniqueId* out) {
   NCCLCHECK(ncclInit());
   NCCLCHECK(PtrCheck(out, "GetUniqueId", "out"));
@@ -98,11 +202,21 @@ ncclResult_t ncclGetUniqueId(ncclUniqueId* out) {
 
 // Prevent compiler from optimizing out these operations
 #ifdef __clang__
+/* 中文逐项-宏 M0133：__attribute__
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 __attribute__；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NCCL_NO_OPTIMIZE __attribute__((optnone))
 #else
 #define NCCL_NO_OPTIMIZE __attribute__((optimize("O0")))
 #endif
 
+/* 中文逐项-函数 F0885：commPoison
+ * 用途与位置：在释放/销毁流程给 communicator 关键字段写入无效状态，辅助发现后续误用。
+ * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
 void NCCL_NO_OPTIMIZE commPoison(ncclComm_t comm) {
   comm->rank = comm->cudaDev = comm->busId = comm->nRanks = -1;
 }
@@ -120,7 +234,11 @@ static ncclResult_t commFree(ncclComm_t comm) {
 
   free(comm->connectSend);
   free(comm->connectRecv);
-  for (int peer=0; peer<comm->nRanks; peer++) {
+  for (/* 中文逐项-变量 V3220：peer
+ * peer（int；文件/静态存储作用域）：通信对端的用户 rank，决定在 channel.peers 中选择哪个连接槽。
+ * 初值/来源 peer = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：peer<comm->nRanks；循环体与增量表达式决定每轮如何推进。
+ */int peer=0; peer<comm->nRanks; peer++) {
     delete comm->p2pSends[peer];
     delete comm->p2pRecvs[peer];
   }
@@ -130,7 +248,11 @@ static ncclResult_t commFree(ncclComm_t comm) {
 
   free(comm->peerInfo);
   ncclTopoFree(comm->topo);
-  for (int n=0; n<comm->nNodes; n++) free(comm->nodeRanks[n].localRankToRank);
+  for (/* 中文逐项-变量 V3221：n
+ * n（int；文件/静态存储作用域）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<comm->nNodes；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<comm->nNodes; n++) free(comm->nodeRanks[n].localRankToRank);
   free(comm->nodeRanks);
   free(comm->rankToNode);
   free(comm->rankToLocalRank);
@@ -140,7 +262,11 @@ static ncclResult_t commFree(ncclComm_t comm) {
 
   CUDACHECK(cudaFree((ncclDevCommAndChannels*)comm->devComm));
 
-  for (int channel=0; channel<MAXCHANNELS; channel++)
+  for (/* 中文逐项-变量 V3222：channel
+ * channel（int；文件/静态存储作用域）：当前逻辑通信流水线对象，包含邻居、连接表和工作 FIFO。
+ * 初值/来源 channel = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：channel<MAXCHANNELS；循环体与增量表达式决定每轮如何推进。
+ */int channel=0; channel<MAXCHANNELS; channel++)
     NCCLCHECK(freeChannel(comm->channels+channel, comm->nRanks));
 
   if (comm->doneEvent != NULL)
@@ -154,13 +280,25 @@ static ncclResult_t commFree(ncclComm_t comm) {
   }
 
   // Last rank frees shared resources between threads
+/* 中文逐项-变量 V3223：isLast
+ * isLast（int；文件/静态存储作用域）：本通道当前批次的最后一条任务标记，GPU 执行完此记录即可退出本次 kernel。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCpuBarrierIn(comm, &isLast));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int isLast;
   NCCLCHECK(ncclCpuBarrierIn(comm, &isLast));
   if (isLast) {
     // Wait for all service threads to be done. We could not
     // do it earlier because it could have blocked and prevented
     // other ranks in the process to call ncclCommDestroy
-    for (int i=0; i<comm->intraRanks; i++) {
+    for (/* 中文逐项-变量 V3224：i
+ * i（int；文件/静态存储作用域）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<comm->intraRanks；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<comm->intraRanks; i++) {
+/* 中文逐项-变量 V3225：ret
+ * ret（void；文件/静态存储作用域）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 此处未显式给初值；后续首个文本使用点：if (comm->intraThreads[i]) pthread_join(comm->intraThreads[i], &ret);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       void* ret;
       if (comm->intraThreads[i]) pthread_join(comm->intraThreads[i], &ret);
     }
@@ -180,8 +318,23 @@ static ncclResult_t commFree(ncclComm_t comm) {
   return ncclSuccess;
 }
 
+/* 中文逐项-参数getter P0024：AggChannelSize
+ * 生成函数 ncclParamAggChannelSize()，读取 NCCL_AGG_CHANNEL_SIZE，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(AggChannelSize, "AGG_CHANNEL_SIZE", -2);
+/* 中文逐项-参数getter P0025：DisableGraphHelper
+ * 生成函数 ncclParamDisableGraphHelper()，读取 NCCL_GRAPH_HELPER_DISABLE，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(DisableGraphHelper, "GRAPH_HELPER_DISABLE", 0);
+/* 中文逐项-参数getter P0026：GraphRegister
+ * 生成函数 ncclParamGraphRegister()，读取 NCCL_GRAPH_REGISTER，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(GraphRegister, "GRAPH_REGISTER", 0);
 
 /* 中文导读：
@@ -193,6 +346,16 @@ NCCL_PARAM(GraphRegister, "GRAPH_REGISTER", 0);
  * 通信组中的每个 rank 各有一份 comm；同进程多 GPU 还会共享本地发射协调所需的某些对象。
  * 后面要经历拓扑搜索、initChannel、transport setup/connect，才能拿到可用的设备连接指针。
  * 读资源生命周期时，应把 comm 分配、channel 分配和 backend 连接分配分成三个阶段。
+ */
+/* 中文逐项-函数 F0886：commAlloc
+ * 用途与位置：分配并初始化当前 rank 的 communicator 总对象、排队状态、事件与连接需求表。
+ * 参数 comret（ncclComm_t* comret）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 ndev（int ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitRankSync。
+ * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；cudaDriverGetVersion；cudaEventCreateWithFlags；cudaGetDevice；cudaGetDriverEntryPoint；getBusId；getenv；ncclCalloc；ncclCreateQueueInfo；ncclCudaHostCalloc；ncclParamAggChannelSize；ncclParamCheckPointers；ncclParamDisableGraphHelper；ncclParamGraphRegister；ncclParamGroupCudaStream；strcmp。
+ * 需要对照的边界/推进条件：ndev < 1；rank >= ndev || rank < 0；str；str && strcmp(str, "ROUND_ROBIN") == 0。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInvalidArgument;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   if (ndev < 1) {
@@ -206,11 +369,25 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
 
   // Try to create a CUDA object right away. If there is something wrong with
   // the device we're on (failure cause #1) , better know it early.
+/* 中文逐项-变量 V3226：doneEvent
+ * doneEvent（cudaEvent_t；函数 commAlloc 内）：通信完成事件及内部 stream 依赖事件；record 只排队，不表示已完成。
+ * 此处未显式给初值；后续首个文本使用点：CUDACHECK(cudaEventCreateWithFlags(&doneEvent,
+ * cudaEventDisableTiming));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   cudaEvent_t doneEvent;
   CUDACHECK(cudaEventCreateWithFlags(&doneEvent, cudaEventDisableTiming));
+/* 中文逐项-变量 V3227：intDoneEvent
+ * intDoneEvent（cudaEvent_t；函数 commAlloc 内）：通信完成事件及内部 stream 依赖事件；record 只排队，不表示已完成。
+ * 此处未显式给初值；后续首个文本使用点：CUDACHECK(cudaEventCreateWithFlags(&intDoneEvent,
+ * cudaEventDisableTiming));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   cudaEvent_t intDoneEvent;
   CUDACHECK(cudaEventCreateWithFlags(&intDoneEvent, cudaEventDisableTiming));
 
+/* 中文逐项-变量 V3228：comm
+ * comm（struct ncclComm；函数 commAlloc 内）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&comm, 1));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclComm* comm;
   NCCLCHECK(ncclCalloc(&comm, 1));
 
@@ -244,6 +421,10 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   comm->asyncTotalSize = 0;
   comm->channelSize = ncclParamAggChannelSize();
   comm->asyncAllocMode = ncclComm::SHORTEST_QUEUE;
+/* 中文逐项-变量 V3229：str
+ * str（char；函数 commAlloc 内）：string或接口前缀，用于环境配置、XML或接口过滤，比较时注意是否允许前缀匹配。
+ * 初值/来源 str = getenv("NCCL_AGG_ALLOC_MODE")；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   char* str = getenv("NCCL_AGG_ALLOC_MODE");
   if (str) INFO(NCCL_ENV, "NCCL_AGG_ALLOC_MODE set by environment to %s", str);
   if (str && strcmp(str, "ROUND_ROBIN") == 0) {
@@ -275,7 +456,11 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   NCCLCHECK(ncclCalloc(&comm->p2pRecvs, comm->nRanks));
 
   // Mark channels as non initialized.
-  for (int c=0; c<MAXCHANNELS; c++) comm->channels[c].id = -1;
+  for (/* 中文逐项-变量 V3230：c
+ * c（int；函数 commAlloc 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<MAXCHANNELS；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<MAXCHANNELS; c++) comm->channels[c].id = -1;
 
   *comret = comm;
   return ncclSuccess;
@@ -291,18 +476,38 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
  * peers 要指向 devPeers，workFifoDev 要指向 GPU 可读取的位置；设备 kernel 再拷到共享内存。
  * 因此调试 host 地址与 device 地址时必须辨认当前字段属于哪一侧，不能只看结构体名字相同。
  */
+/* 中文逐项-函数 F0887：devCommSetup
+ * 用途与位置：构造设备端精简 communicator 和连续 channel 布局，把主机连接视图转换成 GPU 可访问地址。
+ * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitRankSync。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclCudaCalloc；ncclCudaMemcpy；std::max。
+ * 需要对照的边界/推进条件：r<comm->nChannels。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t devCommSetup(ncclComm_t comm) {
+/* 中文逐项-变量 V3231：devCommAndChans
+ * devCommAndChans（ncclDevCommAndChannels；函数 devCommSetup 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCudaCalloc(&devCommAndChans, 1));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   ncclDevCommAndChannels *devCommAndChans;
   NCCLCHECK(ncclCudaCalloc(&devCommAndChans, 1));
   comm->devComm = &devCommAndChans->comm;
   comm->hostDevComm.channels = devCommAndChans->channels;
 
   // Duplicate the channels on the device
+/* 中文逐项-变量 V3232：nChannels
+ * nChannels（int；函数 devCommSetup 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = std::max(comm->nChannels, comm->p2pnChannels)；保留下限或较大候选，避免并行度/尺寸低于需要的最小值。
+ */
   int nChannels = std::max(comm->nChannels, comm->p2pnChannels);
   NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, nChannels));
 
   // Copy userRanks and peers
-  for (int r=0; r<comm->nChannels; r++) {
+  for (/* 中文逐项-变量 V3233：r
+ * r（int；函数 devCommSetup 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<comm->nChannels; r++) {
     NCCLCHECK(ncclCudaMemcpy(comm->channels[r].ring.devUserRanks, comm->channels[r].ring.userRanks, comm->nRanks));
   }
 
@@ -312,8 +517,24 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
 }
 
 // Pre-process the string so that running "strings" on the lib can quickly reveal the version.
+/* 中文逐项-常量 X1154：VERSION_STRING
+ * 编译期定义：VERSION_STRING = "NCCL version " STR(NCCL_MAJOR) "." STR(NCCL_MINOR) "." STR(NCCL_PATCH) NCCL_SUFFIX "+cuda"
+ * STR(CUDA_MAJOR) "." STR(CUDA_MINOR)。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define VERSION_STRING "NCCL version " STR(NCCL_MAJOR) "." STR(NCCL_MINOR) "." STR(NCCL_PATCH) NCCL_SUFFIX "+cuda" STR(CUDA_MAJOR) "." STR(CUDA_MINOR)
+/* 中文逐项-函数 F0888：showVersion
+ * 用途与位置：按日志配置打印库版本和构建相关信息，辅助确认实际加载的库。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitRankDev。
+ * 本体直接出现的调用/包装：fflush。
+ * 需要对照的边界/推进条件：shown == 0 && ncclDebugLevel >= NCCL_LOG_VERSION；ncclDebugFile != stdout。各条件所属分支见紧邻函数体。
+ */
 static void showVersion() {
+/* 中文逐项-变量 V3234：shown
+ * shown（int；函数 showVersion 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 shown = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   static int shown = 0;
   if (shown == 0 && ncclDebugLevel >= NCCL_LOG_VERSION) {
     printf("%s\n", VERSION_STRING);
@@ -324,6 +545,15 @@ static void showVersion() {
   }
 }
 
+/* 中文逐项-函数 F0889：fillInfo
+ * 用途与位置：收集当前 rank 的主机、进程、GPU、共享内存和 GDR 能力摘要供 bootstrap 汇总。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 info（struct ncclPeerInfo* info）：当前函数处理的任务/属性描述对象，按ncclInfo、PeerInfo、QP信息或XML类型区分其所属阶段。
+ * 参数 commHash（uint64_t commHash）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；SYSCHECK；cudaGetDevice；getHostHash；getPidHash；ncclCudaCompCap；ncclGpuGdrSupport；stat。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, uint64_t commHash) {
   info->rank = comm->rank;
   CUDACHECK(cudaGetDevice(&info->cudaDev));
@@ -333,6 +563,10 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
   // Get the device MAJOR:MINOR of /dev/shm so we can use that
   // information to decide whether we can use SHM for inter-process
   // communication in a container environment
+/* 中文逐项-变量 V3235：statbuf
+ * statbuf（struct stat；函数 fillInfo 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：SYSCHECK(stat("/dev/shm", &statbuf), "stat");。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct stat statbuf;
   SYSCHECK(stat("/dev/shm", &statbuf), "stat");
   info->shmDev = statbuf.st_dev;
@@ -351,31 +585,84 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
  * AllGather/ReduceScatter 用用户 rank 决定输出/输入段位置；AllReduce 用内部环 index 排算法块。
  * 物理相邻 GPU、用户 rank 相邻、环顺序相邻是三种关系，应分别跟踪。
  */
+/* 中文逐项-函数 F0890：setupChannel
+ * 用途与位置：把拓扑环顺序旋转到本 rank 开头，建立用户 rank 表及本 rank 内部环索引。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 channelId（int channelId）：实际 channels 数组下标；与一次操作内的分片编号 bid 区分。
+ * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 nranks（int nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 参数 ringRanks（int* ringRanks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；initChannel。
+ * 需要对照的边界/推进条件：i < nranks；ringRanks[i] == 0；ringRanks[i] == rank；i<nranks。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t setupChannel(struct ncclComm* comm, int channelId, int rank, int nranks, int* ringRanks) {
   TRACE(NCCL_INIT, "rank %d nranks %d", rank, nranks);
   NCCLCHECK(initChannel(comm, channelId));
 
+/* 中文逐项-变量 V3236：ring
+ * ring（struct ncclRing；函数 setupChannel 内）：本 channel 的环邻居和内部顺序，决定前驱接收与后继发送。
+ * 初值/来源 ring = &comm->channels[channelId].ring；取得已有对象/数组元素地址，不在这一表达式中创建新分配。
+ */
   struct ncclRing* ring = &comm->channels[channelId].ring;
   // Find our ring-distance from rank zero and reorganize ranks to start with rank.
+/* 中文逐项-变量 V3237：ixZero、ixRank
+ * ixZero（int；函数 setupChannel 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ixZero = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * ixRank（int；函数 setupChannel 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ixRank = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int ixZero=0, ixRank=0;
-  for (int i=0; i < nranks; i++) {
+  for (/* 中文逐项-变量 V3238：i
+ * i（int；函数 setupChannel 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i < nranks；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i < nranks; i++) {
     if (ringRanks[i] == 0) ixZero = i;
     if (ringRanks[i] == rank) ixRank = i;
   }
   ring->index = (ixRank-ixZero + nranks)%nranks;
-  for (int i=0; i<nranks; i++) {
+  for (/* 中文逐项-变量 V3239：i
+ * i（int；函数 setupChannel 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<nranks；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<nranks; i++) {
     ring->userRanks[i] = ringRanks[(i+ixRank)%nranks];
   }
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0891：waitForNonNullPtr
+ * 用途与位置：等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
+ * 参数 p（void* p）：当前遍历或处理对象的局部引用/值，类型和下面初始化来源确定其具体身份。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommSetIntraProc。
+ * 本体直接出现的调用/包装：sched_yield。
+ * 需要对照的边界/推进条件：*ptr == NULL。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return (void*)*ptr;。CHECK类宏还可能提前返回/跳转。
+ */
 void* waitForNonNullPtr(void* p) {
+/* 中文逐项-变量 V3240：ptr
+ * ptr（void；函数 waitForNonNullPtr 内）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
+ * 初值/来源 ptr = (volatile void**) p；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   volatile void** ptr = (volatile void**) p;
   while (*ptr == NULL) sched_yield();
   return (void*)*ptr;
 }
 
+/* 中文逐项-函数 F0892：initParams
+ * 用途与位置：初始化当前 communicator 的 CUDA 发射参数、参数指针与设备 kernel 所需上下文。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommSetIntraProc。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t initParams(struct ncclComm* comm) {
+/* 中文逐项-变量 V3241：params
+ * params（struct cudaLaunchParams；函数 initParams 内）：CUDA 发射参数或当前/同进程全组的发射参数表，包含 grid、block、stream 和参数地址。
+ * 初值/来源 params = comm->myParams = comm->intraParams+comm->intraRank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct cudaLaunchParams* params = comm->myParams = comm->intraParams+comm->intraRank;
   params->args = comm->argsptrs;
   params->stream = NULL;
@@ -386,6 +673,17 @@ ncclResult_t initParams(struct ncclComm* comm) {
 }
 
 // Allocate/Set Intra Process Structures and set CG options
+/* 中文逐项-函数 F0893：ncclCommSetIntraProc
+ * 用途与位置：把同进程 rank 加入本地发射协调组，设置屏障、设备列表及协作发射能力。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 ranks（int ranks）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 comm0（struct ncclComm* comm0）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；assert；cudaDeviceGetAttribute；cudaStreamCreateWithFlags；getenv；initParams；ncclCalloc；ncclCudaCompCap；strcmp；waitForNonNullPtr。
+ * 需要对照的边界/推进条件：rank == 0；str；str && strcmp(str, "GROUP") == 0；comm->launchMode == ncclComm::GROUP。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommSetIntraProc(struct ncclComm* comm, int rank, int ranks, struct ncclComm* comm0) {
   comm->intraRank = rank;
   comm->intraRanks = ranks;
@@ -394,6 +692,10 @@ ncclResult_t ncclCommSetIntraProc(struct ncclComm* comm, int rank, int ranks, st
   // Alloc shared structures
   if (rank == 0) {
     assert(comm == comm0);
+/* 中文逐项-变量 V3242：bar
+ * bar（int；函数 ncclCommSetIntraProc 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&bar, 2));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int* bar;
     NCCLCHECK(ncclCalloc(&bar, 2));
     bar[0] = bar[1] = 0;
@@ -401,10 +703,18 @@ ncclResult_t ncclCommSetIntraProc(struct ncclComm* comm, int rank, int ranks, st
     NCCLCHECK(ncclCalloc(&comm->intraParams, comm->intraRanks));
     NCCLCHECK(ncclCalloc(&comm->intraThreads, comm->intraRanks));
     NCCLCHECK(ncclCalloc(&comm->intraCudaDevs, comm->intraRanks));
+/* 中文逐项-变量 V3243：CGMode
+ * CGMode（int；函数 ncclCommSetIntraProc 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&CGMode, 1));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int* CGMode;
     NCCLCHECK(ncclCalloc(&CGMode, 1));
     *CGMode = 0x11;
     comm->intraCGMode = CGMode;
+/* 中文逐项-变量 V3244：CC
+ * CC（int；函数 ncclCommSetIntraProc 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&CC, 1));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int* CC;
     NCCLCHECK(ncclCalloc(&CC, 1));
     *CC = ncclCudaCompCap();
@@ -421,10 +731,18 @@ ncclResult_t ncclCommSetIntraProc(struct ncclComm* comm, int rank, int ranks, st
   comm->intraThreads[comm->intraRank] = comm->proxyState.thread;
   NCCLCHECK(initParams(comm));
 
+/* 中文逐项-变量 V3245：cgMdLaunch
+ * cgMdLaunch（int；函数 ncclCommSetIntraProc 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 cgMdLaunch = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int cgMdLaunch = 0;
 
   // Set CG Mode
   comm->launchMode = ncclComm::PARALLEL;
+/* 中文逐项-变量 V3246：str
+ * str（char；函数 ncclCommSetIntraProc 内）：string或接口前缀，用于环境配置、XML或接口过滤，比较时注意是否允许前缀匹配。
+ * 初值/来源 str = getenv("NCCL_LAUNCH_MODE")；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   char* str = getenv("NCCL_LAUNCH_MODE");
   if (str) INFO(NCCL_ENV, "NCCL_LAUNCH_MODE set by environment to %s", str);
   if (str && strcmp(str, "GROUP") == 0) {
@@ -447,31 +765,111 @@ ncclResult_t ncclCommSetIntraProc(struct ncclComm* comm, int rank, int ranks, st
   return ncclSuccess;
 }
 
+/* 中文逐项-常量 X1155：DEFAULT_LL_BUFFSIZE
+ * 编译期定义：DEFAULT_LL_BUFFSIZE = (NCCL_LL_LINES_PER_THREAD*NCCL_LL_MAX_NTHREADS*NCCL_STEPS*sizeof(union
+ * ncclLLFifoLine))。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define DEFAULT_LL_BUFFSIZE (NCCL_LL_LINES_PER_THREAD*NCCL_LL_MAX_NTHREADS*NCCL_STEPS*sizeof(union ncclLLFifoLine))
+/* 中文逐项-常量 X1156：DEFAULT_LL128_BUFFSIZE
+ * 编译期定义：DEFAULT_LL128_BUFFSIZE = (NCCL_LL128_ELEMS_PER_THREAD*NCCL_LL128_MAX_NTHREADS*NCCL_STEPS*sizeof(uint64_t))。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define DEFAULT_LL128_BUFFSIZE (NCCL_LL128_ELEMS_PER_THREAD*NCCL_LL128_MAX_NTHREADS*NCCL_STEPS*sizeof(uint64_t))
+/* 中文逐项-常量 X1157：DEFAULT_BUFFSIZE
+ * 编译期定义：DEFAULT_BUFFSIZE = (1 << 22)。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define DEFAULT_BUFFSIZE (1 << 22) /* 4MiB */
+/* 中文逐项-常量 X1158：DEFAULT_BUFFSIZE_ARM
+ * 编译期定义：DEFAULT_BUFFSIZE_ARM = (1 << 20)。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define DEFAULT_BUFFSIZE_ARM (1 << 20) /* 1MiB */
+/* 中文逐项-参数getter P0027：BuffSize
+ * 生成函数 ncclParamBuffSize()，读取 NCCL_BUFFSIZE，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(BuffSize, "BUFFSIZE", -2);
+/* 中文逐项-参数getter P0028：LlBuffSize
+ * 生成函数 ncclParamLlBuffSize()，读取 NCCL_LL_BUFFSIZE，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(LlBuffSize, "LL_BUFFSIZE", -2);
+/* 中文逐项-参数getter P0029：Ll128BuffSize
+ * 生成函数 ncclParamLl128BuffSize()，读取 NCCL_LL128_BUFFSIZE，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(Ll128BuffSize, "LL128_BUFFSIZE", -2);
 
+/* 中文逐项-函数 F0894：computeBuffSizes
+ * 用途与位置：读取/选择 LL、LL128、Simple 的协议缓冲尺寸，为后续 channel 传输与分片提供容量。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclParamBuffSize；ncclParamLl128BuffSize；ncclParamLlBuffSize；ncclTopoCpuType。
+ * 需要对照的边界/推进条件：cpuArch == NCCL_TOPO_CPU_ARCH_ARM；p<NCCL_NUM_PROTOCOLS。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t computeBuffSizes(struct ncclComm* comm) {
+/* 中文逐项-变量 V3247：cpuArch、cpuVendor、cpuModel
+ * cpuArch（int；函数 computeBuffSizes 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCpuType(comm->topo, &cpuArch, &cpuVendor,
+ * &cpuModel));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * cpuVendor（int；函数 computeBuffSizes 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCpuType(comm->topo, &cpuArch, &cpuVendor,
+ * &cpuModel));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * cpuModel（int；函数 computeBuffSizes 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCpuType(comm->topo, &cpuArch, &cpuVendor,
+ * &cpuModel));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int cpuArch, cpuVendor, cpuModel;
   NCCLCHECK(ncclTopoCpuType(comm->topo, &cpuArch, &cpuVendor, &cpuModel));
 
+/* 中文逐项-变量 V3248：envs
+ * envs（int64_t；函数 computeBuffSizes 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 envs = { ncclParamLlBuffSize(), ncclParamLl128BuffSize(), ncclParamBuffSize()
+ * }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
   int64_t envs[NCCL_NUM_PROTOCOLS] = { ncclParamLlBuffSize(), ncclParamLl128BuffSize(), ncclParamBuffSize() };
+/* 中文逐项-变量 V3249：defaults
+ * defaults（int；函数 computeBuffSizes 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 defaults = { DEFAULT_LL_BUFFSIZE, DEFAULT_LL128_BUFFSIZE, DEFAULT_BUFFSIZE
+ * }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
   int defaults[NCCL_NUM_PROTOCOLS] = { DEFAULT_LL_BUFFSIZE, DEFAULT_LL128_BUFFSIZE, DEFAULT_BUFFSIZE };
 
   if (cpuArch == NCCL_TOPO_CPU_ARCH_ARM) defaults[NCCL_PROTO_SIMPLE] = DEFAULT_BUFFSIZE_ARM;
 
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
+  for (/* 中文逐项-变量 V3250：p
+ * p（int；函数 computeBuffSizes 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<NCCL_NUM_PROTOCOLS；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
     comm->buffSizes[p] = comm->hostDevComm.buffSizes[p] = envs[p] != -2 ? envs[p] : defaults[p];
   }
   return ncclSuccess;
 }
 
+/* 中文逐项-参数getter P0030：GraphDumpFileRank
+ * 生成函数 ncclParamGraphDumpFileRank()，读取 NCCL_GRAPH_DUMP_FILE_RANK，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(GraphDumpFileRank, "GRAPH_DUMP_FILE_RANK", 0);
+/* 中文逐项-参数getter P0031：CollNetNodeThreshold
+ * 生成函数 ncclParamCollNetNodeThreshold()，读取 NCCL_COLLNET_NODE_THRESHOLD，编译默认值为 2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(CollNetNodeThreshold, "COLLNET_NODE_THRESHOLD", 2);
+/* 中文逐项-参数getter P0032：NvbPreconnect
+ * 生成函数 ncclParamNvbPreconnect()，读取 NCCL_NVB_PRECONNECT，编译默认值为 1。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(NvbPreconnect, "NVB_PRECONNECT", 1);
 
 /* 中文导读：
@@ -487,13 +885,37 @@ NCCL_PARAM(NvbPreconnect, "NVB_PRECONNECT", 1);
  * 5. 调优模型、P2P channel 映射、共享资源和启动参数就绪后，devCommSetup 复制设备视图。
  * 这里的 bootstrapAllGather 是 CPU 控制信息交换，不是调用公开 ncclAllGather GPU API。
  */
+/* 中文逐项-函数 F0895：initTransportsRank
+ * 用途与位置：串联 bootstrap、硬件建图、路径搜索、全局图拼接、传输建链和性能模型，建立当前 rank 通信环境。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 commId（ncclUniqueId* commId）：应用分发的引导会合标识，同一通信组所有rank需要使用同一份。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitRankSync。
+ * 本体直接出现的调用/包装：CPU_COUNT；NCCLCHECK；NCCLCHECKGOTO；bootstrapAllGather；bootstrapBarrier；bootstrapInit；bootstrapIntraNodeAllGather；collNetSupport；computeBuffSizes；fillInfo；free；getHash；getenv；memcpy；ncclCalloc；ncclChannelCompute；ncclCommSetIntraProc；ncclParamCollNetNodeThreshold；更多调用保留在函数体。
+ * 需要对照的边界/推进条件：i < nranks；i != rank) && (comm->peerInfo[i].hostHash == comm->peerInfo[rank].hostHash) &&
+ * (comm->peerInfo[i].busId == comm->peerInfo[rank].busId；CPU_COUNT(&comm->cpuAffinity；comm->rank ==
+ * ncclParamGraphDumpFileRank。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInvalidUsage;；return ncclInternalError;；return ret;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ * 同步阅读点：本函数含屏障、fence或CPU锁/条件变量；它们分别约束参与线程、可见性或元数据互斥，不能互相替代。
+ */
 static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* commId) {
   // We use 2 AllGathers
   // 1. { peerInfo, comm, compCap}
   // 2. { nChannels, graphInfo, topoRanks }
 
+/* 中文逐项-变量 V3251：rank
+ * rank（int；函数 initTransportsRank 内）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 初值/来源 rank = comm->rank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int rank = comm->rank;
+/* 中文逐项-变量 V3252：nranks
+ * nranks（int；函数 initTransportsRank 内）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 初值/来源 nranks = comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nranks = comm->nRanks;
+/* 中文逐项-变量 V3253：commHash
+ * commHash（uint64_t；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 commHash = getHash(commId->internal, NCCL_UNIQUE_ID_BYTES)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   uint64_t commHash = getHash(commId->internal, NCCL_UNIQUE_ID_BYTES);
   TRACE(NCCL_INIT, "comm %p, commHash %lx, rank %d nranks %d - BEGIN", comm, commHash, rank, nranks);
   NCCLCHECK(bootstrapInit(commId, comm));
@@ -507,7 +929,11 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(fillInfo(comm, comm->peerInfo+rank, commHash));
   NCCLCHECK(bootstrapAllGather(comm->bootstrap, comm->peerInfo, sizeof(struct ncclPeerInfo)));
 
-  for (int i = 0; i < nranks; i++) {
+  for (/* 中文逐项-变量 V3254：i
+ * i（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i < nranks；循环体与增量表达式决定每轮如何推进。
+ */int i = 0; i < nranks; i++) {
     if ((i != rank) && (comm->peerInfo[i].hostHash == comm->peerInfo[rank].hostHash) && (comm->peerInfo[i].busId == comm->peerInfo[rank].busId)) {
       WARN("Duplicate GPU detected : rank %d and rank %d both on CUDA device %lx", rank, i, comm->peerInfo[rank].busId);
       return ncclInvalidUsage;
@@ -536,11 +962,20 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Set Affinity to a CPU local the our GPU, so that all memory we allocate
   // on the host is local.
   NCCLCHECK(ncclTopoGetCpuAffinity(comm->topo, comm->rank, &comm->cpuAffinity));
+/* 中文逐项-变量 V3255：affinitySave
+ * affinitySave（cpu_set_t；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：sched_getaffinity(0, sizeof(cpu_set_t), &affinitySave);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   cpu_set_t affinitySave;
   if (CPU_COUNT(&comm->cpuAffinity)) {
     sched_getaffinity(0, sizeof(cpu_set_t), &affinitySave);
     sched_setaffinity(0, sizeof(cpu_set_t), &comm->cpuAffinity);
   }
+/* 中文逐项-变量 V3256：ret
+ * ret（ncclResult_t；函数 initTransportsRank 内）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECKGOTO(setupChannel(comm, c, rank, nranks, rings+c*nranks), ret,
+ * affinity_restore);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   ncclResult_t ret;
 
   // Launch proxy service thread
@@ -551,6 +986,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
  * 后续 Postset 会拼接节点并可能复制 channel；最终 comm->nChannels 不能只看这里的 maxChannels。
  */
   // Get rings and trees
+/* 中文逐项-变量 V3257：ringGraph
+ * ringGraph（struct ncclTopoGraph；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：ringGraph.id = 0;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclTopoGraph ringGraph;
   ringGraph.id = 0;
   ringGraph.pattern = NCCL_TOPO_PATTERN_RING;
@@ -560,6 +999,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(ncclTopoCompute(comm->topo, &ringGraph));
   NCCLCHECK(ncclTopoPrintGraph(comm->topo, &ringGraph));
 
+/* 中文逐项-变量 V3258：treeGraph
+ * treeGraph（struct ncclTopoGraph；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：treeGraph.id = 1;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclTopoGraph treeGraph;
   treeGraph.id = 1;
   treeGraph.pattern = NCCL_TOPO_PATTERN_BALANCED_TREE;
@@ -569,6 +1012,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(ncclTopoCompute(comm->topo, &treeGraph));
   NCCLCHECK(ncclTopoPrintGraph(comm->topo, &treeGraph));
 
+/* 中文逐项-变量 V3259：collNetGraph
+ * collNetGraph（struct ncclTopoGraph；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：collNetGraph.id = 2;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclTopoGraph collNetGraph;
   collNetGraph.id = 2;
   collNetGraph.pattern = NCCL_TOPO_PATTERN_TREE;
@@ -578,12 +1025,20 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(ncclTopoPrintGraph(comm->topo, &collNetGraph));
 
   if (comm->rank == ncclParamGraphDumpFileRank()) {
+/* 中文逐项-变量 V3260：graphs
+ * graphs（struct ncclTopoGraph；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 graphs = { &ringGraph, &treeGraph, &collNetGraph }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
     struct ncclTopoGraph* graphs[3] = { &ringGraph, &treeGraph, &collNetGraph };
     NCCLCHECK(ncclTopoDumpGraphs(comm->topo, 3, graphs));
   }
 
   // Determine local CollNet support before all-gather
   if (collNetSupport()) {
+/* 中文逐项-变量 V3261：collNetEnable
+ * collNetEnable（char；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 collNetEnable = getenv("NCCL_COLLNET_ENABLE")；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     char *collNetEnable = getenv("NCCL_COLLNET_ENABLE");
     if (collNetEnable != NULL) {
       INFO(NCCL_ALL, "NCCL_COLLNET_ENABLE set by environment to %s.", collNetEnable);
@@ -595,22 +1050,74 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   if (comm->collNetSupport == 1 && collNetGraph.nChannels <= 0) comm->collNetSupport = 0;
 
   // AllGather3 - begin
+/* 中文逐项-类型 T0388：ncclGraphInfo
+ * 类型职责：初始化全组交换的图参数摘要，使不同节点的通道数/速度/模式收敛一致。
+ * 声明内可见成员（含嵌套成员）：pattern、nChannels、sameChannels、speedIntra、speedInter、typeIntra、typeInter。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
   struct ncclGraphInfo {
+/* 中文逐项-变量 V3262：pattern
+ * pattern（int；成员 ncclGraphInfo）：图通信模式与允许的机内/机间路径类别，决定搜索可接受候选。
+ */
     int pattern;
+/* 中文逐项-变量 V3263：nChannels
+ * nChannels（int；成员 ncclGraphInfo）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ */
     int nChannels;
+/* 中文逐项-变量 V3264：sameChannels
+ * sameChannels（int；成员 ncclGraphInfo）：图搜索是否允许进出不同NIC、是否重放相同机内GPU顺序的限制。
+ */
     int sameChannels;
+/* 中文逐项-变量 V3265：speedIntra
+ * speedIntra（float；成员 ncclGraphInfo）：图中每通道机内/机间速度与机间延迟估计，不是运行时逐包测量。
+ */
     float speedIntra;
+/* 中文逐项-变量 V3266：speedInter
+ * speedInter（float；成员 ncclGraphInfo）：图中每通道机内/机间速度与机间延迟估计，不是运行时逐包测量。
+ */
     float speedInter;
+/* 中文逐项-变量 V3267：typeIntra
+ * typeIntra（int；成员 ncclGraphInfo）：图通信模式与允许的机内/机间路径类别，决定搜索可接受候选。
+ */
     int typeIntra;
+/* 中文逐项-变量 V3268：typeInter
+ * typeInter（int；成员 ncclGraphInfo）：图通信模式与允许的机内/机间路径类别，决定搜索可接受候选。
+ */
     int typeInter;
   };
 
+/* 中文逐项-变量 V3269：allGather3Data
+ * allGather3Data（struct { int netDev; int collNetSupport; struct ncclGraphInfo tree; struct ncclGraphInfo ring;
+ * struct ncclGrap …（完整表达式见紧邻源码）；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&allGather3Data, nranks));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
+/* 中文逐项-类型 T0389：<匿名struct>
+ * 类型职责：内嵌匿名结构：把紧邻的一组属性组织到外层对象中，布局和拥有关系继承所在对象。
+ * 声明内可见成员（含嵌套成员）：netDev、collNetSupport、tree、ring、collNet、topoRanks。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
   struct {
+/* 中文逐项-变量 V3270：netDev
+ * netDev（int；成员 <匿名>）：实际端口、QP能力上限、设备名、PCI路径和所选后端设备编号。
+ */
     int netDev;
+/* 中文逐项-变量 V3271：collNetSupport
+ * collNetSupport（int；成员 <匿名>）：该communicator是否具备一致可用的CollNet路径，算法选型还要检查类型/归约支持。
+ */
     int collNetSupport;
+/* 中文逐项-变量 V3272：tree
+ * tree（struct ncclGraphInfo；成员 <匿名>）：本 channel 的树邻接关系，up/down 决定向上归约和向下广播。
+ */
     struct ncclGraphInfo tree;
+/* 中文逐项-变量 V3273：ring
+ * ring（struct ncclGraphInfo；成员 <匿名>）：本 channel 的环邻居和内部顺序，决定前驱接收与后继发送。
+ */
     struct ncclGraphInfo ring;
+/* 中文逐项-变量 V3274：collNet
+ * collNet（struct ncclGraphInfo；成员 <匿名>）：图搜索任务是否服务网络集合归约，影响端点与速度约束。
+ */
     struct ncclGraphInfo collNet;
+/* 中文逐项-变量 V3275：topoRanks
+ * topoRanks（struct ncclTopoRanks；成员 <匿名>）：该rank的局部拓扑端点摘要，初始化AllGather后供全局Ring/Tree拼接。
+ */
     struct ncclTopoRanks topoRanks;
   } *allGather3Data;
 
@@ -645,12 +1152,31 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(bootstrapAllGather(comm->bootstrap, allGather3Data, sizeof(*allGather3Data)));
 
   // Determine nNodes, firstRanks, ...
+/* 中文逐项-变量 V3276：nodesFirstRank、nodesTreePatterns
+ * nodesFirstRank（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&nodesFirstRank, nranks));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * nodesTreePatterns（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&nodesTreePatterns, nranks));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int *nodesFirstRank, *nodesTreePatterns;
   NCCLCHECK(ncclCalloc(&nodesFirstRank, nranks));
   NCCLCHECK(ncclCalloc(&nodesTreePatterns, nranks));
   NCCLCHECK(ncclCalloc(&comm->rankToNode, comm->nRanks));
-  for (int r=0; r<nranks; r++) {
+  for (/* 中文逐项-变量 V3277：r
+ * r（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<nranks；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<nranks; r++) {
+/* 中文逐项-变量 V3278：node
+ * node（int；函数 initTransportsRank 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 此处未显式给初值；后续首个文本使用点：for (node=0; node<comm->nNodes && nodesFirstRank[node] != firstRank;
+ * node++);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int node;
+/* 中文逐项-变量 V3279：firstRank
+ * firstRank（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 firstRank = allGather3Data[r].topoRanks.ringRecv[0]；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int firstRank = allGather3Data[r].topoRanks.ringRecv[0];
     for (node=0; node<comm->nNodes && nodesFirstRank[node] != firstRank; node++);
     if (node == comm->nNodes) {
@@ -664,19 +1190,39 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Now that we know nNodes, alloc nodeRanks and compute localRanks for each node
   NCCLCHECK(ncclCalloc(&comm->nodeRanks, comm->nNodes));
   NCCLCHECK(ncclCalloc(&comm->rankToLocalRank, comm->nRanks));
-  for (int r=0; r<comm->nRanks; r++) {
+  for (/* 中文逐项-变量 V3280：r
+ * r（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<comm->nRanks；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<comm->nRanks; r++) {
+/* 中文逐项-变量 V3281：node
+ * node（int；函数 initTransportsRank 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 初值/来源 node = comm->rankToNode[r]；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int node = comm->rankToNode[r];
     comm->rankToLocalRank[r] = comm->nodeRanks[node].localRanks;
     comm->nodeRanks[node].localRanks++;
   }
   // Allocate ranks arrays for each node
-  for (int n=0; n<comm->nNodes; n++) {
+  for (/* 中文逐项-变量 V3282：n
+ * n（int；函数 initTransportsRank 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<comm->nNodes；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<comm->nNodes; n++) {
     NCCLCHECK(ncclCalloc(&comm->nodeRanks[n].localRankToRank, comm->nodeRanks[n].localRanks));
     comm->maxLocalRanks = std::max(comm->maxLocalRanks, comm->nodeRanks[n].localRanks);
     comm->nodeRanks[n].localRanks = 0;
   }
   // And fill the ranks arrays
-  for (int r=0; r<comm->nRanks; r++) {
+  for (/* 中文逐项-变量 V3283：r
+ * r（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<comm->nRanks；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<comm->nRanks; r++) {
+/* 中文逐项-变量 V3284：node
+ * node（int；函数 initTransportsRank 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 初值/来源 node = comm->rankToNode[r]；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int node = comm->rankToNode[r];
     comm->nodeRanks[node].localRankToRank[comm->nodeRanks[node].localRanks++] = r;
   }
@@ -694,10 +1240,22 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
     return ncclInternalError;
   }
 
+/* 中文逐项-变量 V3285：nChannelsOrig
+ * nChannelsOrig（int；函数 initTransportsRank 内）：对应对象/条目的数量，用于限制后续循环、数组容量或并行度。
+ * 初值/来源 nChannelsOrig = comm->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nChannelsOrig = comm->nChannels;
+/* 中文逐项-变量 V3286：allTopoRanks
+ * allTopoRanks（struct ncclTopoRanks；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&allTopoRanks, comm->nRanks));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclTopoRanks** allTopoRanks;
   NCCLCHECK(ncclCalloc(&allTopoRanks, comm->nRanks));
-  for (int i=0; i<nranks; i++) {
+  for (/* 中文逐项-变量 V3287：i
+ * i（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<nranks；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<nranks; i++) {
     comm->peerInfo[i].netDev = allGather3Data[i].netDev;
     allTopoRanks[i] = &allGather3Data[i].topoRanks;
     // Make sure we align all ranks so that the tuning is consistent across ranks
@@ -732,17 +1290,29 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   if (comm->nChannels < nChannelsOrig) {
     // We started duplicating channels during Preset(), so we need to move the
     // duplicated channels since we have removed some.
-    for (int i=0; i<comm->nChannels; i++) memcpy(comm->channels+comm->nChannels+i, comm->channels+nChannelsOrig+i, sizeof(struct ncclChannel));
+    for (/* 中文逐项-变量 V3288：i
+ * i（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<comm->nChannels; i++) memcpy(comm->channels+comm->nChannels+i, comm->channels+nChannelsOrig+i, sizeof(struct ncclChannel));
   }
 
   // Determine CollNet support after all-gather now that we know nNodes and each node localRanks
   if (comm->collNetSupport == 1) {
+/* 中文逐项-变量 V3289：collNetNodeThreshold
+ * collNetNodeThreshold（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 collNetNodeThreshold = ncclParamCollNetNodeThreshold()；调用对应接口取得结果；成功、容量与生命周期要按该接口返回契约判断。
+ */
     int collNetNodeThreshold = ncclParamCollNetNodeThreshold();
     if (comm->nNodes < collNetNodeThreshold) {
       INFO(NCCL_INIT, "Communicator has %d nodes which is less than CollNet node threshold %d, disabling CollNet", comm->nNodes, collNetNodeThreshold);
       comm->collNetSupport = 0;
     }
-    for (int n=0; n<comm->nNodes; n++) {
+    for (/* 中文逐项-变量 V3290：n
+ * n（int；函数 initTransportsRank 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<comm->nNodes；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<comm->nNodes; n++) {
       if (comm->nodeRanks[n].localRanks > NCCL_MAX_DIRECT_ARITY+1) {
         WARN("CollNet currently only supports up to %d GPUs per node, disabling CollNet", NCCL_MAX_DIRECT_ARITY+1);
         comm->collNetSupport = 0;
@@ -751,6 +1321,10 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
     }
   }
 
+/* 中文逐项-变量 V3291：rings
+ * rings（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&rings, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int *rings;
   NCCLCHECK(ncclCalloc(&rings, nranks*MAXCHANNELS));
   NCCLCHECK(ncclTopoPostset(comm, nodesFirstRank, nodesTreePatterns, allTopoRanks, rings, &collNetGraph));
@@ -764,9 +1338,21 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 
   TRACE(NCCL_INIT, "rank %d nranks %d - BUILT %d TREES/RINGS", rank, nranks, comm->nChannels);
 
+/* 中文逐项-变量 V3292：line
+ * line（char；函数 initTransportsRank 内）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
+ * 此处未显式给初值；后续首个文本使用点：line[0]='\0';。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   char line[1024];
   line[0]='\0';
-  for (int c=0; c<comm->nChannels; c++) {
+  for (/* 中文逐项-变量 V3293：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->nChannels; c++) {
+/* 中文逐项-变量 V3294：tree
+ * tree（struct ncclTree；函数 initTransportsRank 内）：本 channel 的树邻接关系，up/down 决定向上归约和向下广播。
+ * 初值/来源 tree = &comm->channels[c].tree；取得已有对象/数组元素地址，不在这一表达式中创建新分配。
+ */
     struct ncclTree* tree = &comm->channels[c].tree;
     snprintf(line+strlen(line), 1023-strlen(line), " [%d] %d/%d/%d->%d->%d",
         c, tree->down[0], tree->down[1], tree->down[2], rank, tree->up);
@@ -782,7 +1368,15 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
  * connectSend/connectRecv 是待建链位图；已 connected 的同槽连接不重复创建。
  */
   // Connect with prev/next for each ring
-  for (int c=0; c<comm->nChannels; c++) {
+  for (/* 中文逐项-变量 V3295：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->nChannels; c++) {
+/* 中文逐项-变量 V3296：channel
+ * channel（struct ncclChannel；函数 initTransportsRank 内）：当前逻辑通信流水线对象，包含邻居、连接表和工作 FIFO。
+ * 初值/来源 channel = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclChannel* channel = comm->channels+c;
     NCCLCHECKGOTO(setupChannel(comm, c, rank, nranks, rings+c*nranks), ret, affinity_restore);
     if (comm->nRanks == 1) continue;
@@ -797,7 +1391,15 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
  * 若 Ring 已经连接了相同 channel/peer/方向，连接标记逻辑会复用该对象，不能简单相加 Ring 与 Tree 边数。
  */
   // Connect Trees
-  for (int c=0; c<comm->nChannels; c++) {
+  for (/* 中文逐项-变量 V3297：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->nChannels; c++) {
+/* 中文逐项-变量 V3298：channel
+ * channel（struct ncclChannel；函数 initTransportsRank 内）：当前逻辑通信流水线对象，包含邻居、连接表和工作 FIFO。
+ * 初值/来源 channel = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclChannel* channel = comm->channels+c;
     if (comm->nRanks == 1) continue;
     NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channel, NCCL_MAX_TREE_ARITY, channel->tree.down, 1, &channel->tree.up, 0), ret, affinity_restore);
@@ -808,19 +1410,55 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 
   // Check if we can setup CollNet
   if (comm->collNetSupport > 0) {
+/* 中文逐项-变量 V3299：collNetSetupFail
+ * collNetSetupFail（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 collNetSetupFail = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int collNetSetupFail = 0;
+/* 中文逐项-变量 V3300：highestTypes
+ * highestTypes（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 highestTypes = {TRANSPORT_P2P}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
     int highestTypes[NCCL_MAX_LOCAL_RANKS] = {TRANSPORT_P2P};
     // Find all head ranks
+/* 中文逐项-变量 V3301：nHeads
+ * nHeads（int；函数 initTransportsRank 内）：当前 CollNet 分工的网络 head 数，额外参与一轮数据块数量计算。
+ * 初值/来源 nHeads = collNetGraph.nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int nHeads = collNetGraph.nChannels;
+/* 中文逐项-变量 V3302：heads
+ * heads（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&heads, nHeads));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int *heads;
     NCCLCHECK(ncclCalloc(&heads, nHeads));
     // Head GPU index is always 0
-    for (int c=0; c<nHeads; c++) {
+    for (/* 中文逐项-变量 V3303：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<nHeads；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<nHeads; c++) {
       heads[c] = collNetGraph.intra[c*comm->localRanks+0];
     }
-    for (int c=0; c<comm->nChannels; c++) {
+    for (/* 中文逐项-变量 V3304：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->nChannels; c++) {
+/* 中文逐项-变量 V3305：channel
+ * channel（struct ncclChannel；函数 initTransportsRank 内）：当前逻辑通信流水线对象，包含邻居、连接表和工作 FIFO。
+ * 初值/来源 channel = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclChannel* channel = comm->channels+c;
-      for (int h=0; h<nHeads; h++) {
+      for (/* 中文逐项-变量 V3306：h
+ * h（int；函数 initTransportsRank 内）：GDRCopy固定缓冲句柄的内部表示，必须用匹配的unpin接口回收。
+ * 初值/来源 h = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：h<nHeads；循环体与增量表达式决定每轮如何推进。
+ */int h=0; h<nHeads; h++) {
+/* 中文逐项-变量 V3307：head
+ * head（int；函数 initTransportsRank 内）：消费者已经释放的协议进度，生产者据此判断循环缓冲能否重用。
+ * 初值/来源 head = heads[h]；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
         const int head = heads[h];
         collNetSetupFail = ncclTransportCollNetSetup(comm, &collNetGraph, channel, head, head, h, collNetRecv);
         if (!collNetSetupFail) collNetSetupFail = ncclTransportCollNetSetup(comm, &collNetGraph, channel, head, head, h, collNetSend);
@@ -835,13 +1473,37 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
     TRACE(NCCL_INIT, "rank %d Connected inter-node CollNet", rank);
 
     // Connect intra-node CollNet
+/* 中文逐项-变量 V3308：highestTransportType0、highestTransportType1
+ * highestTransportType0（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &collNetGraph, 0, &highestTransportType0), ret,
+ * collnet_cleanup);。若由输出参数填入，必须先检查填充调用成功再读值。
+ * highestTransportType1（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &collNetGraph, 1, &highestTransportType1), ret,
+ * collnet_cleanup);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int highestTransportType0, highestTransportType1;
-    for (int c=0; c<comm->nChannels; c++) {
+    for (/* 中文逐项-变量 V3309：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->nChannels; c++) {
+/* 中文逐项-变量 V3310：channelRecv
+ * channelRecv（struct ncclChannel；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channelRecv = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclChannel* channelRecv = comm->channels+c;
       NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channelRecv, NCCL_MAX_DIRECT_ARITY, channelRecv->collTree.up, NCCL_MAX_DIRECT_ARITY, channelRecv->collTree.down, 0), ret, collnet_cleanup);
     }
     NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &collNetGraph, 0, &highestTransportType0), ret, collnet_cleanup);
-    for (int c=0; c<comm->nChannels; c++) {
+    for (/* 中文逐项-变量 V3311：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->nChannels; c++) {
+/* 中文逐项-变量 V3312：channelSend
+ * channelSend（struct ncclChannel；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channelSend = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclChannel* channelSend = comm->channels+c;
       NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channelSend, NCCL_MAX_DIRECT_ARITY, channelSend->collTree.down, NCCL_MAX_DIRECT_ARITY, channelSend->collTree.up, 1), ret, collnet_cleanup);
     }
@@ -851,7 +1513,11 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
     // because we need to know whether all ranks can p2p each other to determine whether we can directly read/write registered user buffer
     comm->intraHighestTransportType = highestTypes[comm->localRank] = highestTransportType0 > highestTransportType1 ? highestTransportType0 : highestTransportType1;
     NCCLCHECK(bootstrapIntraNodeAllGather(comm->bootstrap, comm->localRankToRank, comm->localRank, comm->localRanks, highestTypes, sizeof(int)));
-    for (int i=0; i<comm->localRanks; i++) {
+    for (/* 中文逐项-变量 V3313：i
+ * i（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<comm->localRanks；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<comm->localRanks; i++) {
       if (highestTypes[i] > comm->intraHighestTransportType)
         comm->intraHighestTransportType = highestTypes[i];
     }
@@ -869,9 +1535,23 @@ collnet_cleanup:
 
   // Compute time models for algorithm and protocol combinations
   do {
+/* 中文逐项-变量 V3314：myCompCap
+ * myCompCap（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 myCompCap = comm->peerInfo[rank].cudaCompCap；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int myCompCap = comm->peerInfo[rank].cudaCompCap;
+/* 中文逐项-变量 V3315：minCompCap、maxCompCap
+ * minCompCap（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 minCompCap = myCompCap；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ * maxCompCap（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 maxCompCap = myCompCap；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     int minCompCap = myCompCap, maxCompCap = myCompCap;
-    for (int i = 0; i < nranks; i++) {
+    for (/* 中文逐项-变量 V3316：i
+ * i（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i < nranks；循环体与增量表达式决定每轮如何推进。
+ */int i = 0; i < nranks; i++) {
       minCompCap = std::min(comm->peerInfo[i].cudaCompCap, minCompCap);
       maxCompCap = std::max(comm->peerInfo[i].cudaCompCap, maxCompCap);
     }
@@ -887,19 +1567,49 @@ collnet_cleanup:
 
   if (ncclParamNvbPreconnect()) {
     // Connect p2p when using NVB path
+/* 中文逐项-变量 V3317：nvbNpeers
+ * nvbNpeers（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetNvbGpus(comm->topo, comm->rank, &nvbNpeers,
+ * &nvbPeers));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int nvbNpeers;
+/* 中文逐项-变量 V3318：nvbPeers
+ * nvbPeers（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetNvbGpus(comm->topo, comm->rank, &nvbNpeers,
+ * &nvbPeers));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int* nvbPeers;
     NCCLCHECK(ncclTopoGetNvbGpus(comm->topo, comm->rank, &nvbNpeers, &nvbPeers));
-    for (int r=0; r<nvbNpeers; r++) {
+    for (/* 中文逐项-变量 V3319：r
+ * r（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<nvbNpeers；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<nvbNpeers; r++) {
+/* 中文逐项-变量 V3320：peer
+ * peer（int；函数 initTransportsRank 内）：通信对端的用户 rank，决定在 channel.peers 中选择哪个连接槽。
+ * 初值/来源 peer = nvbPeers[r]；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
       int peer = nvbPeers[r];
+/* 中文逐项-变量 V3321：channelId
+ * channelId（int；函数 initTransportsRank 内）：实际 channels 数组下标；与一次操作内的分片编号 bid 区分。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclChannelCompute(comm, peer, c, ncclFuncSend, &channelId));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int channelId;
-      for (int c=0; c<comm->p2pnChannelsPerPeer; c++) {
+      for (/* 中文逐项-变量 V3322：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->p2pnChannelsPerPeer；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->p2pnChannelsPerPeer; c++) {
         NCCLCHECK(ncclChannelCompute(comm, peer, c, ncclFuncSend, &channelId));
         if (comm->channels[channelId].peers[peer].send[1].connected == 0) {
           comm->connectSend[peer] |= (1<<channelId);
         }
       }
-      for (int c=0; c<comm->p2pnChannelsPerPeer; c++) {
+      for (/* 中文逐项-变量 V3323：c
+ * c（int；函数 initTransportsRank 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->p2pnChannelsPerPeer；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->p2pnChannelsPerPeer; c++) {
         NCCLCHECK(ncclChannelCompute(comm, peer, c, ncclFuncRecv, &channelId));
         if (comm->channels[channelId].peers[peer].recv[1].connected == 0) {
           comm->connectRecv[peer] |= (1<<channelId);
@@ -911,16 +1621,33 @@ collnet_cleanup:
   }
 
   // Connect to local net proxy
+/* 中文逐项-变量 V3324：proxyConn
+ * proxyConn（struct ncclProxyConnector；函数 initTransportsRank 内）：逻辑连接到代理服务的引用，记录代理 rank 和实际后台连接。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_NET, 1, comm->rank,
+ * &proxyConn));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclProxyConnector proxyConn;
   NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_NET, 1, comm->rank, &proxyConn));
   NCCLCHECK(ncclProxyCall(&proxyConn, ncclProxyMsgSharedInit, &comm->p2pnChannels, sizeof(int), NULL, 0));
 
   // Then to remote ones when using PXN
   if (ncclPxnDisable() == 0) {
+/* 中文逐项-变量 V3325：nranks
+ * nranks（int；函数 initTransportsRank 内）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetPxnRanks(comm, &pxnPeers, &nranks));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int nranks;
+/* 中文逐项-变量 V3326：pxnPeers
+ * pxnPeers（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetPxnRanks(comm, &pxnPeers, &nranks));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int* pxnPeers;
     NCCLCHECK(ncclTopoGetPxnRanks(comm, &pxnPeers, &nranks));
-    for (int r=0; r<nranks; r++) {
+    for (/* 中文逐项-变量 V3327：r
+ * r（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<nranks；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<nranks; r++) {
       NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_NET, 1, pxnPeers[r], &proxyConn));
       NCCLCHECK(ncclProxyCall(&proxyConn, ncclProxyMsgSharedInit, &comm->p2pnChannels, sizeof(int), NULL, 0));
     }
@@ -929,8 +1656,20 @@ collnet_cleanup:
 
   do {
     // Compute intra-process ranks
+/* 中文逐项-变量 V3328：intraProcRank0、intraProcRank、intraProcRanks
+ * intraProcRank0（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 intraProcRank0 = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ * intraProcRank（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 intraProcRank = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ * intraProcRanks（int；函数 initTransportsRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 intraProcRanks = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int intraProcRank0 = -1, intraProcRank = -1, intraProcRanks = 0;
-    for (int i = 0; i < nranks; i++) {
+    for (/* 中文逐项-变量 V3329：i
+ * i（int；函数 initTransportsRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i < nranks；循环体与增量表达式决定每轮如何推进。
+ */int i = 0; i < nranks; i++) {
       if ((comm->peerInfo[i].hostHash == comm->peerInfo[rank].hostHash)
           && (comm->peerInfo[i].pidHash == comm->peerInfo[rank].pidHash)) {
         // Rank is in same process
@@ -966,13 +1705,35 @@ affinity_restore:
   return ncclSuccess;
 }
 
+/* 中文逐项-参数getter P0033：SetStackSize
+ * 生成函数 ncclParamSetStackSize()，读取 NCCL_SET_STACK_SIZE，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(SetStackSize, "SET_STACK_SIZE", 0);
 
 /* 中文导读：
  * 真正执行单 rank 初始化的工作函数：切换 CUDA 设备，分配 communicator，建立拓扑/连接，配置设备视图。
  * Sync 指这里执行初始化流程，不代表后续集合通信会同步等待 GPU 完成。
  */
+/* 中文逐项-函数 F0896：ncclCommInitRankSync
+ * 用途与位置：同步建立一个 rank 的 communicator，完成设备选择、总对象分配、传输初始化和设备视图构造。
+ * 参数 newcomm（ncclComm_t* newcomm）：公开初始化结果句柄的输出地址，只有初始化成功后才能交给后续通信调用。
+ * 参数 nranks（int nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 参数 commId（ncclUniqueId commId）：应用分发的引导会合标识，同一通信组所有rank需要使用同一份。
+ * 参数 myrank（int myrank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 cudaDev（int cudaDev）：本进程 CUDA 可见设备序号，供切换设备上下文使用。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitRankDev。
+ * 本体直接出现的调用/包装：CUDACHECK；CUDACHECKIGNORE；NCCLCHECKGOTO；bootstrapAbort；commAlloc；cudaDeviceSetLimit；cudaSetDevice；devCommSetup；initTransportsRank；ncclParamSetStackSize。
+ * 需要对照的边界/推进条件：maxLocalSizeBytes > 0 && ncclParamSetStackSize() == 1；*newcomm) &&
+ * (*newcomm)->bootstrap。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;；return res;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommInitRankSync(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
+/* 中文逐项-变量 V3330：res
+ * res（ncclResult_t；函数 ncclCommInitRankSync 内）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECKGOTO(commAlloc(newcomm, nranks, myrank), res, cleanup);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   ncclResult_t res;
 
   CUDACHECK(cudaSetDevice(cudaDev));
@@ -1000,8 +1761,29 @@ cleanup:
  * 公开初始化 API 与实际初始化之间的调度层。
  * 处于 group 时记录异步初始化任务，最外层 GroupEnd 再启动线程，使同进程多 GPU 初始化能够相互握手。
  */
+/* 中文逐项-函数 F0897：ncclCommInitRankDev
+ * 用途与位置：按是否处于 Group 选择立即初始化或保存异步初始化任务，并处理设备上下文。
+ * 参数 newcomm（ncclComm_t* newcomm）：公开初始化结果句柄的输出地址，只有初始化成功后才能交给后续通信调用。
+ * 参数 nranks（int nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 参数 commId（ncclUniqueId commId）：应用分发的引导会合标识，同一通信组所有rank需要使用同一份。
+ * 参数 myrank（int myrank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 cudaDev（int cudaDev）：本进程 CUDA 可见设备序号，供切换设备上下文使用。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitRank；src/init.cc::ncclCommInitAll。
+ * 本体直接出现的调用/包装：CUDACHECKGOTO；NCCLCHECKGOTO；PtrCheck；bootstrapCreateRoot；cudaFree；getenv；ncclAsyncErrCheck；ncclAsyncInit；ncclAsyncMode；ncclCommInitRankSync；ncclInit；showVersion。
+ * 需要对照的边界/推进条件：env && myrank == 0；myrank == 0；nranks < 1 || myrank < 0 || myrank >=
+ * nranks；ncclAsyncMode。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclAsyncErrCheck(res);；return res;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
+/* 中文逐项-变量 V3331：res
+ * res（ncclResult_t；函数 ncclCommInitRankDev 内）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECKGOTO(bootstrapCreateRoot(&commId, true), res, end);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   ncclResult_t res;
+/* 中文逐项-变量 V3332：env
+ * env（char；函数 ncclCommInitRankDev 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 env = getenv("NCCL_COMM_ID")；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   char* env = getenv("NCCL_COMM_ID");
   if (env && myrank == 0) {
     INFO(NCCL_ENV, "NCCL_COMM_ID set by environment to %s", env);
@@ -1033,8 +1815,22 @@ end:
 }
 
 NCCL_API(ncclResult_t, ncclCommInitRank, ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank);
+/* 中文逐项-函数 F0898：ncclCommInitRank
+ * 用途与位置：公开多进程/多机初始化入口，使用当前设备、全组规模和 uniqueId 建立当前 rank。
+ * 参数 newcomm（ncclComm_t* newcomm）：公开初始化结果句柄的输出地址，只有初始化成功后才能交给后续通信调用。
+ * 参数 nranks（int nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 参数 commId（ncclUniqueId commId）：应用分发的引导会合标识，同一通信组所有rank需要使用同一份。
+ * 参数 myrank（int myrank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；cudaGetDevice；ncclCommInitRankDev。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommInitRank(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
+/* 中文逐项-变量 V3333：cudaDev
+ * cudaDev（int；函数 ncclCommInitRank 内）：本进程 CUDA 可见设备序号，供切换设备上下文使用。
+ * 此处未显式给初值；后续首个文本使用点：CUDACHECK(cudaGetDevice(&cudaDev));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int cudaDev;
   CUDACHECK(cudaGetDevice(&cudaDev));
   NCCLCHECK(ncclCommInitRankDev(newcomm, nranks, commId, myrank, cudaDev));
@@ -1048,6 +1844,16 @@ NCCL_API(ncclResult_t, ncclCommInitAll, ncclComm_t* comms, int ndev, const int* 
  * 它面向单进程本地设备；多进程/多机器通常由应用分发 uniqueId 后各自调用 ncclCommInitRank。
  * 这里 ndev 是 communicator 的 rank 数，不意味着创建一个覆盖整个集群的硬件对象。
  */
+/* 中文逐项-函数 F0899：ncclCommInitAll
+ * 用途与位置：单进程本地多 GPU 便捷初始化，使用同一 uniqueId 和 Group 协调各设备加入同一通信组。
+ * 参数 comms（ncclComm_t* comms）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 ndev（int ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 devlist（const int* devlist）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；PtrCheck；ncclCommInitRankDev；ncclGetUniqueId；ncclGroupEnd；ncclGroupStart。
+ * 需要对照的边界/推进条件：ndev < 0；i<ndev。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInvalidArgument;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   NCCLCHECK(PtrCheck(comms, "CommInitAll", "comms"));
@@ -1056,10 +1862,18 @@ ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist) {
     return ncclInvalidArgument;
   }
 
+/* 中文逐项-变量 V3334：uniqueId
+ * uniqueId（ncclUniqueId；函数 ncclCommInitAll 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetUniqueId(&uniqueId));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   ncclUniqueId uniqueId;
   NCCLCHECK(ncclGetUniqueId(&uniqueId));
   NCCLCHECK(ncclGroupStart());
-  for (int i=0; i<ndev; i++) {
+  for (/* 中文逐项-变量 V3335：i
+ * i（int；函数 ncclCommInitAll 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<ndev；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<ndev; i++) {
     // Ignore return codes .. we need to call ncclGroupEnd to clean up anyway
     ncclCommInitRankDev(comms+i, ndev, uniqueId, i, devlist ? devlist[i] : i);
   }
@@ -1067,7 +1881,20 @@ ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist) {
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0900：ncclGraphHelperDestroy
+ * 用途与位置：停止并等待图 IPC 清理辅助线程，回收其锁、队列与同步对象。
+ * 参数 comm（ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::commDestroy。
+ * 本体直接出现的调用/包装：free；pthread_cond_signal；pthread_join；pthread_mutex_lock；pthread_mutex_unlock。
+ * 需要对照的边界/推进条件：comm->graphHelperThread && res；res。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ * 同步阅读点：本函数含屏障、fence或CPU锁/条件变量；它们分别约束参与线程、可见性或元数据互斥，不能互相替代。
+ */
 static ncclResult_t ncclGraphHelperDestroy(ncclComm* comm) {
+/* 中文逐项-变量 V3336：res
+ * res（auto；函数 ncclGraphHelperDestroy 内）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 初值/来源 res = comm->graphHelperResources；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   auto res = comm->graphHelperResources;
   if (comm->graphHelperThread && res) {
     pthread_mutex_lock(&res->threadLock);
@@ -1087,6 +1914,15 @@ static ncclResult_t ncclGraphHelperDestroy(ncclComm* comm) {
  * 销毁 communicator 的完整生命周期入口之一：协调后台服务与图辅助资源，再释放通道及主机/设备状态。
  * 做资源统计时要区分单次操作完成、连接仍驻留和 communicator 最终销毁，三者释放范围不同。
  */
+/* 中文逐项-函数 F0901：commDestroy
+ * 用途与位置：协调 Proxy 和图辅助资源停止，再进入 communicator 总资源释放。
+ * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommDestroy；src/init.cc::ncclCommAbort。
+ * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；commFree；cudaGetDevice；cudaSetDevice；cudaStreamSynchronize；ncclDestroyQueueInfo；ncclGraphHelperDestroy。
+ * 需要对照的边界/推进条件：comm->rank == -1 || comm->nRanks <= 0 || comm->cudaDev == -1 || comm->busId == -1；savedDevice !=
+ * commDevice；savedDevice != commDevice。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInvalidArgument;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t commDestroy(ncclComm_t comm) {
   // Try and prevent a double free of the comm struct (user error)
   if (comm->rank == -1 || comm->nRanks <= 0 || comm->cudaDev == -1 || comm->busId == -1) {
@@ -1094,8 +1930,16 @@ static ncclResult_t commDestroy(ncclComm_t comm) {
     return ncclInvalidArgument;
   }
 
+/* 中文逐项-变量 V3337：savedDevice
+ * savedDevice（int；函数 commDestroy 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：CUDACHECK(cudaGetDevice(&savedDevice));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int savedDevice;
   CUDACHECK(cudaGetDevice(&savedDevice));
+/* 中文逐项-变量 V3338：commDevice
+ * commDevice（int；函数 commDestroy 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 commDevice = comm->cudaDev；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int commDevice = comm->cudaDev;
 
   if (savedDevice != commDevice) {
@@ -1121,12 +1965,32 @@ static ncclResult_t commDestroy(ncclComm_t comm) {
 }
 
 NCCL_API(ncclResult_t, ncclCommDestroy, ncclComm_t comm);
+/* 中文逐项-函数 F0902：ncclCommDestroy
+ * 用途与位置：正常销毁公开 communicator 句柄，按本版生命周期要求回收长期通信对象。
+ * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/group.cc::ncclGroupEnd。
+ * 本体直接出现的调用/包装：NCCLCHECK；commDestroy。
+ * 需要对照的边界/推进条件：comm == NULL。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommDestroy(ncclComm_t comm) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   if (comm == NULL)
     return ncclSuccess;
 
+/* 中文逐项-变量 V3339：rank、nranks、cudaDev
+ * rank（int；函数 ncclCommDestroy 内）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 初值/来源 rank = comm->rank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * nranks（int；函数 ncclCommDestroy 内）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 初值/来源 nranks = comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * cudaDev（int；函数 ncclCommDestroy 内）：本进程 CUDA 可见设备序号，供切换设备上下文使用。
+ * 初值/来源 cudaDev = comm->cudaDev；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int rank = comm->rank, nranks = comm->nRanks, cudaDev = comm->cudaDev;
+/* 中文逐项-变量 V3340：busId
+ * busId（int64_t；函数 ncclCommDestroy 内）：PCI BDF 的整数标识，用于将 CUDA、NVML 与拓扑中的同一设备关联。
+ * 初值/来源 busId = comm->busId；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int64_t busId = comm->busId;
   TRACE(NCCL_INIT, "comm %p rank %d nRanks %d cudaDev %d busId %lx", comm, rank, nranks, cudaDev, busId);
 
@@ -1142,12 +2006,32 @@ NCCL_API(ncclResult_t, ncclCommAbort, ncclComm_t comm);
  * 应用正常路径先确保相关 CUDA 工作生命周期正确，再 Destroy；异步错误可用 GetAsyncError 查询。
  * 本版本不包含后来版本的 InitRankConfig/Split 等 API，不应套用新版对象生命周期。
  */
+/* 中文逐项-函数 F0903：ncclCommAbort
+ * 用途与位置：设置共享中止标志并执行异常清理，帮助 GPU/Proxy/socket 等待退出。
+ * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；commDestroy。
+ * 需要对照的边界/推进条件：comm == NULL。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommAbort(ncclComm_t comm) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   if (comm == NULL)
     return ncclSuccess;
 
+/* 中文逐项-变量 V3341：rank、nranks、cudaDev
+ * rank（int；函数 ncclCommAbort 内）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 初值/来源 rank = comm->rank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * nranks（int；函数 ncclCommAbort 内）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 初值/来源 nranks = comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * cudaDev（int；函数 ncclCommAbort 内）：本进程 CUDA 可见设备序号，供切换设备上下文使用。
+ * 初值/来源 cudaDev = comm->cudaDev；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int rank = comm->rank, nranks = comm->nRanks, cudaDev = comm->cudaDev;
+/* 中文逐项-变量 V3342：busId
+ * busId（int64_t；函数 ncclCommAbort 内）：PCI BDF 的整数标识，用于将 CUDA、NVML 与拓扑中的同一设备关联。
+ * 初值/来源 busId = comm->busId；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int64_t busId = comm->busId;
   TRACE(NCCL_INIT, "comm %p rank %d nRanks %d cudaDev %d busId %lx", comm, rank, nranks, cudaDev, busId);
 
@@ -1160,6 +2044,14 @@ ncclResult_t ncclCommAbort(ncclComm_t comm) {
 }
 
 NCCL_API(const char*, ncclGetErrorString, ncclResult_t code);
+/* 中文逐项-函数 F0904：ncclGetErrorString
+ * 用途与位置：把 NCCL 结果枚举映射成稳定可读字符串，不改变 communicator 的执行状态。
+ * 参数 code（ncclResult_t code）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/enqueue.cc::ncclEnqueueHostSetup。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return "no error";；return "unhandled cuda error";；return "unhandled system error";；return "internal
+ * error";；return "invalid argument";；其余错误/特化返回见函数体。CHECK类宏还可能提前返回/跳转。
+ */
 const char* ncclGetErrorString(ncclResult_t code) {
   switch (code) {
     case ncclSuccess                : return "no error";
@@ -1173,6 +2065,14 @@ const char* ncclGetErrorString(ncclResult_t code) {
 }
 
 NCCL_API(ncclResult_t, ncclCommGetAsyncError, ncclComm_t comm, ncclResult_t *asyncError);
+/* 中文逐项-函数 F0905：ncclCommGetAsyncError
+ * 用途与位置：查询 communicator 已记录的异步失败，使应用可在提交成功后检测后台错误。
+ * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 asyncError（ncclResult_t *asyncError）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；PtrCheck。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError) {
   NCCLCHECK(PtrCheck(comm, "ncclGetAsyncError", "comm"));
   NCCLCHECK(PtrCheck(asyncError, "ncclGetAsyncError", "asyncError"));
@@ -1181,6 +2081,14 @@ ncclResult_t ncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError) {
 }
 
 NCCL_API(ncclResult_t, ncclCommCount, const ncclComm_t comm, int* count);
+/* 中文逐项-函数 F0906：ncclCommCount
+ * 用途与位置：读取通信组 rank 总数到用户输出参数，返回的是逻辑参与规模。
+ * 参数 comm（const ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 count（int* count）：当前对象的有效元素数量；复制 API 和 P2P 归一到 Int8 后等于字节数，不能脱离 datatype 解释。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；PtrCheck。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommCount(const ncclComm_t comm, int* count) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   NCCLCHECK(PtrCheck(comm, "CommCount", "comm"));
@@ -1190,6 +2098,14 @@ ncclResult_t ncclCommCount(const ncclComm_t comm, int* count) {
 }
 
 NCCL_API(ncclResult_t, ncclCommCuDevice, const ncclComm_t comm, int* devid);
+/* 中文逐项-函数 F0907：ncclCommCuDevice
+ * 用途与位置：查询该 communicator 所属本地 CUDA 设备序号，不能把它等同于全局 rank。
+ * 参数 comm（const ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 devid（int* devid）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；PtrCheck。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommCuDevice(const ncclComm_t comm, int* devid) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   NCCLCHECK(PtrCheck(comm, "CommCuDevice", "comm"));
@@ -1199,6 +2115,14 @@ ncclResult_t ncclCommCuDevice(const ncclComm_t comm, int* devid) {
 }
 
 NCCL_API(ncclResult_t, ncclCommUserRank, const ncclComm_t comm, int* rank);
+/* 中文逐项-函数 F0908：ncclCommUserRank
+ * 用途与位置：查询本 communicator 当前对象对应的用户 rank 编号。
+ * 参数 comm（const ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 rank（int* rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；PtrCheck。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclCommUserRank(const ncclComm_t comm, int* rank) {
   NVTX3_FUNC_RANGE_IN(nccl_domain);
   NCCLCHECK(PtrCheck(comm, "CommUserRank", "comm"));

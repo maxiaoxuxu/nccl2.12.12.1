@@ -15,7 +15,15 @@
  */
 
 /* Temporary helper #defines, #undef'ed at end of header */
+/* 中文逐项-常量 X1029：NVTX3_CPP_VERSION_MAJOR
+ * 编译期定义：NVTX3_CPP_VERSION_MAJOR = 1。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_CPP_VERSION_MAJOR 1
+/* 中文逐项-常量 X1030：NVTX3_CPP_VERSION_MINOR
+ * 编译期定义：NVTX3_CPP_VERSION_MINOR = 0。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_CPP_VERSION_MINOR 0
 
 /* This section handles the decision of whether to provide unversioned symbols.
@@ -42,6 +50,10 @@
     /* Define macro used by all definitions in this header to indicate the
      * unversioned symbols should be defined in addition to the versioned ones.
      */
+/* 中文逐项-常量 X1031：NVTX3_INLINE_THIS_VERSION
+ * 编译期定义：NVTX3_INLINE_THIS_VERSION = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
     #define NVTX3_INLINE_THIS_VERSION
 
     #if !defined(NVTX3_CPP_INLINED_VERSION_MAJOR)
@@ -59,6 +71,10 @@
          *
          * Not to be confused with the version number of the NVTX core library.
          */
+/* 中文逐项-常量 X1032：NVTX3_CPP_INLINED_VERSION_MAJOR
+ * 编译期定义：NVTX3_CPP_INLINED_VERSION_MAJOR = 1 // NVTX3_CPP_VERSION_MAJOR。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
         #define NVTX3_CPP_INLINED_VERSION_MAJOR 1  // NVTX3_CPP_VERSION_MAJOR
 
         /**
@@ -71,6 +87,10 @@
          *
          * Not to be confused with the version number of the NVTX core library.
          */
+/* 中文逐项-常量 X1033：NVTX3_CPP_INLINED_VERSION_MINOR
+ * 编译期定义：NVTX3_CPP_INLINED_VERSION_MINOR = 0 // NVTX3_CPP_VERSION_MINOR。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
         #define NVTX3_CPP_INLINED_VERSION_MINOR 0  // NVTX3_CPP_VERSION_MINOR
     #elif NVTX3_CPP_INLINED_VERSION_MAJOR != NVTX3_CPP_VERSION_MAJOR
         /* Unsupported case -- cannot define unversioned symbols for different major versions
@@ -85,6 +105,10 @@
          * redefine the minor version macro to this header's version.
          */
         #undef NVTX3_CPP_INLINED_VERSION_MINOR
+/* 中文逐项-常量 X1034：NVTX3_CPP_INLINED_VERSION_MINOR
+ * 编译期定义：NVTX3_CPP_INLINED_VERSION_MINOR = 0 // NVTX3_CPP_VERSION_MINOR。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
         #define NVTX3_CPP_INLINED_VERSION_MINOR 0  // NVTX3_CPP_VERSION_MINOR
         // else, already have this version or newer, nothing to do
     #endif
@@ -566,16 +590,36 @@
 
 /* Within this header, nvtx3::NVTX3_VERSION_NAMESPACE resolves to nvtx3::vX,
  * where "X" is the major version number. */
+/* 中文逐项-宏 M0117：NVTX3_CONCAT
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX3_CONCAT；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX3_CONCAT(A, B) A##B
+/* 中文逐项-宏 M0118：NVTX3_NAMESPACE_FOR
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX3_NAMESPACE_FOR；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX3_NAMESPACE_FOR(VERSION) NVTX3_CONCAT(v, VERSION)
+/* 中文逐项-常量 X1035：NVTX3_VERSION_NAMESPACE
+ * 编译期定义：NVTX3_VERSION_NAMESPACE = NVTX3_NAMESPACE_FOR(NVTX3_CPP_VERSION_MAJOR)。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_VERSION_NAMESPACE NVTX3_NAMESPACE_FOR(NVTX3_CPP_VERSION_MAJOR)
 
 /* Avoid duplicating #if defined(NVTX3_INLINE_THIS_VERSION) for namespaces
  * in each minor version by making a macro to use unconditionally, which
  * resolves to "inline" or nothing as appropriate. */
 #if defined(NVTX3_INLINE_THIS_VERSION)
+/* 中文逐项-常量 X1036：NVTX3_INLINE_IF_REQUESTED
+ * 编译期定义：NVTX3_INLINE_IF_REQUESTED = inline。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_INLINE_IF_REQUESTED inline
 #else
+/* 中文逐项-常量 X1037：NVTX3_INLINE_IF_REQUESTED
+ * 编译期定义：NVTX3_INLINE_IF_REQUESTED = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_INLINE_IF_REQUESTED
 #endif
 
@@ -588,14 +632,26 @@
  * to using non-constexpr constructors for classes with union members.
  */
 #if __cpp_constexpr >= 201304L
+/* 中文逐项-常量 X1038：NVTX3_RELAXED_CONSTEXPR
+ * 编译期定义：NVTX3_RELAXED_CONSTEXPR = constexpr。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_RELAXED_CONSTEXPR constexpr
 #else
+/* 中文逐项-常量 X1039：NVTX3_RELAXED_CONSTEXPR
+ * 编译期定义：NVTX3_RELAXED_CONSTEXPR = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_RELAXED_CONSTEXPR
 #endif
 
 /* Implementation sections, enclosed in guard macros for each minor version */
 
 #ifndef NVTX3_CPP_DEFINITIONS_V1_0
+/* 中文逐项-常量 X1040：NVTX3_CPP_DEFINITIONS_V1_0
+ * 编译期定义：NVTX3_CPP_DEFINITIONS_V1_0 = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_CPP_DEFINITIONS_V1_0
 
 namespace nvtx3 {
@@ -612,6 +668,14 @@ namespace detail {
  * @tparam T The type to verify
  * @return True if `T` contains a member `T::name` of type `const char*` or
  * `const wchar_t*`.
+ */
+/* 中文逐项-函数 F0809：has_name_member
+ * 用途与位置：通过模板替换检测命名域类型是否具有要求的静态name成员，编译期拒绝不满足接口的类型。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::get。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return (std::is_same<char const*, typename std::decay<decltype(T::name)>::type>::value ||
+ * std::is_same<wchar_t const*, typename std::decay<d …（完整表达式见紧邻源码）。CHECK类宏还可能提前返回/跳转。
  */
 template <typename T>
 constexpr auto has_name_member() noexcept -> decltype(T::name, bool())
@@ -675,6 +739,10 @@ constexpr auto has_name_member() noexcept -> decltype(T::name, bool())
  * nvtx3::thread_range r3{};
  * ```
  */
+/* 中文逐项-类型 T0346：domain
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：_domain。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 class domain {
  public:
   domain(domain const&) = delete;
@@ -726,12 +794,23 @@ class domain {
    * name the `domain` object.
    * @return Reference to the `domain` corresponding to the type `DomainName`.
    */
+/* 中文逐项-函数 F0810：get
+ * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::named_category；src/include/nvtx3.hpp::domain_thread_range；src/include/nvtx3.hpp::~domain_thread_range；src/include/nvtx3.hpp::start_range；src/include/nvtx3.hpp::mark。
+ * 本体直接出现的调用/包装：detail::has_name_member<DomainName>。
+ * 源码返回表达式：return d;。CHECK类宏还可能提前返回/跳转。
+ */
   template <typename DomainName>
   static domain const& get()
   {
     static_assert(detail::has_name_member<DomainName>(),
                   "Type used to identify a domain must contain a name member of"
                   "type const char* or const wchar_t*");
+/* 中文逐项-变量 V3023：d
+ * d（domain；函数 get 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 d = {DomainName::name}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
     static domain const d{DomainName::name};
     return d;
   }
@@ -755,6 +834,9 @@ class domain {
    * applications will be grouped together.
    *
    */
+/* 中文逐项-类型 T0347：global
+ * 类型职责：本文件的struct类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ */
   struct global {
   };
 
@@ -767,6 +849,12 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文逐项-函数 F0811：domain
+ * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
+ * 参数 name（char const* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit domain(char const* name) noexcept : _domain{nvtxDomainCreateA(name)} {}
 
   /**
@@ -777,6 +865,12 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文逐项-函数 F0812：domain
+ * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
+ * 参数 name（wchar_t const* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit domain(wchar_t const* name) noexcept : _domain{nvtxDomainCreateW(name)} {}
 
   /**
@@ -787,6 +881,12 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文逐项-函数 F0813：domain
+ * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
+ * 参数 <未命名参数>（std::string const& name）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit domain(std::string const& name) noexcept : domain{name.c_str()} {}
 
   /**
@@ -797,6 +897,12 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文逐项-函数 F0814：domain
+ * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
+ * 参数 <未命名参数>（std::wstring const& name）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit domain(std::wstring const& name) noexcept : domain{name.c_str()} {}
 
   /**
@@ -826,6 +932,9 @@ class domain {
   ~domain() = default;
 
  private:
+/* 中文逐项-变量 V3024：_domain
+ * _domain（nvtxDomainHandle_t；成员 domain）：NVTX域/注册对象的不透明句柄，工具API使用它定位标记域或字符串，不是GPU内存地址。
+ */
   nvtxDomainHandle_t const _domain{};  ///< The `domain`s NVTX handle
 };
 
@@ -842,9 +951,20 @@ class domain {
  * @return Reference to the `domain` corresponding to the global NVTX domain.
  *
  */
+/* 中文逐项-函数 F0815：domain::get<domain::global>
+ * 用途与位置：全局域特化，返回默认NVTX域表示，避免为默认作用域创建重复命名域。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return d;。CHECK类宏还可能提前返回/跳转。
+ */
 template <>
 inline domain const& domain::get<domain::global>()
 {
+/* 中文逐项-变量 V3025：d
+ * d（domain；函数 domain::get<domain::global> 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 d = {}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
   static domain const d{};
   return d;
 }
@@ -853,6 +973,10 @@ inline domain const& domain::get<domain::global>()
  * @brief Indicates the values of the red, green, blue color channels for
  * a rgb color code.
  *
+ */
+/* 中文逐项-类型 T0348：rgb
+ * 类型职责：本文件的struct类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：red、green、blue。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
  */
 struct rgb {
   /// Type used for component values
@@ -868,13 +992,30 @@ struct rgb {
    * @param green_ Value of the green channel
    * @param blue_ Value of the blue channel
    */
+/* 中文逐项-函数 F0816：rgb
+ * 用途与位置：构造颜色分量描述，RGB未显式给alpha的部分按对应包装约定处理，不影响张量数据。
+ * 参数 red_（component_type red_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 green_（component_type green_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 blue_（component_type blue_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr rgb(component_type red_, component_type green_, component_type blue_) noexcept
     : red{red_}, green{green_}, blue{blue_}
   {
   }
 
+/* 中文逐项-变量 V3026：red
+ * red（component_type；成员 rgb）：ARGB颜色的单字节分量，打包后仅控制性能工具显示颜色。
+ */
   component_type const red{};    ///< Red channel value
+/* 中文逐项-变量 V3027：green
+ * green（component_type；成员 rgb）：ARGB颜色的单字节分量，打包后仅控制性能工具显示颜色。
+ */
   component_type const green{};  ///< Green channel value
+/* 中文逐项-变量 V3028：blue
+ * blue（component_type；成员 rgb）：ARGB颜色的单字节分量，打包后仅控制性能工具显示颜色。
+ */
   component_type const blue{};   ///< Blue channel value
 };
 
@@ -882,6 +1023,10 @@ struct rgb {
  * @brief Indicates the value of the alpha, red, green, and blue color
  * channels for an argb color code.
  *
+ */
+/* 中文逐项-类型 T0349：argb
+ * 类型职责：本文件的struct类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：alpha。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
  */
 struct argb final : rgb {
   /**
@@ -896,6 +1041,15 @@ struct argb final : rgb {
    * @param blue_  Value of the blue channel
    *
    */
+/* 中文逐项-函数 F0817：argb
+ * 用途与位置：构造颜色分量描述，RGB未显式给alpha的部分按对应包装约定处理，不影响张量数据。
+ * 参数 alpha_（component_type alpha_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 red_（component_type red_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 green_（component_type green_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 blue_（component_type blue_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr argb(component_type alpha_,
                  component_type red_,
                  component_type green_,
@@ -904,6 +1058,9 @@ struct argb final : rgb {
   {
   }
 
+/* 中文逐项-变量 V3029：alpha
+ * alpha（component_type；成员 argb）：ARGB颜色的单字节分量，打包后仅控制性能工具显示颜色。
+ */
   component_type const alpha{};  ///< Alpha channel value
 };
 
@@ -915,6 +1072,10 @@ struct argb final : rgb {
  * differentiate among different events in a visualization tool such as Nsight
  * Systems.
  *
+ */
+/* 中文逐项-类型 T0350：color
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：_value、_type。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
  */
 class color {
  public:
@@ -938,6 +1099,12 @@ class color {
    *
    * @param hex_code The hex code used to construct the `color`
    */
+/* 中文逐项-函数 F0818：color
+ * 用途与位置：构造NVTX颜色属性，保存颜色种类和打包值以供事件属性使用。
+ * 参数 hex_code（value_type hex_code）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr explicit color(value_type hex_code) noexcept : _value{hex_code} {}
 
   /**
@@ -946,6 +1113,12 @@ class color {
    *
    * @param argb The alpha, red, green, blue components of the desired `color`
    */
+/* 中文逐项-函数 F0819：color
+ * 用途与位置：构造NVTX颜色属性，保存颜色种类和打包值以供事件属性使用。
+ * 参数 argb（argb argb）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr color(argb argb) noexcept
     : color{from_bytes_msb_to_lsb(argb.alpha, argb.red, argb.green, argb.blue)}
   {
@@ -959,6 +1132,12 @@ class color {
    *
    * @param rgb The red, green, blue components of the desired `color`
    */
+/* 中文逐项-函数 F0820：color
+ * 用途与位置：构造NVTX颜色属性，保存颜色种类和打包值以供事件属性使用。
+ * 参数 rgb（rgb rgb）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr color(rgb rgb) noexcept
     : color{from_bytes_msb_to_lsb(0xFF, rgb.red, rgb.green, rgb.blue)}
   {
@@ -968,12 +1147,26 @@ class color {
    * @brief Returns the `color`s argb hex code
    *
    */
+/* 中文逐项-函数 F0821：get_value
+ * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return _value;。CHECK类宏还可能提前返回/跳转。
+ */
   constexpr value_type get_value() const noexcept { return _value; }
 
   /**
    * @brief Return the NVTX color type of the color.
    *
    */
+/* 中文逐项-函数 F0822：get_type
+ * 用途与位置：返回NVTX消息/颜色/载荷的类型标签，使消费者选择正确union视图。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return _type;。CHECK类宏还可能提前返回/跳转。
+ */
   constexpr nvtxColorType_t get_type() const noexcept { return _type; }
 
   color()             = delete;
@@ -989,6 +1182,17 @@ class color {
    * most to least significant byte order.
    *
    */
+/* 中文逐项-函数 F0823：from_bytes_msb_to_lsb
+ * 用途与位置：按从高到低字节顺序打包颜色分量，形成NVTX事件颜色值。
+ * 参数 byte3（uint8_t byte3）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 byte2（uint8_t byte2）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 byte1（uint8_t byte1）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 byte0（uint8_t byte0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return uint32_t{byte3} << 24 | uint32_t{byte2} << 16 | uint32_t{byte1} << 8 |
+ * uint32_t{byte0};。CHECK类宏还可能提前返回/跳转。
+ */
   constexpr static value_type from_bytes_msb_to_lsb(uint8_t byte3,
                                                     uint8_t byte2,
                                                     uint8_t byte1,
@@ -997,7 +1201,13 @@ class color {
     return uint32_t{byte3} << 24 | uint32_t{byte2} << 16 | uint32_t{byte1} << 8 | uint32_t{byte0};
   }
 
+/* 中文逐项-变量 V3030：_value
+ * _value（value_type；成员 color）：NVTX包装保存的标量/union值，配合类型字段解释。
+ */
   value_type const _value{};                     ///< color's argb color code
+/* 中文逐项-变量 V3031：_type
+ * _type（nvtxColorType_t；成员 color）：NVTX颜色/消息/载荷的union类型标签，读取值前先看对应标签。
+ */
   nvtxColorType_t const _type{NVTX_COLOR_ARGB};  ///< NVTX color type code
 };
 
@@ -1022,6 +1232,10 @@ class color {
  * To associate a name string with a category id, see `named_category`.
  *
  */
+/* 中文逐项-类型 T0351：category
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：id_。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 class category {
  public:
   /// Type used for `category`s integer id.
@@ -1036,12 +1250,25 @@ class category {
    *
    * @param[in] id The `category`'s identifying value
    */
+/* 中文逐项-函数 F0824：category
+ * 用途与位置：保存NVTX事件类别整数标识，供性能工具分组显示。
+ * 参数 id（id_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr explicit category(id_type id) noexcept : id_{id} {}
 
   /**
    * @brief Returns the id of the category.
    *
    */
+/* 中文逐项-函数 F0825：get_id
+ * 用途与位置：读取当前NVTX类别或范围标识，不等于NCCL rank/channel编号。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::named_category。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return id_;。CHECK类宏还可能提前返回/跳转。
+ */
   constexpr id_type get_id() const noexcept { return id_; }
 
   category()                = delete;
@@ -1052,6 +1279,9 @@ class category {
   category& operator=(category&&) = default;
 
  private:
+/* 中文逐项-变量 V3032：id_
+ * id_（id_type；成员 category）：NVTX范围或类别id，供start/end或类别分组匹配，与NCCL rank无关。
+ */
   id_type const id_{};  ///< category's unique identifier
 };
 
@@ -1104,6 +1334,9 @@ class category {
  * which the `named_category` belongs. Else, `domain::global` to  indicate
  * that the global NVTX domain should be used.
  */
+/* 中文逐项-类型 T0352：named_category
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ */
 template <typename D = domain::global>
 class named_category final : public category {
  public:
@@ -1141,11 +1374,22 @@ class named_category final : public category {
    * @tparam C Type containing a member `C::name` that resolves  to either a
    * `char const*` or `wchar_t const*` and `C::id`.
    */
+/* 中文逐项-函数 F0826：get
+ * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::named_category；src/include/nvtx3.hpp::domain_thread_range；src/include/nvtx3.hpp::~domain_thread_range；src/include/nvtx3.hpp::start_range；src/include/nvtx3.hpp::mark。
+ * 本体直接出现的调用/包装：detail::has_name_member<C>。
+ * 源码返回表达式：return category;。CHECK类宏还可能提前返回/跳转。
+ */
   template <typename C>
   static named_category<D> const& get() noexcept
   {
     static_assert(detail::has_name_member<C>(),
                   "Type used to name a category must contain a name member.");
+/* 中文逐项-变量 V3033：category
+ * category（named_category<D>；函数 get 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 category = {C::id, C::name}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
     static named_category<D> const category{C::id, C::name};
     return category;
   }
@@ -1159,6 +1403,13 @@ class named_category final : public category {
    * @param[in] id The category id to name
    * @param[in] name The name to associated with `id`
    */
+/* 中文逐项-函数 F0827：named_category
+ * 用途与位置：在指定NVTX域中为类别id注册可读名字，后续事件可引用该类别。
+ * 参数 id（id_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 参数 name（char const* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：domain::get<D>；get_id；nvtxDomainNameCategoryA。
+ */
   named_category(id_type id, char const* name) noexcept : category{id}
   {
 #ifndef NVTX_DISABLE
@@ -1179,6 +1430,13 @@ class named_category final : public category {
    * @param[in] id The category id to name
    * @param[in] name The name to associated with `id`
    */
+/* 中文逐项-函数 F0828：named_category
+ * 用途与位置：在指定NVTX域中为类别id注册可读名字，后续事件可引用该类别。
+ * 参数 id（id_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 参数 name（wchar_t const* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：domain::get<D>；get_id；nvtxDomainNameCategoryW。
+ */
   named_category(id_type id, wchar_t const* name) noexcept : category{id}
   {
 #ifndef NVTX_DISABLE
@@ -1236,6 +1494,10 @@ class named_category final : public category {
  * which the `registered_string` belongs. Else, `domain::global` to  indicate
  * that the global NVTX domain should be used.
  */
+/* 中文逐项-类型 T0353：registered_string
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：handle_。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 template <typename D = domain::global>
 class registered_string {
  public:
@@ -1272,9 +1534,20 @@ class registered_string {
    * registered string's contents.
    * @return Reference to a `registered_string` associated with the type `M`.
    */
+/* 中文逐项-函数 F0829：get
+ * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::named_category；src/include/nvtx3.hpp::domain_thread_range；src/include/nvtx3.hpp::~domain_thread_range；src/include/nvtx3.hpp::start_range；src/include/nvtx3.hpp::mark。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return registered_string;。CHECK类宏还可能提前返回/跳转。
+ */
   template <typename M>
   static registered_string<D> const& get() noexcept
   {
+/* 中文逐项-变量 V3034：registered_string
+ * registered_string（registered_string<D>；函数 get 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 registered_string = {M::message}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
     static registered_string<D> const registered_string{M::message};
     return registered_string;
   }
@@ -1290,6 +1563,12 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0830：registered_string
+ * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
+ * 参数 msg（char const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit registered_string(char const* msg) noexcept
     : handle_{nvtxDomainRegisterStringA(domain::get<D>(), msg)}
   {
@@ -1306,6 +1585,12 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0831：registered_string
+ * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
+ * 参数 <未命名参数>（std::string const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit registered_string(std::string const& msg) noexcept : registered_string{msg.c_str()} {}
 
   /**
@@ -1319,6 +1604,12 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0832：registered_string
+ * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
+ * 参数 msg（wchar_t const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit registered_string(wchar_t const* msg) noexcept
     : handle_{nvtxDomainRegisterStringW(domain::get<D>(), msg)}
   {
@@ -1335,12 +1626,25 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0833：registered_string
+ * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
+ * 参数 <未命名参数>（std::wstring const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit registered_string(std::wstring const& msg) noexcept : registered_string{msg.c_str()} {}
 
   /**
    * @brief Returns the registered string's handle
    *
    */
+/* 中文逐项-函数 F0834：get_handle
+ * 用途与位置：读取包装保存的不透明NVTX注册字符串/域等句柄，必须交给对应NVTX API使用。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return handle_;。CHECK类宏还可能提前返回/跳转。
+ */
   nvtxStringHandle_t get_handle() const noexcept { return handle_; }
 
   registered_string()                         = delete;
@@ -1351,6 +1655,9 @@ class registered_string {
   registered_string& operator=(registered_string&&) = default;
 
  private:
+/* 中文逐项-变量 V3035：handle_
+ * handle_（nvtxStringHandle_t；成员 registered_string）：NVTX域/注册对象的不透明句柄，工具API使用它定位标记域或字符串，不是GPU内存地址。
+ */
   nvtxStringHandle_t const handle_{};  ///< The handle returned from
                                        ///< registering the message with NVTX
 };
@@ -1392,6 +1699,17 @@ class registered_string {
  * nvtx3::thread_range range3{"message 3"};
  * \endcode
  */
+/* 中文逐项-函数 F0835：get_value
+ * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return value_;。CHECK类宏还可能提前返回/跳转。
+ */
+/* 中文逐项-类型 T0354：message
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：registered。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 class message {
  public:
   using value_type = nvtxMessageValue_t;
@@ -1401,6 +1719,12 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0836：message
+ * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
+ * 参数 msg（char const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   NVTX3_RELAXED_CONSTEXPR message(char const* msg) noexcept : type_{NVTX_MESSAGE_TYPE_ASCII}
   {
     value_.ascii = msg;
@@ -1411,6 +1735,12 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0837：message
+ * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
+ * 参数 <未命名参数>（std::string const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   message(std::string const& msg) noexcept : message{msg.c_str()} {}
 
   /**
@@ -1428,6 +1758,12 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0838：message
+ * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
+ * 参数 msg（wchar_t const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   NVTX3_RELAXED_CONSTEXPR message(wchar_t const* msg) noexcept : type_{NVTX_MESSAGE_TYPE_UNICODE}
   {
     value_.unicode = msg;
@@ -1438,6 +1774,12 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文逐项-函数 F0839：message
+ * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
+ * 参数 <未命名参数>（std::wstring const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   message(std::wstring const& msg) noexcept : message{msg.c_str()} {}
 
   /**
@@ -1459,6 +1801,10 @@ class message {
    * @param msg The message that has already been registered with NVTX.
    */
   template <typename D>
+/* 中文逐项-变量 V3036：registered
+ * registered（NVTX3_RELAXED_CONSTEXPR；成员 message）：消息union中的ASCII/Unicode文本地址或已注册字符串句柄，只使用type指定的视图。
+ * 初值/来源 registered = msg.get_handle()；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   NVTX3_RELAXED_CONSTEXPR message(registered_string<D> const& msg) noexcept
     : type_{NVTX_MESSAGE_TYPE_REGISTERED}
   {
@@ -1475,10 +1821,25 @@ class message {
    * @brief Return the type information about the value the union holds.
    *
    */
+/* 中文逐项-函数 F0840：nvtxMessageType_t get_type
+ * 用途与位置：返回NVTX消息/颜色/载荷的类型标签，使消费者选择正确union视图。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return type_;。CHECK类宏还可能提前返回/跳转。
+ */
   NVTX3_RELAXED_CONSTEXPR nvtxMessageType_t get_type() const noexcept { return type_; }
 
  private:
+/* 中文逐项-变量 V3037：type_
+ * type_（nvtxMessageType_t；文件/静态存储作用域）：NVTX颜色/消息/载荷的union类型标签，读取值前先看对应标签。
+ * 初值/来源 type_ = {}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
   nvtxMessageType_t const type_{};  ///< message type
+/* 中文逐项-变量 V3038：value_
+ * value_（nvtxMessageValue_t；文件/静态存储作用域）：NVTX包装保存的标量/union值，配合类型字段解释。
+ * 初值/来源 value_ = {}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
   nvtxMessageValue_t value_{};      ///< message contents
 };
 
@@ -1499,6 +1860,10 @@ class message {
  * nvtx3::thread_range range1{ nvtx3::payload{3.14} };
  * ```
  */
+/* 中文逐项-类型 T0355：payload
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：explicit、explicit、explicit、explicit、explicit、explicit、nvtxPayloadType_t、type_、value_。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 class payload {
  public:
   using value_type = typename nvtxEventAttributes_v2::payload_t;
@@ -1508,7 +1873,15 @@ class payload {
    *
    * @param value Value to use as contents of the payload
    */
-  NVTX3_RELAXED_CONSTEXPR explicit payload(int64_t value) noexcept
+/* 中文逐项-变量 V3039：explicit
+ * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
+ */
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0841：payload
+ * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
+ * 参数 value（int64_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */payload(int64_t value) noexcept
     : type_{NVTX_PAYLOAD_TYPE_INT64}, value_{}
   {
     value_.llValue = value;
@@ -1519,7 +1892,15 @@ class payload {
    *
    * @param value Value to use as contents of the payload
    */
-  NVTX3_RELAXED_CONSTEXPR explicit payload(int32_t value) noexcept
+/* 中文逐项-变量 V3040：explicit
+ * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
+ */
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0842：payload
+ * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
+ * 参数 value（int32_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */payload(int32_t value) noexcept
     : type_{NVTX_PAYLOAD_TYPE_INT32}, value_{}
   {
     value_.iValue = value;
@@ -1530,7 +1911,15 @@ class payload {
    *
    * @param value Value to use as contents of the payload
    */
-  NVTX3_RELAXED_CONSTEXPR explicit payload(uint64_t value) noexcept
+/* 中文逐项-变量 V3041：explicit
+ * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
+ */
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0843：payload
+ * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
+ * 参数 value（uint64_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */payload(uint64_t value) noexcept
     : type_{NVTX_PAYLOAD_TYPE_UNSIGNED_INT64}, value_{}
   {
     value_.ullValue = value;
@@ -1541,7 +1930,15 @@ class payload {
    *
    * @param value Value to use as contents of the payload
    */
-  NVTX3_RELAXED_CONSTEXPR explicit payload(uint32_t value) noexcept
+/* 中文逐项-变量 V3042：explicit
+ * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
+ */
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0844：payload
+ * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
+ * 参数 value（uint32_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */payload(uint32_t value) noexcept
     : type_{NVTX_PAYLOAD_TYPE_UNSIGNED_INT32}, value_{}
   {
     value_.uiValue = value;
@@ -1553,7 +1950,15 @@ class payload {
    *
    * @param value Value to use as contents of the payload
    */
-  NVTX3_RELAXED_CONSTEXPR explicit payload(float value) noexcept
+/* 中文逐项-变量 V3043：explicit
+ * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
+ */
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0845：payload
+ * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
+ * 参数 value（float value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */payload(float value) noexcept
     : type_{NVTX_PAYLOAD_TYPE_FLOAT}, value_{}
   {
     value_.fValue = value;
@@ -1565,7 +1970,15 @@ class payload {
    *
    * @param value Value to use as contents of the payload
    */
-  NVTX3_RELAXED_CONSTEXPR explicit payload(double value) noexcept
+/* 中文逐项-变量 V3044：explicit
+ * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
+ */
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0846：payload
+ * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
+ * 参数 value（double value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */payload(double value) noexcept
     : type_{NVTX_PAYLOAD_TYPE_DOUBLE}, value_{}
   {
     value_.dValue = value;
@@ -1575,16 +1988,38 @@ class payload {
    * @brief Return the union holding the value of the payload
    *
    */
+/* 中文逐项-函数 F0847：get_value
+ * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return value_;。CHECK类宏还可能提前返回/跳转。
+ */
   NVTX3_RELAXED_CONSTEXPR value_type get_value() const noexcept { return value_; }
 
   /**
    * @brief Return the information about the type the union holds.
    *
    */
-  NVTX3_RELAXED_CONSTEXPR nvtxPayloadType_t get_type() const noexcept { return type_; }
+/* 中文逐项-变量 V3045：nvtxPayloadType_t
+ * nvtxPayloadType_t（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX载荷类型标签的声明/解析项，具体使用仍由payloadType和union对应。
+ */
+  NVTX3_RELAXED_CONSTEXPR nvtxPayloadType_t /* 中文逐项-函数 F0848：get_type
+ * 用途与位置：返回NVTX消息/颜色/载荷的类型标签，使消费者选择正确union视图。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return type_;。CHECK类宏还可能提前返回/跳转。
+ */get_type() const noexcept { return type_; }
 
  private:
+/* 中文逐项-变量 V3046：type_
+ * type_（nvtxPayloadType_t；成员 payload）：NVTX颜色/消息/载荷的union类型标签，读取值前先看对应标签。
+ */
   nvtxPayloadType_t const type_;  ///< Type of the payload value
+/* 中文逐项-变量 V3047：value_
+ * value_（value_type；成员 payload）：NVTX包装保存的标量/union值，配合类型字段解释。
+ */
   value_type value_;              ///< Union holding the payload value
 };
 
@@ -1649,6 +2084,10 @@ class payload {
  * \endcode
  *
  */
+/* 中文逐项-类型 T0356：event_attributes
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：attributes_。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 class event_attributes {
  public:
   using value_type = nvtxEventAttributes_t;
@@ -1657,6 +2096,12 @@ class event_attributes {
    * @brief Default constructor creates an `event_attributes` with no
    * category, color, payload, nor message.
    */
+/* 中文逐项-函数 F0849：event_attributes
+ * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr event_attributes() noexcept
     : attributes_{
         NVTX_VERSION,                   // version
@@ -1680,6 +2125,12 @@ class event_attributes {
    * forwards the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文逐项-函数 F0850：event_attributes
+ * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：c.get_id。
+ */
   template <typename... Args>
   NVTX3_RELAXED_CONSTEXPR explicit event_attributes(category const& c, Args const&... args) noexcept
     : event_attributes(args...)
@@ -1694,6 +2145,12 @@ class event_attributes {
    * the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文逐项-函数 F0851：event_attributes
+ * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：c.get_type；c.get_value。
+ */
   template <typename... Args>
   NVTX3_RELAXED_CONSTEXPR explicit event_attributes(color const& c, Args const&... args) noexcept
     : event_attributes(args...)
@@ -1709,6 +2166,12 @@ class event_attributes {
    * the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文逐项-函数 F0852：event_attributes
+ * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：p.get_type；p.get_value。
+ */
   template <typename... Args>
   NVTX3_RELAXED_CONSTEXPR explicit event_attributes(payload const& p, Args const&... args) noexcept
     : event_attributes(args...)
@@ -1724,6 +2187,12 @@ class event_attributes {
    * the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文逐项-函数 F0853：event_attributes
+ * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：m.get_type；m.get_value。
+ */
   template <typename... Args>
   NVTX3_RELAXED_CONSTEXPR explicit event_attributes(message const& m, Args const&... args) noexcept
     : event_attributes(args...)
@@ -1742,9 +2211,19 @@ class event_attributes {
    * @brief Get raw pointer to underlying NVTX attributes object.
    *
    */
+/* 中文逐项-函数 F0854：get
+ * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::named_category；src/include/nvtx3.hpp::domain_thread_range；src/include/nvtx3.hpp::~domain_thread_range；src/include/nvtx3.hpp::start_range；src/include/nvtx3.hpp::mark。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return &attributes_;。CHECK类宏还可能提前返回/跳转。
+ */
   constexpr value_type const* get() const noexcept { return &attributes_; }
 
  private:
+/* 中文逐项-变量 V3048：attributes_
+ * attributes_（value_type；成员 event_attributes）：NVTX C++包装合成的事件属性对象，传给底层标记API；不是NCCL操作参数。
+ */
   value_type attributes_{};  ///< The NVTX attributes structure
 };
 
@@ -1795,6 +2274,9 @@ class event_attributes {
  * my_thread_range r3{"range 3"}; // Alias for range in custom domain
  * ```
  */
+/* 中文逐项-类型 T0357：domain_thread_range
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ */
 template <class D = domain::global>
 class domain_thread_range {
  public:
@@ -1813,6 +2295,12 @@ class domain_thread_range {
    * @param[in] attr `event_attributes` that describes the desired attributes
    * of the range.
    */
+/* 中文逐项-函数 F0855：domain_thread_range
+ * 用途与位置：RAII范围对象：构造时在当前线程push一个NVTX范围，析构时配对pop。
+ * 参数 <未命名参数>（event_attributes const& attr）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：attr.get；domain::get<D>；nvtxDomainRangePushEx。
+ */
   explicit domain_thread_range(event_attributes const& attr) noexcept
   {
 #ifndef NVTX_DISABLE
@@ -1849,6 +2337,12 @@ class domain_thread_range {
    * forward.
    *
    */
+/* 中文逐项-函数 F0856：domain_thread_range
+ * 用途与位置：RAII范围对象：构造时在当前线程push一个NVTX范围，析构时配对pop。
+ * 参数 <未命名参数>（First const& first）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   template <typename First,
             typename... Args,
             typename = typename std::enable_if<
@@ -1863,6 +2357,12 @@ class domain_thread_range {
    * message, color, payload, nor category.
    *
    */
+/* 中文逐项-函数 F0857：domain_thread_range
+ * 用途与位置：RAII范围对象：构造时在当前线程push一个NVTX范围，析构时配对pop。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   domain_thread_range() : domain_thread_range{event_attributes{}} {}
 
   /**
@@ -1881,6 +2381,12 @@ class domain_thread_range {
   /**
    * @brief Destroy the domain_thread_range, ending the NVTX range event.
    */
+/* 中文逐项-函数 F0858：~domain_thread_range
+ * 用途与位置：结束当前线程RAII对象管理的NVTX范围，保证离开C++作用域时标记配对。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：domain::get<D>；nvtxDomainRangePop。
+ */
   ~domain_thread_range() noexcept
   {
 #ifndef NVTX_DISABLE
@@ -1899,6 +2405,10 @@ using thread_range = domain_thread_range<>;
  * @brief Handle used for correlating explicit range start and end events.
  *
  */
+/* 中文逐项-类型 T0358：range_handle
+ * 类型职责：本文件的struct类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：_range_id。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 struct range_handle {
   /// Type used for the handle's value
   using value_type = nvtxRangeId_t;
@@ -1907,6 +2417,12 @@ struct range_handle {
    * @brief Construct a `range_handle` from the given id.
    *
    */
+/* 中文逐项-函数 F0859：range_handle
+ * 用途与位置：保存跨线程/进程范围start返回的NVTX id及域，以便之后显式结束。
+ * 参数 id（value_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr explicit range_handle(value_type id) noexcept : _range_id{id} {}
 
   /**
@@ -1914,9 +2430,19 @@ struct range_handle {
    *
    * @return value_type The handle's value
    */
+/* 中文逐项-函数 F0860：get_value
+ * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 源码返回表达式：return _range_id;。CHECK类宏还可能提前返回/跳转。
+ */
   constexpr value_type get_value() const noexcept { return _range_id; }
 
  private:
+/* 中文逐项-变量 V3049：_range_id
+ * _range_id（value_type；成员 range_handle）：NVTX范围或类别id，供start/end或类别分组匹配，与NCCL rank无关。
+ */
   value_type _range_id{};  ///< The underlying NVTX range id
 };
 
@@ -1944,6 +2470,14 @@ struct range_handle {
  * @param[in] attr `event_attributes` that describes the desired attributes
  * of the range.
  * @return Unique handle to be passed to `end_range` to end the range.
+ */
+/* 中文逐项-函数 F0861：start_range
+ * 用途与位置：开始可显式结束的NVTX范围并返回句柄，标记被测时间区间而不执行通信。
+ * 参数 <未命名参数>（event_attributes const& attr）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::start_range。
+ * 本体直接出现的调用/包装：attr.get；domain::get<D>；nvtxDomainRangeStartEx。
+ * 源码返回表达式：return range_handle{nvtxDomainRangeStartEx(domain::get<D>(), attr.get())};；return
+ * range_handle{};。CHECK类宏还可能提前返回/跳转。
  */
 template <typename D = domain::global>
 range_handle start_range(event_attributes const& attr) noexcept
@@ -1984,6 +2518,13 @@ range_handle start_range(event_attributes const& attr) noexcept
  * `event_attributes`.
  * @return Unique handle to be passed to `end_range` to end the range.
  */
+/* 中文逐项-函数 F0862：start_range
+ * 用途与位置：开始可显式结束的NVTX范围并返回句柄，标记被测时间区间而不执行通信。
+ * 参数 <未命名参数>（First const& first）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::start_range。
+ * 本体直接出现的调用/包装：start_range。
+ * 源码返回表达式：return start_range(event_attributes{first, args...});；return range_handle{};。CHECK类宏还可能提前返回/跳转。
+ */
 template <typename First,
           typename... Args,
           typename = typename std::enable_if<
@@ -2009,6 +2550,12 @@ range_handle start_range(First const& first, Args const&... args) noexcept
  * handle `r` already indicates the domain to which the range belongs.
  *
  * @param r Handle to a range started by a prior call to `start_range`.
+ */
+/* 中文逐项-函数 F0863：end_range
+ * 用途与位置：根据保存的域和范围id结束NVTX范围，与start_range配对。
+ * 参数 r（range_handle r）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3.hpp::~domain_process_range。
+ * 本体直接出现的调用/包装：nvtxRangeEnd；r.get_value。
  */
 inline void end_range(range_handle r)
 {
@@ -2038,6 +2585,10 @@ inline void end_range(range_handle r)
  * to which the `domain_process_range` belongs. Else, `domain::global` to
  * indicate that the global NVTX domain should be used.
  */
+/* 中文逐项-类型 T0359：domain_process_range
+ * 类型职责：本文件的class类型，用成员把下面的相关状态放在一起；创建、修改和释放位置由使用它的函数控制。
+ * 声明内可见成员（含嵌套成员）：handle_。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 template <typename D = domain::global>
 class domain_process_range {
  public:
@@ -2046,6 +2597,12 @@ class domain_process_range {
    *
    * @param attr
    */
+/* 中文逐项-函数 F0864：domain_process_range
+ * 用途与位置：RAII包装显式NVTX范围，构造start、析构end；范围不要求只依赖线程push/pop栈。
+ * 参数 <未命名参数>（event_attributes const& attr）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   explicit domain_process_range(event_attributes const& attr) noexcept
     : handle_{new range_handle{start_range<D>(attr)}}
   {
@@ -2057,6 +2614,12 @@ class domain_process_range {
    * @param first
    * @param args
    */
+/* 中文逐项-函数 F0865：domain_process_range
+ * 用途与位置：RAII包装显式NVTX范围，构造start、析构end；范围不要求只依赖线程push/pop栈。
+ * 参数 <未命名参数>（First const& first）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   template <typename First,
             typename... Args,
             typename = typename std::enable_if<
@@ -2070,12 +2633,25 @@ class domain_process_range {
    * @brief Construct a new domain process range object
    *
    */
+/* 中文逐项-函数 F0866：domain_process_range
+ * 用途与位置：RAII包装显式NVTX范围，构造start、析构end；范围不要求只依赖线程push/pop栈。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ */
   constexpr domain_process_range() noexcept : domain_process_range{event_attributes{}} {}
 
   /**
    * @brief Destroy the `domain_process_range` ending the range.
    *
    */
+/* 中文逐项-函数 F0867：~domain_process_range
+ * 用途与位置：以保存的NVTX域和id结束该RAII范围，不等待NCCL GPU通信完成。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：end_range。
+ * 需要对照的边界/推进条件：handle_。各条件所属分支见紧邻函数体。
+ */
   ~domain_process_range()
   {
     if (handle_) { end_range(*handle_); }
@@ -2107,6 +2683,9 @@ class domain_process_range {
   domain_process_range& operator=(domain_process_range const&) = delete;
 
  private:
+/* 中文逐项-变量 V3050：handle_
+ * handle_（std::unique_ptr<range_handle>；成员 domain_process_range）：NVTX域/注册对象的不透明句柄，工具API使用它定位标记域或字符串，不是GPU内存地址。
+ */
   std::unique_ptr<range_handle> handle_;  ///< Range handle used to correlate
                                           ///< the start/end of the range
 };
@@ -2137,6 +2716,12 @@ using process_range = domain_process_range<>;
  * indicate that the global NVTX domain should be used.
  * @param[in] attr `event_attributes` that describes the desired attributes
  * of the mark.
+ */
+/* 中文逐项-函数 F0868：mark
+ * 用途与位置：提交一个瞬时时间点NVTX事件，不建立持续区间、不做张量传输。
+ * 参数 <未命名参数>（event_attributes const& attr）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：attr.get；domain::get<D>；nvtxDomainMarkEx。
  */
 template <typename D = domain::global>
 inline void mark(event_attributes const& attr) noexcept
@@ -2181,11 +2766,19 @@ inline void mark(event_attributes const& attr) noexcept
  * `domain::global` to  indicate that the global NVTX domain should be used.
  */
 #ifndef NVTX_DISABLE
+/* 中文逐项-宏 M0119：NVTX3_V1_FUNC_RANGE_IN
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX3_V1_FUNC_RANGE_IN；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX3_V1_FUNC_RANGE_IN(D)                                                  \
   static ::nvtx3::v1::registered_string<D> const nvtx3_func_name__{__func__};      \
   static ::nvtx3::v1::event_attributes const nvtx3_func_attr__{nvtx3_func_name__}; \
   ::nvtx3::v1::domain_thread_range<D> const nvtx3_range__{nvtx3_func_attr__};
 #else
+/* 中文逐项-宏 M0120：NVTX3_V1_FUNC_RANGE_IN
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX3_V1_FUNC_RANGE_IN；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX3_V1_FUNC_RANGE_IN(D)
 #endif
 
@@ -2211,13 +2804,25 @@ inline void mark(event_attributes const& attr) noexcept
  * } // Range ends on return from foo()
  * ```
  */
+/* 中文逐项-宏 M0121：NVTX3_V1_FUNC_RANGE
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX3_V1_FUNC_RANGE；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX3_V1_FUNC_RANGE() NVTX3_V1_FUNC_RANGE_IN(::nvtx3::v1::domain::global)
 
 /* When inlining this version, versioned macros must have unversioned aliases.
  * For each NVTX3_Vx_ #define, make an NVTX3_ alias of it here.*/
 #if defined(NVTX3_INLINE_THIS_VERSION)
 /* clang format off */
+/* 中文逐项-常量 X1041：NVTX3_FUNC_RANGE_IN
+ * 编译期定义：NVTX3_FUNC_RANGE_IN = NVTX3_V1_FUNC_RANGE_IN。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_FUNC_RANGE_IN   NVTX3_V1_FUNC_RANGE_IN
+/* 中文逐项-常量 X1042：NVTX3_FUNC_RANGE
+ * 编译期定义：NVTX3_FUNC_RANGE = NVTX3_V1_FUNC_RANGE。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX3_FUNC_RANGE      NVTX3_V1_FUNC_RANGE
 /* clang format on */
 #endif

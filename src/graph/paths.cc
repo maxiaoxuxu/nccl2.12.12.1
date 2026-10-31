@@ -13,13 +13,39 @@
 
 // Pre-compute GPU->NIC, GPU->GPU and NIC->GPU paths
 
+/* 中文逐项-类型 T0135：ncclTopoNodeList
+ * 类型职责：广度优先路径搜索的一层待扩展节点队列，层间切换保证按跳数逐层遍历。
+ * 声明内可见成员（含嵌套成员）：list、count。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 struct ncclTopoNodeList {
+/* 中文逐项-变量 V1139：list
+ * list（struct ncclTopoNode；成员 ncclTopoNodeList）：节点或链路指针列表，count给出有效条目数，遍历不得越过当前有效范围。
+ */
   struct ncclTopoNode* list[NCCL_TOPO_MAX_NODES];
+/* 中文逐项-变量 V1140：count
+ * count（int；成员 ncclTopoNodeList）：当前对象的有效元素数量；复制 API 和 P2P 归一到 Int8 后等于字节数，不能脱离 datatype 解释。
+ */
   int count;
 };
 
+/* 中文逐项-函数 F0440：getPath
+ * 用途与位置：从指定源节点的 paths 缓存中找到目标硬件类型/id 对应的路径项。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 node（struct ncclTopoNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 参数 t（int t）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 参数 id（int64_t id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 参数 path（struct ncclTopoLinkList** path）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoSetPaths。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：i<system->nodes[t].count；system->nodes[t].nodes[i].id == id。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;；return ncclInternalError;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t getPath(struct ncclTopoSystem* system, struct ncclTopoNode* node, int t, int64_t id, struct ncclTopoLinkList** path) {
-  for (int i=0; i<system->nodes[t].count; i++) {
+  for (/* 中文逐项-变量 V1141：i
+ * i（int；函数 getPath 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<system->nodes[t].count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<system->nodes[t].count; i++) {
     if (system->nodes[t].nodes[i].id == id) {
       *path = node->paths[t]+i;
       return ncclSuccess;
@@ -29,6 +55,11 @@ static ncclResult_t getPath(struct ncclTopoSystem* system, struct ncclTopoNode* 
   return ncclInternalError;
 }
 
+/* 中文逐项-参数getter P0007：NvbDisable
+ * 生成函数 ncclParamNvbDisable()，读取 NCCL_NVB_DISABLE，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(NvbDisable, "NVB_DISABLE", 0);
 
 /* 中文精读：硬件图上的路径预计算
@@ -37,16 +68,38 @@ NCCL_PARAM(NvbDisable, "NVB_DISABLE", 0);
  * 随后 P2P/GDR 检查还会按实际访问能力改写/绕行路径，因此物理可达不等于可用 CUDA P2P。
  * 这些路径是 Search 的输入；它们不是用户张量中 chunk 的路径描述。
  */
+/* 中文逐项-函数 F0441：ncclTopoSetPaths
+ * 用途与位置：从硬件节点做带带宽与路径类型约束的广度优先扩展，建立到该节点的路径缓存。
+ * 参数 baseNode（struct ncclTopoNode* baseNode）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputePaths。
+ * 本体直接出现的调用/包装：NCCLCHECK；getPath；memcpy；ncclCalloc；ncclParamNvbDisable；std::max；std::min。
+ * 需要对照的边界/推进条件：baseNode->paths[baseNode->type] == NULL；nodeList.count；n<nodeList.count；l<node->nlinks。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInternalError;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclTopoSetPaths(struct ncclTopoNode* baseNode, struct ncclTopoSystem* system) {
   if (baseNode->paths[baseNode->type] == NULL) {
     NCCLCHECK(ncclCalloc(baseNode->paths+baseNode->type, system->nodes[baseNode->type].count));
   }
 
   // breadth-first search to set all paths to that node in the system
+/* 中文逐项-变量 V1142：nodeList
+ * nodeList（struct ncclTopoNodeList；函数 ncclTopoSetPaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：nodeList.count = 1; nodeList.list[0] = baseNode;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclTopoNodeList nodeList;
+/* 中文逐项-变量 V1143：nextNodeList
+ * nextNodeList（struct ncclTopoNodeList；函数 ncclTopoSetPaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：nextNodeList.count = 0;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclTopoNodeList nextNodeList;
   nodeList.count = 1; nodeList.list[0] = baseNode;
   nextNodeList.count = 0;
+/* 中文逐项-变量 V1144：basePath
+ * basePath（struct ncclTopoLinkList；函数 ncclTopoSetPaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(getPath(system, baseNode, baseNode->type, baseNode->id,
+ * &basePath));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclTopoLinkList* basePath;
   NCCLCHECK(getPath(system, baseNode, baseNode->type, baseNode->id, &basePath));
   basePath->count = 0;
@@ -55,18 +108,51 @@ static ncclResult_t ncclTopoSetPaths(struct ncclTopoNode* baseNode, struct ncclT
 
   while (nodeList.count) {
     nextNodeList.count = 0;
-    for (int n=0; n<nodeList.count; n++) {
+    for (/* 中文逐项-变量 V1145：n
+ * n（int；函数 ncclTopoSetPaths 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<nodeList.count；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<nodeList.count; n++) {
+/* 中文逐项-变量 V1146：node
+ * node（struct ncclTopoNode；函数 ncclTopoSetPaths 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 初值/来源 node = nodeList.list[n]；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclTopoNode* node = nodeList.list[n];
+/* 中文逐项-变量 V1147：path
+ * path（struct ncclTopoLinkList；函数 ncclTopoSetPaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(getPath(system, node, baseNode->type, baseNode->id, &path));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       struct ncclTopoLinkList* path;
       NCCLCHECK(getPath(system, node, baseNode->type, baseNode->id, &path));
-      for (int l=0; l<node->nlinks; l++) {
+      for (/* 中文逐项-变量 V1148：l
+ * l（int；函数 ncclTopoSetPaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 l = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：l<node->nlinks；循环体与增量表达式决定每轮如何推进。
+ */int l=0; l<node->nlinks; l++) {
+/* 中文逐项-变量 V1149：link
+ * link（struct ncclTopoLink；函数 ncclTopoSetPaths 内）：当前RDMA设备链路类型/端口启用过滤位，接口枚举和筛选时使用。
+ * 初值/来源 link = node->links+l；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         struct ncclTopoLink* link = node->links+l;
+/* 中文逐项-变量 V1150：remNode
+ * remNode（struct ncclTopoNode；函数 ncclTopoSetPaths 内）：硬件边指向的另一个节点，路径搜索沿此指针扩展。
+ * 初值/来源 remNode = link->remNode；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         struct ncclTopoNode* remNode = link->remNode;
         if (remNode->paths[baseNode->type] == NULL) {
           NCCLCHECK(ncclCalloc(remNode->paths+baseNode->type, system->nodes[baseNode->type].count));
         }
+/* 中文逐项-变量 V1151：remPath
+ * remPath（struct ncclTopoLinkList；函数 ncclTopoSetPaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(getPath(system, remNode, baseNode->type, baseNode->id,
+ * &remPath));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
         struct ncclTopoLinkList* remPath;
         NCCLCHECK(getPath(system, remNode, baseNode->type, baseNode->id, &remPath));
+/* 中文逐项-变量 V1152：width
+ * width（float；函数 ncclTopoSetPaths 内）：链路/路径速度或延迟的估计值，单位和层次由设备属性/图模型字段约定。
+ * 初值/来源 width = std::min(path->width, link->width)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
         float width = std::min(path->width, link->width);
 
         // allow routing through a GPU only as 1 hop
@@ -75,7 +161,11 @@ static ncclResult_t ncclTopoSetPaths(struct ncclTopoNode* baseNode, struct ncclT
 
         if ((remPath->width == 0 || remPath->count > path->count) && remPath->width < width) {
           // Find reverse link
-          for (int l=0; l<remNode->nlinks; l++) {
+          for (/* 中文逐项-变量 V1153：l
+ * l（int；函数 ncclTopoSetPaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 l = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：l<remNode->nlinks；循环体与增量表达式决定每轮如何推进。
+ */int l=0; l<remNode->nlinks; l++) {
             if (remNode->links[l].remNode == node) {
               remPath->list[0] = remNode->links+l;
               break;
@@ -87,12 +177,20 @@ static ncclResult_t ncclTopoSetPaths(struct ncclTopoNode* baseNode, struct ncclT
             return ncclInternalError;
           }
           // Copy the rest of the path
-          for (int i=0; i<path->count; i++) remPath->list[i+1] = path->list[i];
+          for (/* 中文逐项-变量 V1154：i
+ * i（int；函数 ncclTopoSetPaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<path->count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<path->count; i++) remPath->list[i+1] = path->list[i];
           remPath->count = path->count + 1;
           remPath->width = width;
 
           // Start with path type = link type. PATH and LINK types are supposed to match.
           // Don't consider LINK_NET as we only care about the NIC->GPU path.
+/* 中文逐项-变量 V1155：type
+ * type（int；函数 ncclTopoSetPaths 内）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 初值/来源 type = link->type == LINK_NET ? LINK_LOC : link->type；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
           int type = link->type == LINK_NET ? LINK_LOC : link->type;
           // Differentiate between one and multiple PCI switches
           if (node->type == PCI && remNode->type == PCI) type = PATH_PXB;
@@ -104,6 +202,11 @@ static ncclResult_t ncclTopoSetPaths(struct ncclTopoNode* baseNode, struct ncclT
           remPath->type = std::max(path->type, type);
 
           // Add to the list for the next iteration if not already in the list
+/* 中文逐项-变量 V1156：i
+ * i（int；函数 ncclTopoSetPaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 此处未显式给初值；后续首个文本使用点：for (i=0; i<nextNodeList.count; i++) if (nextNodeList.list[i] == remNode)
+ * break;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
           int i;
           for (i=0; i<nextNodeList.count; i++) if (nextNodeList.list[i] == remNode) break;
           if (i == nextNodeList.count) nextNodeList.list[nextNodeList.count++] = remNode;
@@ -115,22 +218,63 @@ static ncclResult_t ncclTopoSetPaths(struct ncclTopoNode* baseNode, struct ncclT
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0442：printNodePaths
+ * 用途与位置：打印缓存路径的跳数、带宽和类别，检查拓扑发现与策略改写后的可达性。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 node（struct ncclTopoNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoPrintPaths。
+ * 本体直接出现的调用/包装：sprintf；strlen。
+ * 需要对照的边界/推进条件：t<NCCL_TOPO_NODE_TYPES；node->paths[t] ==
+ * NULL；n<system->nodes[t].count；i<node->paths[t][n].count。各条件所属分支见紧邻函数体。
+ */
 static void printNodePaths(struct ncclTopoSystem* system, struct ncclTopoNode* node) {
+/* 中文逐项-变量 V1157：line
+ * line（char；函数 printNodePaths 内）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
+ * 此处未显式给初值；后续首个文本使用点：sprintf(line, "%s/%lX :", topoNodeTypeStr[node->type], node->id);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   char line[1024];
 #ifdef ENABLE_TRACE
   INFO(NCCL_GRAPH, "Paths from %s/%lX :", topoNodeTypeStr[node->type], node->id);
 #else
   sprintf(line, "%s/%lX :", topoNodeTypeStr[node->type], node->id);
+/* 中文逐项-变量 V1158：offset
+ * offset（int；函数 printNodePaths 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = strlen(line)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   int offset = strlen(line);
 #endif
-  for (int t=0; t<NCCL_TOPO_NODE_TYPES; t++) {
+  for (/* 中文逐项-变量 V1159：t
+ * t（int；函数 printNodePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 t = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：t<NCCL_TOPO_NODE_TYPES；循环体与增量表达式决定每轮如何推进。
+ */int t=0; t<NCCL_TOPO_NODE_TYPES; t++) {
     if (node->paths[t] == NULL) continue;
-    for (int n = 0; n<system->nodes[t].count; n++) {
+    for (/* 中文逐项-变量 V1160：n
+ * n（int；函数 printNodePaths 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<system->nodes[t].count；循环体与增量表达式决定每轮如何推进。
+ */int n = 0; n<system->nodes[t].count; n++) {
 #ifdef ENABLE_TRACE
       line[0] = 0;
+/* 中文逐项-变量 V1161：offset
+ * offset（int；函数 printNodePaths 内）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
+ * 初值/来源 offset = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
       int offset = 0;
-      for (int i=0; i<node->paths[t][n].count; i++) {
+      for (/* 中文逐项-变量 V1162：i
+ * i（int；函数 printNodePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<node->paths[t][n].count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<node->paths[t][n].count; i++) {
+/* 中文逐项-变量 V1163：link
+ * link（struct ncclTopoLink；函数 printNodePaths 内）：当前RDMA设备链路类型/端口启用过滤位，接口枚举和筛选时使用。
+ * 初值/来源 link = node->paths[t][n].list[i]；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         struct ncclTopoLink* link = node->paths[t][n].list[i];
+/* 中文逐项-变量 V1164：remNode
+ * remNode（struct ncclTopoNode；函数 printNodePaths 内）：硬件边指向的另一个节点，路径搜索沿此指针扩展。
+ * 初值/来源 remNode = link->remNode；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         struct ncclTopoNode* remNode = link->remNode;
         sprintf(line+offset, "--%s->%s/%lX", topoLinkTypeStr[link->type], topoNodeTypeStr[remNode->type], remNode->id);
         offset = strlen(line);
@@ -147,22 +291,68 @@ static void printNodePaths(struct ncclTopoSystem* system, struct ncclTopoNode* n
 #endif
 }
 
+/* 中文逐项-函数 F0443：ncclTopoPrintPaths
+ * 用途与位置：打印缓存路径的跳数、带宽和类别，检查拓扑发现与策略改写后的可达性。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/topo.cc::ncclTopoPrint。
+ * 本体直接出现的调用/包装：printNodePaths。
+ * 需要对照的边界/推进条件：i<system->nodes[GPU].count；i<system->nodes[NET].count。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoPrintPaths(struct ncclTopoSystem* system) {
-  for (int i=0; i<system->nodes[GPU].count; i++) {
+  for (/* 中文逐项-变量 V1165：i
+ * i（int；函数 ncclTopoPrintPaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<system->nodes[GPU].count; i++) {
     printNodePaths(system, system->nodes[GPU].nodes+i);
   }
-  for (int i=0; i<system->nodes[NET].count; i++) {
+  for (/* 中文逐项-变量 V1166：i
+ * i（int；函数 ncclTopoPrintPaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<system->nodes[NET].count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<system->nodes[NET].count; i++) {
     printNodePaths(system, system->nodes[NET].nodes+i);
   }
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0444：getLocalCpu
+ * 用途与位置：为 GPU/设备选择其局部 CPU 节点，供亲和性和通过 CPU 绕行的路径计算。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 gpu（int gpu）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 参数 retCpu（int* retCpu）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputePaths。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：c<system->nodes[CPU].count；minHops == 0 || hops < minHops；localCpu == -1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInternalError;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t getLocalCpu(struct ncclTopoSystem* system, int gpu, int* retCpu) {
   // Find the closest CPU to a GPU
+/* 中文逐项-变量 V1167：minHops
+ * minHops（int；函数 getLocalCpu 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 minHops = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int minHops = 0;
+/* 中文逐项-变量 V1168：localCpu
+ * localCpu（int；函数 getLocalCpu 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 localCpu = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
   int localCpu = -1;
+/* 中文逐项-变量 V1169：paths
+ * paths（struct ncclTopoLinkList；函数 getLocalCpu 内）：硬件节点表、直接链路数/链路数组和预计算多跳路径缓存。
+ * 初值/来源 paths = system->nodes[GPU].nodes[gpu].paths[CPU]；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoLinkList* paths = system->nodes[GPU].nodes[gpu].paths[CPU];
-  for (int c=0; c<system->nodes[CPU].count; c++) {
+  for (/* 中文逐项-变量 V1170：c
+ * c（int；函数 getLocalCpu 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<system->nodes[CPU].count；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<system->nodes[CPU].count; c++) {
+/* 中文逐项-变量 V1171：hops
+ * hops（int；函数 getLocalCpu 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 hops = paths[c].count；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     int hops = paths[c].count;
     if (minHops == 0 || hops < minHops) {
       localCpu = c;
@@ -177,15 +367,49 @@ static ncclResult_t getLocalCpu(struct ncclTopoSystem* system, int gpu, int* ret
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0445：addInterStep
+ * 用途与位置：用中间节点拼接两段已有路径，更新链路列表、瓶颈带宽与路径类别。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 tx（int tx）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 ix（int ix）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 t1（int t1）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 i1（int i1）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 t2（int t2）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 i2（int i2）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputePaths。
+ * 本体直接出现的调用/包装：std::max；std::min。
+ * 需要对照的边界/推进条件：i<srcNode->paths[tx][ix].count；i<cpuNode->paths[t2][i2].count；tx == GPU。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t addInterStep(struct ncclTopoSystem* system, int tx, int ix, int t1, int i1, int t2, int i2) {
+/* 中文逐项-变量 V1172：cpuNode
+ * cpuNode（struct ncclTopoNode；函数 addInterStep 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 cpuNode = system->nodes[tx].nodes+ix；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoNode* cpuNode = system->nodes[tx].nodes+ix;
+/* 中文逐项-变量 V1173：srcNode
+ * srcNode（struct ncclTopoNode；函数 addInterStep 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 srcNode = system->nodes[t1].nodes+i1；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoNode* srcNode = system->nodes[t1].nodes+i1;
 
+/* 中文逐项-变量 V1174：l
+ * l（int；函数 addInterStep 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 l = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int l=0;
   // Node 1 -> CPU
-  for (int i=0; i<srcNode->paths[tx][ix].count; i++) srcNode->paths[t2][i2].list[l++] = srcNode->paths[tx][ix].list[i];
+  for (/* 中文逐项-变量 V1175：i
+ * i（int；函数 addInterStep 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<srcNode->paths[tx][ix].count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<srcNode->paths[tx][ix].count; i++) srcNode->paths[t2][i2].list[l++] = srcNode->paths[tx][ix].list[i];
   // CPU -> Node 2
-  for (int i=0; i<cpuNode->paths[t2][i2].count; i++) srcNode->paths[t2][i2].list[l++] = cpuNode->paths[t2][i2].list[i];
+  for (/* 中文逐项-变量 V1176：i
+ * i（int；函数 addInterStep 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<cpuNode->paths[t2][i2].count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<cpuNode->paths[t2][i2].count; i++) srcNode->paths[t2][i2].list[l++] = cpuNode->paths[t2][i2].list[i];
 
   // Update path characteristics
   srcNode->paths[t2][i2].count = l;
@@ -196,16 +420,44 @@ static ncclResult_t addInterStep(struct ncclTopoSystem* system, int tx, int ix, 
 }
 
 // Remove/free paths for a given type
+/* 中文逐项-函数 F0446：ncclTopoRemovePathType
+ * 用途与位置：释放每个硬件节点到指定目标类型的路径缓存，避免拓扑裁剪后继续使用旧下标。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 nodeType（int nodeType）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputePaths；src/graph/paths.cc::ncclTopoFree。
+ * 本体直接出现的调用/包装：free。
+ * 需要对照的边界/推进条件：t<NCCL_TOPO_NODE_TYPES；n<system->nodes[t].count；n<system->nodes[nodeType].count。各条件所属分支见紧邻函数体。
+ */
 static void ncclTopoRemovePathType(struct ncclTopoSystem* system, int nodeType) {
-  for (int t=0; t<NCCL_TOPO_NODE_TYPES; t++) {
+  for (/* 中文逐项-变量 V1177：t
+ * t（int；函数 ncclTopoRemovePathType 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 t = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：t<NCCL_TOPO_NODE_TYPES；循环体与增量表达式决定每轮如何推进。
+ */int t=0; t<NCCL_TOPO_NODE_TYPES; t++) {
     // Remove links _to_ the given type
-    for (int n=0; n<system->nodes[t].count; n++) {
+    for (/* 中文逐项-变量 V1178：n
+ * n（int；函数 ncclTopoRemovePathType 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<system->nodes[t].count；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<system->nodes[t].count; n++) {
+/* 中文逐项-变量 V1179：node
+ * node（struct ncclTopoNode；函数 ncclTopoRemovePathType 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 初值/来源 node = system->nodes[t].nodes+n；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclTopoNode* node = system->nodes[t].nodes+n;
       free(node->paths[nodeType]);
       node->paths[nodeType] = NULL;
     }
     // Remove links _from_ the given type
-    for (int n=0; n<system->nodes[nodeType].count; n++) {
+    for (/* 中文逐项-变量 V1180：n
+ * n（int；函数 ncclTopoRemovePathType 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<system->nodes[nodeType].count；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<system->nodes[nodeType].count; n++) {
+/* 中文逐项-变量 V1181：node
+ * node（struct ncclTopoNode；函数 ncclTopoRemovePathType 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 初值/来源 node = system->nodes[nodeType].nodes+n；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclTopoNode* node = system->nodes[nodeType].nodes+n;
       free(node->paths[t]);
       node->paths[t] = NULL;
@@ -213,21 +465,56 @@ static void ncclTopoRemovePathType(struct ncclTopoSystem* system, int nodeType) 
   }
 }
 
+/* 中文逐项-变量 V1182：levelsOldToNew
+ * levelsOldToNew（int；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 levelsOldToNew = { PATH_LOC, PATH_PIX, PATH_PXB, PATH_PHB, PATH_SYS, PATH_SYS
+ * }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
 static const int levelsOldToNew[] = { PATH_LOC, PATH_PIX, PATH_PXB, PATH_PHB, PATH_SYS, PATH_SYS };
+/* 中文逐项-函数 F0447：ncclGetLevel
+ * 用途与位置：把环境配置的拓扑距离名字或数字解析成内部路径级别，支持默认值与禁用策略。
+ * 参数 level（int* level）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 disableEnv（const char* disableEnv）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 levelEnv（const char* levelEnv）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoCheckP2p；src/graph/paths.cc::ncclTopoCheckGdr。
+ * 本体直接出现的调用/包装：getenv；strcmp；strtol。
+ * 需要对照的边界/推进条件：*level == -1；disableEnv；str；disable == 1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclGetLevel(int* level, const char* disableEnv, const char* levelEnv) {
   if (*level == -1) {
+/* 中文逐项-变量 V1183：l
+ * l（int；函数 ncclGetLevel 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 l = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
     int l = -1;
     if (disableEnv) {
+/* 中文逐项-变量 V1184：str
+ * str（char；函数 ncclGetLevel 内）：string或接口前缀，用于环境配置、XML或接口过滤，比较时注意是否允许前缀匹配。
+ * 初值/来源 str = getenv(disableEnv)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
       char* str = getenv(disableEnv);
       if (str) {
+/* 中文逐项-变量 V1185：disable
+ * disable（int；函数 ncclGetLevel 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 disable = strtol(str, NULL, 0)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
         int disable = strtol(str, NULL, 0);
         if (disable == 1) l = 0;
       }
     }
     if (l == -1) {
+/* 中文逐项-变量 V1186：str
+ * str（char；函数 ncclGetLevel 内）：string或接口前缀，用于环境配置、XML或接口过滤，比较时注意是否允许前缀匹配。
+ * 初值/来源 str = getenv(levelEnv)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
       char* str = getenv(levelEnv);
       if (str) {
-        for (int i=0; i<=PATH_SYS; i++) {
+        for (/* 中文逐项-变量 V1187：i
+ * i（int；函数 ncclGetLevel 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<=PATH_SYS；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<=PATH_SYS; i++) {
           if (strcmp(str, topoPathTypeStr[i]) == 0) {
             l = i;
             break;
@@ -238,7 +525,15 @@ ncclResult_t ncclGetLevel(int* level, const char* disableEnv, const char* levelE
         // "old level" int, and each value mapping to the correct value defined in topo.h
         // maxOldLevel is a quick check to handle out of bounds (based on the length of levelsOldToNew)
         if (l == -1 && str[0] >= '0' && str[0] <= '9') {
+/* 中文逐项-变量 V1188：oldLevel
+ * oldLevel（int；函数 ncclGetLevel 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 oldLevel = strtol(str, NULL, 0)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
           int oldLevel = strtol(str, NULL, 0);
+/* 中文逐项-变量 V1189：maxOldLevel
+ * maxOldLevel（int；函数 ncclGetLevel 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 maxOldLevel = sizeof(levelsOldToNew)/sizeof(int) - 1；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
           const int maxOldLevel = sizeof(levelsOldToNew)/sizeof(int) - 1;
           if (oldLevel > maxOldLevel) oldLevel = maxOldLevel;
           l = levelsOldToNew[oldLevel];
@@ -251,27 +546,72 @@ ncclResult_t ncclGetLevel(int* level, const char* disableEnv, const char* levelE
   return ncclSuccess;
 }
 
+/* 中文逐项-参数getter P0008：IgnoreDisabledP2p
+ * 生成函数 ncclParamIgnoreDisabledP2p()，读取 NCCL_IGNORE_DISABLED_P2P，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(IgnoreDisabledP2p, "IGNORE_DISABLED_P2P", 0);
 
+/* 中文逐项-变量 V1190：ncclTopoUserP2pLevel
+ * ncclTopoUserP2pLevel（int；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ncclTopoUserP2pLevel = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
 int ncclTopoUserP2pLevel = -1;
+/* 中文逐项-函数 F0448：ncclTopoCheckP2p
+ * 用途与位置：结合拓扑距离、环境策略和硬件 P2P 状态判断 GPU 间能否直接访问及是否需中间 GPU。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 id1（int64_t id1）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 id2（int64_t id2）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 p2p（int* p2p）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 read（int *read）：P2P/GDR方向是否采用读/拉取策略，发送读显存和接收写显存可能有不同能力条件。
+ * 参数 intermediateRank（int* intermediateRank）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputePaths；src/transport/p2p.cc::p2pCanConnect；src/transport/p2p.cc::p2pGetInfo。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclGetLevel；ncclNvmlEnsureInitialized；ncclParamIgnoreDisabledP2p；ncclTopoCpuType；ncclTopoIdToIndex。
+ * 需要对照的边界/推进条件：read；intermediateRank；ncclTopoIdToIndex(system, GPU, id2, &g2) == ncclInternalError；path->count ==
+ * 2。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;；return ncclUnhandledCudaError;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_t id2, int* p2p, int *read, int* intermediateRank) {
   *p2p = 0;
   if (read) *read = 0;
   if (intermediateRank) *intermediateRank = -1;
 
   // Get GPUs from topology
+/* 中文逐项-变量 V1191：g1、g2
+ * g1（int；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoIdToIndex(system, GPU, id1, &g1));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * g2（int；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：if (ncclTopoIdToIndex(system, GPU, id2, &g2) == ncclInternalError) {。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int g1, g2;
   NCCLCHECK(ncclTopoIdToIndex(system, GPU, id1, &g1));
+/* 中文逐项-变量 V1192：gpu1
+ * gpu1（struct ncclTopoNode；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 gpu1 = system->nodes[GPU].nodes+g1；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoNode* gpu1 = system->nodes[GPU].nodes+g1;
   if (ncclTopoIdToIndex(system, GPU, id2, &g2) == ncclInternalError) {
     // GPU not found, we can't use p2p.
     return ncclSuccess;
   }
 
+/* 中文逐项-变量 V1193：intermediateIndex
+ * intermediateIndex（int；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 intermediateIndex = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
   int intermediateIndex = -1;
   // Set intermediate GPU rank, if routing through an intermediate GPU.
+/* 中文逐项-变量 V1194：path
+ * path（struct ncclTopoLinkList；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 path = gpu1->paths[GPU]+g2；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoLinkList* path = gpu1->paths[GPU]+g2;
   if (path->count == 2) {
+/* 中文逐项-变量 V1195：intermediateNode
+ * intermediateNode（struct ncclTopoNode；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 intermediateNode = path->list[0]->remNode；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclTopoNode* intermediateNode = path->list[0]->remNode;
     if (intermediateNode->type == GPU) {
       intermediateIndex = intermediateNode - system->nodes[GPU].nodes;
@@ -280,6 +620,10 @@ ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_
   }
 
   // In general, use P2P whenever we can.
+/* 中文逐项-变量 V1196：p2pLevel
+ * p2pLevel（int；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 p2pLevel = PATH_SYS；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   int p2pLevel = PATH_SYS;
 
   // User override
@@ -291,6 +635,14 @@ ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_
   }
 
   // Don't use P2P through ARM CPUs
+/* 中文逐项-变量 V1197：arch、vendor、model
+ * arch（int；函数 ncclTopoCheckP2p 内）：CPU架构/厂商/型号，决定互连带宽模型与特定策略。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCpuType(system, &arch, &vendor, &model));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * vendor（int；函数 ncclTopoCheckP2p 内）：CPU架构/厂商/型号，决定互连带宽模型与特定策略。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCpuType(system, &arch, &vendor, &model));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * model（int；函数 ncclTopoCheckP2p 内）：CPU架构/厂商/型号，决定互连带宽模型与特定策略。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCpuType(system, &arch, &vendor, &model));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int arch, vendor, model;
   NCCLCHECK(ncclTopoCpuType(system, &arch, &vendor, &model));
   if (arch == NCCL_TOPO_CPU_ARCH_ARM) p2pLevel = PATH_PXB;
@@ -309,7 +661,15 @@ compare:
     // NCCL_IGNORE_DISABLED_P2P=2 is used by unit tests that don't want to
     // validate against NVML at all since they are pretending to be on other hw.
     if (g1 != g2 && ncclParamIgnoreDisabledP2p() != 2) {
+/* 中文逐项-变量 V1198：indexes
+ * indexes（int；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 indexes = {-1,-1,-1}；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
       int indexes[3] = {-1,-1,-1};
+/* 中文逐项-变量 V1199：verticeN
+ * verticeN（int；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 verticeN = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
       int verticeN = 0;
       NCCLCHECK(ncclNvmlEnsureInitialized());
 
@@ -317,9 +677,21 @@ compare:
       if (intermediateIndex != -1) indexes[verticeN++] = system->nodes[GPU].nodes[intermediateIndex].gpu.dev;
       indexes[verticeN++] = system->nodes[GPU].nodes[g2].gpu.dev;
 
-      for (int i=1; i < verticeN; i++) {
+      for (/* 中文逐项-变量 V1200：i
+ * i（int；函数 ncclTopoCheckP2p 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 1；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ * 所在for循环的继续条件：i < verticeN；循环体与增量表达式决定每轮如何推进。
+ */int i=1; i < verticeN; i++) {
+/* 中文逐项-变量 V1201：status
+ * status（nvmlGpuP2PStatus_t；函数 ncclTopoCheckP2p 内）：完成/调用的通用状态和厂商错误细节，非成功不能把目标数据当作有效结果。
+ * 此处未显式给初值；后续首个文本使用点：status = ncclNvmlDevicePairs[indexes[i-1]][indexes[i-0]].p2pStatusRead;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
         nvmlGpuP2PStatus_t status;
         status = ncclNvmlDevicePairs[indexes[i-1]][indexes[i-0]].p2pStatusRead;
+/* 中文逐项-变量 V1202：good
+ * good（bool；函数 ncclTopoCheckP2p 内）：本作用域条件状态；为真时启用下面受它保护的分支，不独立创建硬件资源。
+ * 初值/来源 good = status == NVML_P2P_STATUS_OK；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
         bool good = status == NVML_P2P_STATUS_OK;
         status = ncclNvmlDevicePairs[indexes[i-1]][indexes[i-0]].p2pStatusWrite;
         good &= status == NVML_P2P_STATUS_OK;
@@ -338,6 +710,10 @@ compare:
   }
 
   if (path->type == PATH_NVL) {
+/* 中文逐项-变量 V1203：gpu2
+ * gpu2（struct ncclTopoNode；函数 ncclTopoCheckP2p 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 gpu2 = system->nodes[GPU].nodes+g2；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclTopoNode* gpu2 = system->nodes[GPU].nodes+g2;
     // Enable P2P Read for Ampere/NVLink only
     if (read && (gpu1->gpu.cudaCompCap == gpu2->gpu.cudaCompCap) && (gpu1->gpu.cudaCompCap == 80)) *read = 1;
@@ -346,7 +722,16 @@ compare:
   return ncclSuccess;
 }
 
+/* 中文逐项-参数getter P0009：NetGdrRead
+ * 生成函数 ncclParamNetGdrRead()，读取 NCCL_NET_GDR_READ，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(NetGdrRead, "NET_GDR_READ", -2);
+/* 中文逐项-变量 V1204：ncclTopoUserGdrLevel
+ * ncclTopoUserGdrLevel（int；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ncclTopoUserGdrLevel = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
 int ncclTopoUserGdrLevel = -1;
 
 /* 中文导读：
@@ -359,14 +744,40 @@ int ncclTopoUserGdrLevel = -1;
  * useGdr 决定 NET 分配/注册 GPU 缓冲还是主机缓冲；不决定由 CPU 还是 GPU 调用 ibv_post_send。
  * 本版本内置 IB 的 verbs 请求仍由 CPU Proxy 推进。
  */
+/* 中文逐项-函数 F0449：ncclTopoCheckGdr
+ * 用途与位置：结合 NIC/GPU 能力、距离与发送读方向策略判断该路径能否使用 GPU Direct RDMA。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 busId（int64_t busId）：PCI BDF 的整数标识，用于将 CUDA、NVML 与拓扑中的同一设备关联。
+ * 参数 netDev（int netDev）：实际端口、QP能力上限、设备名、PCI路径和所选后端设备编号。
+ * 参数 read（int read）：P2P/GDR方向是否采用读/拉取策略，发送读显存和接收写显存可能有不同能力条件。
+ * 参数 useGdr（int* useGdr）：该方向协议缓冲是否允许 NIC 直接访问 GPU 内存，不表示 GPU 自己提交 verbs 请求。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoGetPxnRanks；src/graph/paths.cc::ncclTopoComputePaths；src/transport/coll_net.cc::sendSetup；src/transport/coll_net.cc::recvSetup；src/transport/net.cc::sendSetup；src/transport/net.cc::recvSetup。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclGetLevel；ncclParamNetGdrRead；ncclTopoGetIntermediateRank；ncclTopoIdToIndex；ncclTopoRankToIndex。
+ * 需要对照的边界/推进条件：net->net.gdrSupport == 0；gpu->gpu.gdrSupport == 0；read；gdrReadParam == 0。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* system, int64_t busId, int netDev, int read, int* useGdr) {
   *useGdr = 0;
 
   // Get GPU and NET
+/* 中文逐项-变量 V1205：n、g
+ * n（int；函数 ncclTopoCheckGdr 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoIdToIndex(system, NET, netDev, &n));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * g（int；函数 ncclTopoCheckGdr 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoIdToIndex(system, GPU, busId, &g));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int n, g;
   NCCLCHECK(ncclTopoIdToIndex(system, NET, netDev, &n));
+/* 中文逐项-变量 V1206：net
+ * net（struct ncclTopoNode；函数 ncclTopoCheckGdr 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 初值/来源 net = system->nodes[NET].nodes+n；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoNode* net = system->nodes[NET].nodes+n;
   NCCLCHECK(ncclTopoIdToIndex(system, GPU, busId, &g));
+/* 中文逐项-变量 V1207：gpu
+ * gpu（struct ncclTopoNode；函数 ncclTopoCheckGdr 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 初值/来源 gpu = system->nodes[GPU].nodes+g；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoNode* gpu = system->nodes[GPU].nodes+g;
 
   // Check that both the NIC and GPUs support it
@@ -374,14 +785,26 @@ ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* system, int64_t busId, int 
   if (gpu->gpu.gdrSupport == 0) return ncclSuccess;
 
   if (read) { // For reads (sends) only enable under certain conditions
+/* 中文逐项-变量 V1208：gdrReadParam
+ * gdrReadParam（int；函数 ncclTopoCheckGdr 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 gdrReadParam = ncclParamNetGdrRead()；调用对应接口取得结果；成功、容量与生命周期要按该接口返回契约判断。
+ */
     int gdrReadParam = ncclParamNetGdrRead();
     if (gdrReadParam == 0) return ncclSuccess;
     if (gdrReadParam < 0) {
+/* 中文逐项-变量 V1209：nvlink
+ * nvlink（int；函数 ncclTopoCheckGdr 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 nvlink = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
       int nvlink = 0;
       // Since we don't know whether there are other communicators,
       // it's better to keep things local if we have a single GPU.
       if (system->nodes[GPU].count == 1) nvlink = 1;
-      for (int i=0; i<system->nodes[GPU].count; i++) {
+      for (/* 中文逐项-变量 V1210：i
+ * i（int；函数 ncclTopoCheckGdr 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<system->nodes[GPU].count; i++) {
         if (i == g) continue;
         if (gpu->paths[GPU][i].type == PATH_NVL) {
           nvlink = 1;
@@ -393,15 +816,34 @@ ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* system, int64_t busId, int 
   }
 
   // Check if we are close enough that it makes sense to enable GDR
+/* 中文逐项-变量 V1211：netGdrLevel
+ * netGdrLevel（int；函数 ncclTopoCheckGdr 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 netGdrLevel = PATH_PXB；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   int netGdrLevel = PATH_PXB;
   NCCLCHECK(ncclGetLevel(&ncclTopoUserGdrLevel, NULL, "NCCL_NET_GDR_LEVEL"));
   if (ncclTopoUserGdrLevel != -2) netGdrLevel = ncclTopoUserGdrLevel;
+/* 中文逐项-变量 V1212：distance
+ * distance（int；函数 ncclTopoCheckGdr 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 distance = gpu->paths[NET][n].type；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int distance = gpu->paths[NET][n].type;
   if (distance == PATH_PXN) {
     // In case of PXN, use the intermediate GPU distance instead
+/* 中文逐项-变量 V1213：proxyRank、g
+ * proxyRank（int；函数 ncclTopoCheckGdr 内）：实际负责网络出口的代理 rank，PXN 时可能与发起通信的 GPU rank 不同。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetIntermediateRank(system, gpu->gpu.rank, netDev,
+ * &proxyRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * g（int；函数 ncclTopoCheckGdr 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoRankToIndex(system, proxyRank, &g));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int proxyRank, g;
     NCCLCHECK(ncclTopoGetIntermediateRank(system, gpu->gpu.rank, netDev, &proxyRank));
     NCCLCHECK(ncclTopoRankToIndex(system, proxyRank, &g));
+/* 中文逐项-变量 V1214：proxyGpu
+ * proxyGpu（struct ncclTopoNode；函数 ncclTopoCheckGdr 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 proxyGpu = system->nodes[GPU].nodes+g；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclTopoNode* proxyGpu = system->nodes[GPU].nodes+g;
     distance = proxyGpu->paths[NET][n].type;
   }
@@ -415,17 +857,54 @@ ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* system, int64_t busId, int 
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0450：ncclTopoGetIntermediateRank
+ * 用途与位置：找出 GPU 到 NET 路径中的中间 GPU rank，决定是否采用 PXN 代理出口。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 netDev（int netDev）：实际端口、QP能力上限、设备名、PCI路径和所选后端设备编号。
+ * 参数 intermediateRank（int* intermediateRank）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoCheckGdr；src/graph/search.cc::ncclTopoGetNetDev。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclTopoIdToIndex；ncclTopoRankToIndex。
+ * 需要对照的边界/推进条件：path->type == PATH_PXN；i<path->count && type == NVS；type != GPU。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInternalError;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoGetIntermediateRank(struct ncclTopoSystem* system, int rank, int netDev, int* intermediateRank) {
   // Get GPU and NET
+/* 中文逐项-变量 V1215：n、g
+ * n（int；函数 ncclTopoGetIntermediateRank 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoIdToIndex(system, NET, netDev, &n));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * g（int；函数 ncclTopoGetIntermediateRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoRankToIndex(system, rank, &g));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int n, g;
   NCCLCHECK(ncclTopoIdToIndex(system, NET, netDev, &n));
   NCCLCHECK(ncclTopoRankToIndex(system, rank, &g));
+/* 中文逐项-变量 V1216：gpu
+ * gpu（struct ncclTopoNode；函数 ncclTopoGetIntermediateRank 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 初值/来源 gpu = system->nodes[GPU].nodes+g；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoNode* gpu = system->nodes[GPU].nodes+g;
+/* 中文逐项-变量 V1217：path
+ * path（struct ncclTopoLinkList；函数 ncclTopoGetIntermediateRank 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 path = gpu->paths[NET]+n；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoLinkList* path = gpu->paths[NET]+n;
   if (path->type == PATH_PXN) {
+/* 中文逐项-变量 V1218：node
+ * node（struct ncclTopoNode；函数 ncclTopoGetIntermediateRank 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 此处未显式给初值；后续首个文本使用点：node = path->list[i]->remNode;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     struct ncclTopoNode* node;
+/* 中文逐项-变量 V1219：type
+ * type（int；函数 ncclTopoGetIntermediateRank 内）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
+ * 初值/来源 type = NVS；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     int type = NVS;
-    for (int i=0; i<path->count && type == NVS; i++) {
+    for (/* 中文逐项-变量 V1220：i
+ * i（int；函数 ncclTopoGetIntermediateRank 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<path->count && type == NVS；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<path->count && type == NVS; i++) {
       node = path->list[i]->remNode;
       type = node->type;
     }
@@ -440,11 +919,28 @@ ncclResult_t ncclTopoGetIntermediateRank(struct ncclTopoSystem* system, int rank
   return ncclSuccess;
 }
 
+/* 中文逐项-参数getter P0010：PxnDisable
+ * 生成函数 ncclParamPxnDisable()，读取 NCCL_PXN_DISABLE，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(PxnDisable, "PXN_DISABLE", 0);
 
 // Net v4 plugins don't have non-blocking connect/accept. We can't therefore use
 // remote proxies without risking deadlocks
+/* 中文逐项-函数 F0451：ncclPxnDisable
+ * 用途与位置：汇总参数和环境条件判断是否禁止 PXN，避免选择当前后端不支持的中间 GPU 网络路径。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputePaths；src/graph/search.cc::ncclTopoGetNetDev；src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：ncclNetVersion；ncclParamPxnDisable。
+ * 需要对照的边界/推进条件：pxnDisable == -1；ncclNetVersion() == 4。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return pxnDisable;。CHECK类宏还可能提前返回/跳转。
+ */
 int ncclPxnDisable() {
+/* 中文逐项-变量 V1221：pxnDisable
+ * pxnDisable（int；函数 ncclPxnDisable 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 pxnDisable = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
   static int pxnDisable = -1;
   if (pxnDisable == -1) {
     if (ncclNetVersion() == 4) {
@@ -457,23 +953,70 @@ int ncclPxnDisable() {
   return pxnDisable;
 }
 
+/* 中文逐项-函数 F0452：ncclTopoGetPxnRanks
+ * 用途与位置：列出本 rank 网络路径可能依赖的中间 GPU rank，为共享代理资源提前准备。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 intermediateRanks（int** intermediateRanks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 nranks（int* nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclRealloc；ncclTopoCheckGdr；ncclTopoGetNetDev。
+ * 需要对照的边界/推进条件：system->nodes[NET].count == 0；rank<comm->nRanks；proxyRank == comm->rank；useGdr == 0。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoGetPxnRanks(struct ncclComm* comm, int** intermediateRanks, int* nranks) {
+/* 中文逐项-变量 V1222：system
+ * system（struct ncclTopoSystem；函数 ncclTopoGetPxnRanks 内）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 初值/来源 system = comm->topo；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclTopoSystem* system = comm->topo;
   *nranks = 0;
   *intermediateRanks = NULL;
   if (system->nodes[NET].count == 0) return ncclSuccess;
 
+/* 中文逐项-变量 V1223：nr
+ * nr（int；函数 ncclTopoGetPxnRanks 内）：非对称 Fan 的运行时有效接收/发送邻居数。
+ * 初值/来源 nr = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int nr = 0;
+/* 中文逐项-变量 V1224：ranks
+ * ranks（int；函数 ncclTopoGetPxnRanks 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ranks = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ */
   int* ranks = NULL;
-  for (int rank=0; rank<comm->nRanks; rank++) {
+  for (/* 中文逐项-变量 V1225：rank
+ * rank（int；函数 ncclTopoGetPxnRanks 内）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 初值/来源 rank = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：rank<comm->nRanks；循环体与增量表达式决定每轮如何推进。
+ */int rank=0; rank<comm->nRanks; rank++) {
+/* 中文逐项-变量 V1226：netDev、proxyRank
+ * netDev（int；函数 ncclTopoGetPxnRanks 内）：实际端口、QP能力上限、设备名、PCI路径和所选后端设备编号。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetNetDev(comm, comm->rank, NULL, 0, rank, &netDev,
+ * &proxyRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * proxyRank（int；函数 ncclTopoGetPxnRanks 内）：实际负责网络出口的代理 rank，PXN 时可能与发起通信的 GPU rank 不同。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetNetDev(comm, comm->rank, NULL, 0, rank, &netDev,
+ * &proxyRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int netDev, proxyRank;
     NCCLCHECK(ncclTopoGetNetDev(comm, comm->rank, NULL, 0, rank, &netDev, &proxyRank));
     if (proxyRank == comm->rank) continue;
+/* 中文逐项-变量 V1227：useGdr
+ * useGdr（int；函数 ncclTopoGetPxnRanks 内）：该方向协议缓冲是否允许 NIC 直接访问 GPU 内存，不表示 GPU 自己提交 verbs 请求。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCheckGdr(comm->topo, comm->busId, netDev, 1,
+ * &useGdr));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int useGdr;
     NCCLCHECK(ncclTopoCheckGdr(comm->topo, comm->busId, netDev, 1, &useGdr));
     if (useGdr == 0) continue;
+/* 中文逐项-变量 V1228：found
+ * found（int；函数 ncclTopoGetPxnRanks 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 found = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int found = 0;
-    for (int r=0; r<nr; r++) {
+    for (/* 中文逐项-变量 V1229：r
+ * r（int；函数 ncclTopoGetPxnRanks 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<nr；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<nr; r++) {
       if (ranks[r] == proxyRank) found = 1;
     }
     if (!found) {
@@ -486,28 +1029,62 @@ ncclResult_t ncclTopoGetPxnRanks(struct ncclComm* comm, int** intermediateRanks,
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0453：ncclTopoComputePaths
+ * 用途与位置：计算 CPU/GPU/NET 路径，并按 P2P、GDR、PXN 策略替换不可直接使用的路径。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 peerInfos（struct ncclPeerInfo* peerInfos）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；addInterStep；getLocalCpu；ncclPxnDisable；ncclTopoCheckGdr；ncclTopoCheckP2p；ncclTopoGetLocalNet；ncclTopoRemovePathType；ncclTopoSetPaths；ncclTransports[TRANSPORT_P2P].canConnect；ncclTransports[TRANSPORT_SHM].canConnect。
+ * 需要对照的边界/推进条件：t<NCCL_TOPO_NODE_TYPES；c<system->nodes[CPU].count；g<system->nodes[GPU].count；p<system->nodes[GPU].count。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoComputePaths(struct ncclTopoSystem* system, struct ncclPeerInfo* peerInfos) {
   // Precompute paths between GPUs/NICs.
 
   // Remove everything in case we're re-computing
-  for (int t=0; t<NCCL_TOPO_NODE_TYPES; t++) ncclTopoRemovePathType(system, t);
+  for (/* 中文逐项-变量 V1230：t
+ * t（int；函数 ncclTopoComputePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 t = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：t<NCCL_TOPO_NODE_TYPES；循环体与增量表达式决定每轮如何推进。
+ */int t=0; t<NCCL_TOPO_NODE_TYPES; t++) ncclTopoRemovePathType(system, t);
 
   // Set direct paths from/to CPUs. We need them in many cases.
-  for (int c=0; c<system->nodes[CPU].count; c++) {
+  for (/* 中文逐项-变量 V1231：c
+ * c（int；函数 ncclTopoComputePaths 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<system->nodes[CPU].count；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<system->nodes[CPU].count; c++) {
     NCCLCHECK(ncclTopoSetPaths(system->nodes[CPU].nodes+c, system));
   }
 
   // Set direct paths from/to GPUs.
-  for (int g=0; g<system->nodes[GPU].count; g++) {
+  for (/* 中文逐项-变量 V1232：g
+ * g（int；函数 ncclTopoComputePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 g = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：g<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int g=0; g<system->nodes[GPU].count; g++) {
     // Compute paths to GPU g
     NCCLCHECK(ncclTopoSetPaths(system->nodes[GPU].nodes+g, system));
 
     // Update path when we don't want to / can't use GPU Direct P2P
-    for (int p=0; p<system->nodes[GPU].count; p++) {
+    for (/* 中文逐项-变量 V1233：p
+ * p（int；函数 ncclTopoComputePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<system->nodes[GPU].count; p++) {
+/* 中文逐项-变量 V1234：p2p
+ * p2p（int；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCheckP2p(system, system->nodes[GPU].nodes[p].id,
+ * system->nodes[GPU].nodes[g].id, &p2p, NULL, NULL));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int p2p;
       NCCLCHECK(ncclTopoCheckP2p(system, system->nodes[GPU].nodes[p].id, system->nodes[GPU].nodes[g].id, &p2p, NULL, NULL));
       if (p2p == 0) {
         // Divert all traffic through the CPU
+/* 中文逐项-变量 V1235：cpu
+ * cpu（int；函数 ncclTopoComputePaths 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(getLocalCpu(system, g, &cpu));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
         int cpu;
         NCCLCHECK(getLocalCpu(system, g, &cpu));
         NCCLCHECK(addInterStep(system, CPU, cpu, GPU, p, GPU, g));
@@ -516,12 +1093,34 @@ ncclResult_t ncclTopoComputePaths(struct ncclTopoSystem* system, struct ncclPeer
 
     if (peerInfos == NULL) continue;
     // Remove GPUs we can't talk to because of containers.
+/* 中文逐项-变量 V1236：dstInfo
+ * dstInfo（struct ncclPeerInfo；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 dstInfo = peerInfos+system->nodes[GPU].nodes[g].gpu.rank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclPeerInfo* dstInfo = peerInfos+system->nodes[GPU].nodes[g].gpu.rank;
-    for (int p=0; p<system->nodes[GPU].count; p++) {
+    for (/* 中文逐项-变量 V1237：p
+ * p（int；函数 ncclTopoComputePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<system->nodes[GPU].count; p++) {
       if (p == g) continue;
+/* 中文逐项-变量 V1238：srcInfo
+ * srcInfo（struct ncclPeerInfo；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 srcInfo = peerInfos+system->nodes[GPU].nodes[p].gpu.rank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclPeerInfo* srcInfo = peerInfos+system->nodes[GPU].nodes[p].gpu.rank;
+/* 中文逐项-变量 V1239：shm
+ * shm（int；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTransports[TRANSPORT_SHM].canConnect(&shm, system, NULL, srcInfo,
+ * dstInfo));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int shm;
       NCCLCHECK(ncclTransports[TRANSPORT_SHM].canConnect(&shm, system, NULL, srcInfo, dstInfo));
+/* 中文逐项-变量 V1240：p2p
+ * p2p（int；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTransports[TRANSPORT_P2P].canConnect(&p2p, system, NULL, srcInfo,
+ * dstInfo));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int p2p;
       NCCLCHECK(ncclTransports[TRANSPORT_P2P].canConnect(&p2p, system, NULL, srcInfo, dstInfo));
       if (shm == 0 && p2p == 0) {
@@ -532,25 +1131,57 @@ ncclResult_t ncclTopoComputePaths(struct ncclTopoSystem* system, struct ncclPeer
   }
 
   // Set direct paths from/to NICs.
-  for (int n=0; n<system->nodes[NET].count; n++) {
+  for (/* 中文逐项-变量 V1241：n
+ * n（int；函数 ncclTopoComputePaths 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<system->nodes[NET].count；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<system->nodes[NET].count; n++) {
+/* 中文逐项-变量 V1242：netNode
+ * netNode（struct ncclTopoNode；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 netNode = system->nodes[NET].nodes+n；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclTopoNode* netNode = system->nodes[NET].nodes+n;
     NCCLCHECK(ncclTopoSetPaths(netNode, system));
 
-    for (int g=0; g<system->nodes[GPU].count; g++) {
+    for (/* 中文逐项-变量 V1243：g
+ * g（int；函数 ncclTopoComputePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 g = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：g<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int g=0; g<system->nodes[GPU].count; g++) {
       // Check whether we can access the NIC through another NVLink-connected GPU (PXN)
+/* 中文逐项-变量 V1244：gpu
+ * gpu（struct ncclTopoNode；函数 ncclTopoComputePaths 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 初值/来源 gpu = system->nodes[GPU].nodes+g；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       struct ncclTopoNode* gpu = system->nodes[GPU].nodes+g;
       if (ncclPxnDisable() != 1 && gpu->paths[NET][n].type > PATH_PXB) {
+/* 中文逐项-变量 V1245：pxnGpu
+ * pxnGpu（int；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 pxnGpu = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
         int pxnGpu = -1;
 
-        for (int p=0; p<system->nodes[GPU].count; p++) {
+        for (/* 中文逐项-变量 V1246：p
+ * p（int；函数 ncclTopoComputePaths 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<system->nodes[GPU].count; p++) {
           if (p == g) continue;
 
           // PXN = PCI + NVLink.
+/* 中文逐项-变量 V1247：peerNode
+ * peerNode（struct ncclTopoNode；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 peerNode = system->nodes[GPU].nodes+p；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
           struct ncclTopoNode* peerNode = system->nodes[GPU].nodes+p;
           if (peerNode->paths[NET][n].type > PATH_PXB || peerNode->paths[GPU][g].type > PATH_NVL) continue;
 
           pxnGpu = p;
 
+/* 中文逐项-变量 V1248：netDev
+ * netDev（int；函数 ncclTopoComputePaths 内）：实际端口、QP能力上限、设备名、PCI路径和所选后端设备编号。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetLocalNet(system, peerNode->gpu.rank, &netDev));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
           int netDev;
           NCCLCHECK(ncclTopoGetLocalNet(system, peerNode->gpu.rank, &netDev));
           // To ensure proper balancing, use preferably a local GPU which advertised that NIC as its preferred one.
@@ -564,10 +1195,19 @@ ncclResult_t ncclTopoComputePaths(struct ncclTopoSystem* system, struct ncclPeer
         }
       }
       // Update path when we dont want to / can't use GPU Direct RDMA.
+/* 中文逐项-变量 V1249：gdr
+ * gdr（int；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCheckGdr(system, system->nodes[GPU].nodes[g].id, netNode->id, 0,
+ * &gdr));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int gdr;
       NCCLCHECK(ncclTopoCheckGdr(system, system->nodes[GPU].nodes[g].id, netNode->id, 0, &gdr));
       if (gdr == 0) {
         // We cannot use GPU Direct RDMA, divert all traffic through the CPU local to the GPU
+/* 中文逐项-变量 V1250：localCpu
+ * localCpu（int；函数 ncclTopoComputePaths 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(getLocalCpu(system, g, &localCpu));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
         int localCpu;
         NCCLCHECK(getLocalCpu(system, g, &localCpu));
         NCCLCHECK(addInterStep(system, CPU, localCpu, NET, n, GPU, g));
@@ -578,17 +1218,50 @@ ncclResult_t ncclTopoComputePaths(struct ncclTopoSystem* system, struct ncclPeer
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0454：ncclTopoTrimSystem
+ * 用途与位置：删除不属于当前通信可达域的硬件节点，并在完全机内通信时裁剪不需要的网络对象。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；free；ncclCalloc；ncclTopoRemoveNode；std::min。
+ * 需要对照的边界/推进条件：g<system->nodes[GPU].count；p<g；gpu->paths[GPU][p].count > 0；gpu->gpu.rank == comm->rank。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInternalError;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoTrimSystem(struct ncclTopoSystem* system, struct ncclComm* comm) {
+/* 中文逐项-变量 V1251：domains
+ * domains（int；函数 ncclTopoTrimSystem 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&domains, system->nodes[GPU].count));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int *domains;
+/* 中文逐项-变量 V1252：ids
+ * ids（int64_t；函数 ncclTopoTrimSystem 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ids, system->nodes[GPU].count));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int64_t *ids;
   NCCLCHECK(ncclCalloc(&domains, system->nodes[GPU].count));
   NCCLCHECK(ncclCalloc(&ids, system->nodes[GPU].count));
+/* 中文逐项-变量 V1253：myDomain
+ * myDomain（int；函数 ncclTopoTrimSystem 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 myDomain = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int myDomain = 0;
-  for (int g=0; g<system->nodes[GPU].count; g++) {
+  for (/* 中文逐项-变量 V1254：g
+ * g（int；函数 ncclTopoTrimSystem 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 g = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：g<system->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int g=0; g<system->nodes[GPU].count; g++) {
+/* 中文逐项-变量 V1255：gpu
+ * gpu（struct ncclTopoNode；函数 ncclTopoTrimSystem 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 初值/来源 gpu = system->nodes[GPU].nodes+g；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclTopoNode* gpu = system->nodes[GPU].nodes+g;
     domains[g] = g;
     ids[g] = gpu->id;
-    for (int p=0; p<g; p++) {
+    for (/* 中文逐项-变量 V1256：p
+ * p（int；函数 ncclTopoTrimSystem 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<g；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<g; p++) {
       if (gpu->paths[GPU][p].count > 0) {
         domains[g] = std::min(domains[g], domains[p]);
       }
@@ -596,10 +1269,26 @@ ncclResult_t ncclTopoTrimSystem(struct ncclTopoSystem* system, struct ncclComm* 
     if (gpu->gpu.rank == comm->rank) myDomain = domains[g];
   }
 
+/* 中文逐项-变量 V1257：ngpus
+ * ngpus（int；函数 ncclTopoTrimSystem 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ngpus = system->nodes[GPU].count；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int ngpus = system->nodes[GPU].count;
-  for (int i=0; i<ngpus; i++) {
+  for (/* 中文逐项-变量 V1258：i
+ * i（int；函数 ncclTopoTrimSystem 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<ngpus；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<ngpus; i++) {
     if (domains[i] == myDomain) continue;
+/* 中文逐项-变量 V1259：gpu
+ * gpu（struct ncclTopoNode；函数 ncclTopoTrimSystem 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 初值/来源 gpu = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ */
     struct ncclTopoNode* gpu = NULL;
+/* 中文逐项-变量 V1260：g
+ * g（int；函数 ncclTopoTrimSystem 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 此处未显式给初值；后续首个文本使用点：for (g=0; g<system->nodes[GPU].count ; g++) {。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int g;
     for (g=0; g<system->nodes[GPU].count /* This one varies over the loops */; g++) {
       gpu = system->nodes[GPU].nodes+g;
@@ -615,7 +1304,11 @@ ncclResult_t ncclTopoTrimSystem(struct ncclTopoSystem* system, struct ncclComm* 
   }
 
   if (system->nodes[GPU].count == comm->nRanks) {
-    for (int n=system->nodes[NET].count-1; n>=0; n--)
+    for (/* 中文逐项-变量 V1261：n
+ * n（int；函数 ncclTopoTrimSystem 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = system->nodes[NET].count-1；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * 所在for循环的继续条件：n>=0；循环体与增量表达式决定每轮如何推进。
+ */int n=system->nodes[NET].count-1; n>=0; n--)
       NCCLCHECK(ncclTopoRemoveNode(system, NET, n));
   }
   free(domains);
@@ -623,15 +1316,51 @@ ncclResult_t ncclTopoTrimSystem(struct ncclTopoSystem* system, struct ncclComm* 
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0455：ncclTopoFree
+ * 用途与位置：回收硬件系统的所有路径缓存和系统对象，本身不关闭 transport 已建立的连接。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：free；ncclTopoRemovePathType。
+ * 需要对照的边界/推进条件：t<NCCL_TOPO_NODE_TYPES。各条件所属分支见紧邻函数体。
+ */
 void ncclTopoFree(struct ncclTopoSystem* system) {
-  for (int t=0; t<NCCL_TOPO_NODE_TYPES; t++) ncclTopoRemovePathType(system, t);
+  for (/* 中文逐项-变量 V1262：t
+ * t（int；函数 ncclTopoFree 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 t = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：t<NCCL_TOPO_NODE_TYPES；循环体与增量表达式决定每轮如何推进。
+ */int t=0; t<NCCL_TOPO_NODE_TYPES; t++) ncclTopoRemovePathType(system, t);
   free(system);
 }
 
+/* 中文逐项-参数getter P0011：NChannelsPerNetPeer
+ * 生成函数 ncclParamNChannelsPerNetPeer()，读取 NCCL_NCHANNELS_PER_NET_PEER，编译默认值为 2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(NChannelsPerNetPeer, "NCHANNELS_PER_NET_PEER", 2);
 
+/* 中文逐项-函数 F0456：ncclTopoGetNchannels
+ * 用途与位置：按 peer 的本地/远端属性和 NVLink 带宽估计点对点通道预算，self 特殊处理。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 g（int g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 参数 peerRank（int peerRank）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 nChannels（int* nChannels）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputeP2pChannels。
+ * 本体直接出现的调用/包装：ncclParamNChannelsPerNetPeer；ncclTopoNVLinkSpeed；ncclTopoRankToIndex；std::max。
+ * 需要对照的边界/推进条件：ncclTopoRankToIndex(system, peerRank, &peer) == ncclSuccess；g == peer；path->type ==
+ * PATH_NVL。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t ncclTopoGetNchannels(struct ncclTopoSystem* system, int g /*local gpu index*/, int peerRank, int* nChannels) {
+/* 中文逐项-变量 V1263：peer
+ * peer（int；函数 ncclTopoGetNchannels 内）：通信对端的用户 rank，决定在 channel.peers 中选择哪个连接槽。
+ * 此处未显式给初值；后续首个文本使用点：if (ncclTopoRankToIndex(system, peerRank, &peer) == ncclSuccess) {。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int peer;
+/* 中文逐项-变量 V1264：path
+ * path（struct ncclTopoLinkList；函数 ncclTopoGetNchannels 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 path = NULL；初始为空地址，尚未持有对象，后续分配/映射成功后再更新。
+ */
   struct ncclTopoLinkList* path = NULL;
   if (ncclTopoRankToIndex(system, peerRank, &peer) == ncclSuccess) {
     // Same rank
@@ -642,6 +1371,10 @@ static ncclResult_t ncclTopoGetNchannels(struct ncclTopoSystem* system, int g /*
     // Local rank
     path = system->nodes[GPU].nodes[peer].paths[GPU]+g;
     if (path->type == PATH_NVL) {
+/* 中文逐项-变量 V1265：nvlWidth
+ * nvlWidth（float；函数 ncclTopoGetNchannels 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 nvlWidth = ncclTopoNVLinkSpeed(system->nodes[GPU].nodes[g].gpu.cudaCompCap)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       float nvlWidth = ncclTopoNVLinkSpeed(system->nodes[GPU].nodes[g].gpu.cudaCompCap);
       *nChannels = 2*std::max(1, (int)(path->width / nvlWidth));
     } else {
@@ -654,10 +1387,32 @@ static ncclResult_t ncclTopoGetNchannels(struct ncclTopoSystem* system, int g /*
   return ncclSuccess;
 }
 
+/* 中文逐项-参数getter P0012：MinP2pNChannels
+ * 生成函数 ncclParamMinP2pNChannels()，读取 NCCL_MIN_P2P_NCHANNELS，编译默认值为 1。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(MinP2pNChannels, "MIN_P2P_NCHANNELS", 1);
+/* 中文逐项-参数getter P0013：MaxP2pNChannels
+ * 生成函数 ncclParamMaxP2pNChannels()，读取 NCCL_MAX_P2P_NCHANNELS，编译默认值为 MAXCHANNELS。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(MaxP2pNChannels, "MAX_P2P_NCHANNELS", MAXCHANNELS);
 
+/* 中文逐项-函数 F0457：nextPow2
+ * 用途与位置：向上取最小二次幂，为 P2P 通道映射和位反转分布提供便于计算的容量。
+ * 参数 v（int v）：LL行的两个64位或int4整行视图，用向量汇编同时读写数据和标记。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/paths.cc::ncclTopoComputeP2pChannels。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：pow2 < v。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return pow2;。CHECK类宏还可能提前返回/跳转。
+ */
 static int nextPow2(int v) {
+/* 中文逐项-变量 V1266：pow2
+ * pow2（int；函数 nextPow2 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 pow2 = 1；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   int pow2 = 1;
   while (pow2 < v) pow2 <<= 1;
   return pow2;
@@ -668,13 +1423,37 @@ static int nextPow2(int v) {
  * 遍历本地 GPU/所有 peer 取限制，再向上对齐到 2 的幂，并用位反转偏移让通道分布更均匀。
  * 日志里的 8 p2p channels、2 per peer 不是 8×2 个独立 channel；具体任务还会按大小调整拆分。
  */
+/* 中文逐项-函数 F0458：ncclTopoComputeP2pChannels
+ * 用途与位置：收敛所有本地 GPU 到 peer 的通道预算，计算全局 P2P 空间与每 peer 数量并生成位反转偏移。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；initChannel；ncclParamMaxP2pNChannels；ncclParamMinP2pNChannels；ncclTopoGetNchannels；nextPow2；std::max；std::min。
+ * 需要对照的边界/推进条件：g<comm->topo->nodes[GPU].count；r<comm->nRanks；nChannels >= 0；c<comm->p2pnChannels。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoComputeP2pChannels(struct ncclComm* comm) {
   comm->p2pnChannels = std::min(comm->nChannels, (int)ncclParamMaxP2pNChannels());
   comm->p2pnChannels = std::max(comm->p2pnChannels, (int)ncclParamMinP2pNChannels());
+/* 中文逐项-变量 V1267：minChannels
+ * minChannels（int；函数 ncclTopoComputeP2pChannels 内）：图/后端允许的逻辑通道上限和下限，受容量与配置共同约束。
+ * 初值/来源 minChannels = comm->p2pnChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int minChannels = comm->p2pnChannels;
   // We need to loop through all local GPUs to have a global picture
-  for (int g=0; g<comm->topo->nodes[GPU].count; g++) {
-    for (int r=0; r<comm->nRanks; r++) {
+  for (/* 中文逐项-变量 V1268：g
+ * g（int；函数 ncclTopoComputeP2pChannels 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 g = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：g<comm->topo->nodes[GPU].count；循环体与增量表达式决定每轮如何推进。
+ */int g=0; g<comm->topo->nodes[GPU].count; g++) {
+    for (/* 中文逐项-变量 V1269：r
+ * r（int；函数 ncclTopoComputeP2pChannels 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<comm->nRanks；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<comm->nRanks; r++) {
+/* 中文逐项-变量 V1270：nChannels
+ * nChannels（int；函数 ncclTopoComputeP2pChannels 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoGetNchannels(comm->topo, g, r, &nChannels));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
       int nChannels;
       NCCLCHECK(ncclTopoGetNchannels(comm->topo, g, r, &nChannels));
       if (nChannels >= 0) minChannels = std::min(minChannels, nChannels);
@@ -692,28 +1471,77 @@ ncclResult_t ncclTopoComputeP2pChannels(struct ncclComm* comm) {
   comm->p2pnChannels = nextPow2(comm->p2pnChannels);
 
   // Init channels that weren't used so far
-  for (int c=comm->nChannels; c<comm->p2pnChannels; c++) NCCLCHECK(initChannel(comm, c));
+  for (/* 中文逐项-变量 V1271：c
+ * c（int；函数 ncclTopoComputeP2pChannels 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = comm->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * 所在for循环的继续条件：c<comm->p2pnChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=comm->nChannels; c<comm->p2pnChannels; c++) NCCLCHECK(initChannel(comm, c));
 
   // We want to spread channels used when there aren't many and progressively
   // fill the whole space of nChannels. To do so we mirror the bits in the
   // nChannels space.
-  for (int c=0; c<comm->p2pnChannelsPerPeer; c++) {
+  for (/* 中文逐项-变量 V1272：c
+ * c（int；函数 ncclTopoComputeP2pChannels 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->p2pnChannelsPerPeer；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->p2pnChannelsPerPeer; c++) {
+/* 中文逐项-变量 V1273：mirror
+ * mirror（int；函数 ncclTopoComputeP2pChannels 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 mirror = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int mirror = 0;
-    for (int b=1, mb=(comm->p2pnChannels>>1); b<comm->p2pnChannels; b<<=1, mb>>=1) if (c & b) mirror |= mb;
+    for (/* 中文逐项-变量 V1274：b、mb
+ * b（int；函数 ncclTopoComputeP2pChannels 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 b = 1；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ * mb（int；函数 ncclTopoComputeP2pChannels 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 mb = (comm->p2pnChannels>>1)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * 所在for循环的继续条件：b<comm->p2pnChannels；循环体与增量表达式决定每轮如何推进。
+ */int b=1, mb=(comm->p2pnChannels>>1); b<comm->p2pnChannels; b<<=1, mb>>=1) if (c & b) mirror |= mb;
     comm->p2pChannels[c] = mirror;
   }
   INFO(NCCL_INIT, "%d coll channels, %d p2p channels, %d p2p channels per peer", comm->nChannels, comm->p2pnChannels, comm->p2pnChannelsPerPeer);
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0459：ncclTopoGetNvbGpus
+ * 用途与位置：找出可经一个中间 GPU 走 NVLink 桥接的 peer，为特定机内路径预连接提供候选。
+ * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 nranks（int* nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 参数 ranks（int** ranks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclCalloc。
+ * 需要对照的边界/推进条件：g<ngpus；gpu->gpu.rank != rank；p<ngpus；gpu->paths[GPU][p].type == PATH_NVB。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoGetNvbGpus(struct ncclTopoSystem* system, int rank, int* nranks, int** ranks) {
+/* 中文逐项-变量 V1275：ngpus
+ * ngpus（int；函数 ncclTopoGetNvbGpus 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ngpus = system->nodes[GPU].count；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int ngpus = system->nodes[GPU].count;
   NCCLCHECK(ncclCalloc(ranks, ngpus));
+/* 中文逐项-变量 V1276：nvbGpus
+ * nvbGpus（int；函数 ncclTopoGetNvbGpus 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 nvbGpus = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int nvbGpus = 0;
-  for (int g=0; g<ngpus; g++) {
+  for (/* 中文逐项-变量 V1277：g
+ * g（int；函数 ncclTopoGetNvbGpus 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 g = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：g<ngpus；循环体与增量表达式决定每轮如何推进。
+ */int g=0; g<ngpus; g++) {
+/* 中文逐项-变量 V1278：gpu
+ * gpu（struct ncclTopoNode；函数 ncclTopoGetNvbGpus 内）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
+ * 初值/来源 gpu = system->nodes[GPU].nodes+g；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclTopoNode* gpu = system->nodes[GPU].nodes+g;
     if (gpu->gpu.rank != rank) continue;
-    for (int p=0; p<ngpus; p++) {
+    for (/* 中文逐项-变量 V1279：p
+ * p（int；函数 ncclTopoGetNvbGpus 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<ngpus；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<ngpus; p++) {
       if (gpu->paths[GPU][p].type == PATH_NVB) {
         (*ranks)[nvbGpus++] = system->nodes[GPU].nodes[p].gpu.rank;
       }

@@ -15,31 +15,127 @@
 /* Prefer macros over inline functions to reduce symbol resolution at link time */
 
 #if defined(_WIN32) 
+/* 中文逐项-常量 X0887：NVTX_PATHCHAR
+ * 编译期定义：NVTX_PATHCHAR = wchar_t。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_PATHCHAR   wchar_t
+/* 中文逐项-宏 M0105：NVTX_STR
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_STR；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_STR(x)     L##x
+/* 中文逐项-常量 X0888：NVTX_GETENV
+ * 编译期定义：NVTX_GETENV = _wgetenv。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_GETENV     _wgetenv
+/* 中文逐项-常量 X0889：NVTX_BUFSIZE
+ * 编译期定义：NVTX_BUFSIZE = MAX_PATH。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_BUFSIZE    MAX_PATH
+/* 中文逐项-常量 X0890：NVTX_DLLHANDLE
+ * 编译期定义：NVTX_DLLHANDLE = HMODULE。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_DLLHANDLE  HMODULE
+/* 中文逐项-宏 M0106：NVTX_DLLOPEN
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_DLLOPEN；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_DLLOPEN(x) LoadLibraryW(x)
+/* 中文逐项-常量 X0891：NVTX_DLLFUNC
+ * 编译期定义：NVTX_DLLFUNC = GetProcAddress。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_DLLFUNC    GetProcAddress
+/* 中文逐项-常量 X0892：NVTX_DLLCLOSE
+ * 编译期定义：NVTX_DLLCLOSE = FreeLibrary。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_DLLCLOSE   FreeLibrary
+/* 中文逐项-宏 M0107：NVTX_YIELD
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_YIELD；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_YIELD()    SwitchToThread()
+/* 中文逐项-宏 M0108：NVTX_MEMBAR
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_MEMBAR；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_MEMBAR()   MemoryBarrier()
+/* 中文逐项-宏 M0109：NVTX_ATOMIC_WRITE_32
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_ATOMIC_WRITE_32；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_ATOMIC_WRITE_32(address, value)                        InterlockedExchange((volatile LONG*)address, value)
+/* 中文逐项-宏 M0110：NVTX_ATOMIC_CAS_32
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_ATOMIC_CAS_32；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_ATOMIC_CAS_32(old, address, exchange, comparand) old = InterlockedCompareExchange((volatile LONG*)address, exchange, comparand)
 #elif defined(__GNUC__)
+/* 中文逐项-常量 X0893：NVTX_PATHCHAR
+ * 编译期定义：NVTX_PATHCHAR = char。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_PATHCHAR   char
+/* 中文逐项-宏 M0111：NVTX_STR
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_STR；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_STR(x)     x
+/* 中文逐项-常量 X0894：NVTX_GETENV
+ * 编译期定义：NVTX_GETENV = getenv。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_GETENV     getenv
+/* 中文逐项-常量 X0895：NVTX_BUFSIZE
+ * 编译期定义：NVTX_BUFSIZE = PATH_MAX。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_BUFSIZE    PATH_MAX
+/* 中文逐项-常量 X0896：NVTX_DLLHANDLE
+ * 编译期定义：NVTX_DLLHANDLE = void*。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_DLLHANDLE  void*
+/* 中文逐项-宏 M0112：NVTX_DLLOPEN
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_DLLOPEN；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_DLLOPEN(x) dlopen(x, RTLD_LAZY)
+/* 中文逐项-常量 X0897：NVTX_DLLFUNC
+ * 编译期定义：NVTX_DLLFUNC = dlsym。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_DLLFUNC    dlsym
+/* 中文逐项-常量 X0898：NVTX_DLLCLOSE
+ * 编译期定义：NVTX_DLLCLOSE = dlclose。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_DLLCLOSE   dlclose
+/* 中文逐项-宏 M0113：NVTX_YIELD
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_YIELD；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_YIELD()    sched_yield()
+/* 中文逐项-宏 M0114：NVTX_MEMBAR
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_MEMBAR；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_MEMBAR()   __sync_synchronize()
 /* Ensure full memory barrier for atomics, to match Windows functions */
+/* 中文逐项-宏 M0115：NVTX_ATOMIC_WRITE_32
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_ATOMIC_WRITE_32；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_ATOMIC_WRITE_32(address, value)                  __sync_synchronize();       __sync_lock_test_and_set(address, value)
+/* 中文逐项-宏 M0116：NVTX_ATOMIC_CAS_32
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NVTX_ATOMIC_CAS_32；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NVTX_ATOMIC_CAS_32(old, address, exchange, comparand) __sync_synchronize(); old = __sync_val_compare_and_swap(address, exchange, comparand)
 #else
 #error The library does not support your configuration!
@@ -48,17 +144,33 @@
 /* Define this to 1 for platforms that where pre-injected libraries can be discovered. */
 #if defined(_WIN32)
 /* TODO */
+/* 中文逐项-常量 X0899：NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY
+ * 编译期定义：NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY = 0。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY 0
 #else
+/* 中文逐项-常量 X0900：NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY
+ * 编译期定义：NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY = 0。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY 0
 #endif
 
 /* Define this to 1 for platforms that support environment variables */
 /* TODO: Detect UWP, a.k.a. Windows Store app, and set this to 0. */
 /* Try:  #if defined(WINAPI_FAMILY_PARTITION) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP) */
+/* 中文逐项-常量 X0901：NVTX_SUPPORT_ENV_VARS
+ * 编译期定义：NVTX_SUPPORT_ENV_VARS = 1。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_SUPPORT_ENV_VARS 1
 
 /* Define this to 1 for platforms that support dynamic/shared libraries */
+/* 中文逐项-常量 X0902：NVTX_SUPPORT_DYNAMIC_INJECTION_LIBRARY
+ * 编译期定义：NVTX_SUPPORT_DYNAMIC_INJECTION_LIBRARY = 1。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_SUPPORT_DYNAMIC_INJECTION_LIBRARY 1
 
 /* Injection libraries implementing InitializeInjectionNvtx2 may be statically linked,
@@ -67,13 +179,25 @@
 *  guaranteed to be initialized to zero if no definitions are found by the linker, the
 *  dynamic injection process proceeds normally if pfnInitializeInjectionNvtx2 is 0. */
 #if defined(__GNUC__) && !defined(_WIN32) && !defined(__CYGWIN__)
+/* 中文逐项-常量 X0903：NVTX_SUPPORT_STATIC_INJECTION_LIBRARY
+ * 编译期定义：NVTX_SUPPORT_STATIC_INJECTION_LIBRARY = 1。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_SUPPORT_STATIC_INJECTION_LIBRARY 1
 /* To statically inject an NVTX library, define InitializeInjectionNvtx2_fnptr as a normal
 *  symbol (not weak) pointing to the implementation of InitializeInjectionNvtx2 (which
 *  does not need to be named "InitializeInjectionNvtx2" as is necessary in a dynamic
 *  injection library. */
+/* 中文逐项-变量 V2964：InitializeInjectionNvtx2_fnptr
+ * InitializeInjectionNvtx2_fnptr（NvtxInitializeInjectionNvtxFunc_t；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：if (InitializeInjectionNvtx2_fnptr)。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
 __attribute__((weak)) NvtxInitializeInjectionNvtxFunc_t InitializeInjectionNvtx2_fnptr;
 #else
+/* 中文逐项-常量 X0904：NVTX_SUPPORT_STATIC_INJECTION_LIBRARY
+ * 编译期定义：NVTX_SUPPORT_STATIC_INJECTION_LIBRARY = 0。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NVTX_SUPPORT_STATIC_INJECTION_LIBRARY 0
 #endif
 
@@ -94,11 +218,37 @@ __attribute__((weak)) NvtxInitializeInjectionNvtxFunc_t InitializeInjectionNvtx2
 *  - Statically-linked injection library defining InitializeInjectionNvtx2_fnptr
 */
 NVTX_LINKONCE_FWDDECL_FUNCTION int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInjectionLibrary)(void);
-NVTX_LINKONCE_DEFINE_FUNCTION int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInjectionLibrary)(void)
+NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0742：nvtxInitializeInjectionLibrary
+ * 用途与位置：查找并加载性能工具注入库，协商导出表并建立可用回调；没有工具时使用空操作。
+ * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：access；faccessat；fclose；fopen；fread；getpid；init_fnptr；snprintf；strerror。
+ * 需要对照的边界/推进条件：!init_fnptr；!injectionLibraryPath；count <= 0 || count >= (int)sizeof(cmdlineBuf；!fp。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return NVTX_ERR_INIT_ACCESS_LIBRARY;；return NVTX_ERR_INIT_LOAD_LIBRARY;；return
+ * NVTX_ERR_INIT_MISSING_LIBRARY_ENTRY_POINT;；return NVTX_ERR_NO_INJECTION_LIBRARY_AVAILABLE;；return
+ * NVTX_ERR_INIT_FAILED_LIBRARY_ENTRY_POINT;；其余错误/特化返回见函数体。CHECK类宏还可能提前返回/跳转。
+ */int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInjectionLibrary)(void)
 {
+/* 中文逐项-变量 V2965：initFuncName
+ * initFuncName（char；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 initFuncName = "InitializeInjectionNvtx2"；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     const char* const initFuncName = "InitializeInjectionNvtx2";
+/* 中文逐项-变量 V2966：init_fnptr
+ * init_fnptr（NvtxInitializeInjectionNvtxFunc_t；函数 nvtxInitializeInjectionLibrary
+ * 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 init_fnptr = (NvtxInitializeInjectionNvtxFunc_t)0；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     NvtxInitializeInjectionNvtxFunc_t init_fnptr = (NvtxInitializeInjectionNvtxFunc_t)0;
+/* 中文逐项-变量 V2967：injectionLibraryHandle
+ * injectionLibraryHandle（NVTX_DLLHANDLE；函数 nvtxInitializeInjectionLibrary 内）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
+ * 初值/来源 injectionLibraryHandle = (NVTX_DLLHANDLE)0；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
     NVTX_DLLHANDLE injectionLibraryHandle = (NVTX_DLLHANDLE)0;
+/* 中文逐项-变量 V2968：entryPointStatus
+ * entryPointStatus（int；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 entryPointStatus = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int entryPointStatus = 0;
 
 #if NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY
@@ -113,11 +263,24 @@ NVTX_LINKONCE_DEFINE_FUNCTION int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInject
 #if NVTX_SUPPORT_ENV_VARS
         /* If env var NVTX_INJECTION64_PATH is set, it should contain the path
         *  to a 64-bit dynamic NVTX injection library (and similar for 32-bit). */
+/* 中文逐项-变量 V2969：nvtxEnvVarName
+ * nvtxEnvVarName（NVTX_PATHCHAR；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 nvtxEnvVarName = (sizeof(void*) == 4) ? NVTX_STR("NVTX_INJECTION32_PATH") :
+ * NVTX_STR("NVTX_INJECTION64_PATH")；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
         const NVTX_PATHCHAR* const nvtxEnvVarName = (sizeof(void*) == 4)
             ? NVTX_STR("NVTX_INJECTION32_PATH")
             : NVTX_STR("NVTX_INJECTION64_PATH");
 #endif /* NVTX_SUPPORT_ENV_VARS */
+/* 中文逐项-变量 V2970：injectionLibraryPathBuf
+ * injectionLibraryPathBuf（NVTX_PATHCHAR；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：(void)injectionLibraryPathBuf;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
         NVTX_PATHCHAR injectionLibraryPathBuf[NVTX_BUFSIZE];
+/* 中文逐项-变量 V2971：injectionLibraryPath
+ * injectionLibraryPath（NVTX_PATHCHAR；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 injectionLibraryPath = (const NVTX_PATHCHAR*)0；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
         const NVTX_PATHCHAR* injectionLibraryPath = (const NVTX_PATHCHAR*)0;
 
         /* Refer to this variable explicitly in case all references to it are #if'ed out */
@@ -139,13 +302,47 @@ NVTX_LINKONCE_DEFINE_FUNCTION int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInject
 #if defined(__ANDROID__)
         if (!injectionLibraryPath)
         {
+/* 中文逐项-变量 V2972：bits
+ * bits（char；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 bits = (sizeof(void*) == 4) ? "32" : "64"；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
             const char *bits = (sizeof(void*) == 4) ? "32" : "64";
+/* 中文逐项-变量 V2973：cmdlineBuf
+ * cmdlineBuf（char；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：count = snprintf(cmdlineBuf, sizeof(cmdlineBuf), "/proc/%d/cmdline",
+ * pid);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
             char cmdlineBuf[32];
+/* 中文逐项-变量 V2974：pkgName
+ * pkgName（char；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：bytesRead = fread(pkgName, 1, sizeof(pkgName) - 1, fp);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
             char pkgName[PATH_MAX];
+/* 中文逐项-变量 V2975：count
+ * count（int；函数 nvtxInitializeInjectionLibrary 内）：当前对象的有效元素数量；复制 API 和 P2P 归一到 Int8 后等于字节数，不能脱离 datatype 解释。
+ * 此处未显式给初值；后续首个文本使用点：count = snprintf(cmdlineBuf, sizeof(cmdlineBuf), "/proc/%d/cmdline",
+ * pid);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
             int count;
+/* 中文逐项-变量 V2976：pid
+ * pid（int；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：pid = (int)getpid();。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
             int pid;
+/* 中文逐项-变量 V2977：fp
+ * fp（FILE；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：fp = fopen(cmdlineBuf, "r");。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
             FILE *fp;
+/* 中文逐项-变量 V2978：bytesRead
+ * bytesRead（size_t；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：bytesRead = fread(pkgName, 1, sizeof(pkgName) - 1, fp);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
             size_t bytesRead;
+/* 中文逐项-变量 V2979：pos
+ * pos（size_t；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：pos = 0;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
             size_t pos;
 
             pid = (int)getpid();
@@ -194,8 +391,16 @@ NVTX_LINKONCE_DEFINE_FUNCTION int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInject
             if (injectionLibraryPathBuf[0] == '/')
             {
 #if (__ANDROID_API__ < 21)
+/* 中文逐项-变量 V2980：access_err
+ * access_err（int；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 access_err = access(injectionLibraryPathBuf, F_OK | R_OK)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
                 int access_err = access(injectionLibraryPathBuf, F_OK | R_OK);
 #else
+/* 中文逐项-变量 V2981：access_err
+ * access_err（int；函数 nvtxInitializeInjectionLibrary 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 access_err = faccessat(AT_FDCWD, injectionLibraryPathBuf, F_OK | R_OK, 0)；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
                 int access_err = faccessat(AT_FDCWD, injectionLibraryPathBuf, F_OK | R_OK, 0);
 #endif
                 if (access_err != 0)
@@ -270,8 +475,20 @@ NVTX_LINKONCE_DEFINE_FUNCTION int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInject
     return NVTX_SUCCESS;
 }
 
-NVTX_LINKONCE_DEFINE_FUNCTION void NVTX_VERSIONED_IDENTIFIER(nvtxInitOnce)(void)
+NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0743：nvtxInitOnce
+ * 用途与位置：以一次性初始化状态和原子/锁协调工具注入，初始化后让标记API走真实工具回调或no-op。
+ * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).initState == NVTX_INIT_STATE_COMPLETE；old ==
+ * NVTX_INIT_STATE_FRESH；NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).initState != NVTX_INIT_STATE_COMPLETE。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return;。CHECK类宏还可能提前返回/跳转。
+ */void NVTX_VERSIONED_IDENTIFIER(nvtxInitOnce)(void)
 {
+/* 中文逐项-变量 V2982：old
+ * old（unsigned int；函数 nvtxInitOnce 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：old,。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     unsigned int old;
     if (NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).initState == NVTX_INIT_STATE_COMPLETE)
     {
@@ -285,7 +502,15 @@ NVTX_LINKONCE_DEFINE_FUNCTION void NVTX_VERSIONED_IDENTIFIER(nvtxInitOnce)(void)
         NVTX_INIT_STATE_FRESH);
     if (old == NVTX_INIT_STATE_FRESH)
     {
+/* 中文逐项-变量 V2983：result
+ * result（int；函数 nvtxInitOnce 内）：异步线程/请求保存的结果码，前台测试函数需要检查它而不只检查长度。
+ * 此处未显式给初值；后续首个文本使用点：result = NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInjectionLibrary)();。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
         int result;
+/* 中文逐项-变量 V2984：forceAllToNoops
+ * forceAllToNoops（int；函数 nvtxInitOnce 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：forceAllToNoops = result != NVTX_SUCCESS;。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
         int forceAllToNoops;
 
         /* Load & initialize injection library -- it will assign the function pointers */

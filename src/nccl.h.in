@@ -5,6 +5,10 @@
  ************************************************************************/
 
 #ifndef NCCL_H_
+/* 中文逐项-常量 X1172：NCCL_H_
+ * 编译期定义：NCCL_H_ = <空替换体>。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_H_
 
 #include <cuda_runtime.h>
@@ -13,12 +17,36 @@
 #include <cuda_bf16.h>
 #endif
 
+/* 中文逐项-常量 X1173：NCCL_MAJOR
+ * 编译期定义：NCCL_MAJOR = ${nccl:Major}。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_MAJOR ${nccl:Major}
+/* 中文逐项-常量 X1174：NCCL_MINOR
+ * 编译期定义：NCCL_MINOR = ${nccl:Minor}。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_MINOR ${nccl:Minor}
+/* 中文逐项-常量 X1175：NCCL_PATCH
+ * 编译期定义：NCCL_PATCH = ${nccl:Patch}。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_PATCH ${nccl:Patch}
+/* 中文逐项-常量 X1176：NCCL_SUFFIX
+ * 编译期定义：NCCL_SUFFIX = "${nccl:Suffix}"。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_SUFFIX "${nccl:Suffix}"
 
+/* 中文逐项-常量 X1177：NCCL_VERSION_CODE
+ * 编译期定义：NCCL_VERSION_CODE = ${nccl:Version}。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_VERSION_CODE ${nccl:Version}
+/* 中文逐项-宏 M0146：NCCL_VERSION
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 NCCL_VERSION；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define NCCL_VERSION(X,Y,Z) (((X) <= 2 && (Y) <= 8) ? (X) * 1000 + (Y) * 100 + (Z) : (X) * 10000 + (Y) * 100 + (Z))
 
 #ifdef __cplusplus
@@ -28,21 +56,64 @@ extern "C" {
 /* Opaque handle to communicator */
 typedef struct ncclComm* ncclComm_t;
 
+/* 中文逐项-常量 X1178：NCCL_UNIQUE_ID_BYTES
+ * 编译期定义：NCCL_UNIQUE_ID_BYTES = 128。
+ * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
+ */
 #define NCCL_UNIQUE_ID_BYTES 128
-typedef struct { char internal[NCCL_UNIQUE_ID_BYTES]; } ncclUniqueId;
+typedef /* 中文逐项-类型 T0394：ncclUniqueId
+ * 类型职责：应用负责分发给全组rank的不透明bootstrap会合标识，不包含完整用户数据。
+ * 声明内可见成员（含嵌套成员）：internal。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */struct { /* 中文逐项-变量 V3561：internal
+ * internal（char；成员 ncclUniqueId）：控制/连接的内部描述或transport类型编号，用于选择正确后台回调。
+ */char internal[NCCL_UNIQUE_ID_BYTES]; } ncclUniqueId;
 
 /* Error type */
-typedef enum { ncclSuccess                 =  0,
+typedef /* 中文逐项-类型 T0395：ncclResult_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum { /* 中文逐项-枚举项 X1179：ncclSuccess
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */ncclSuccess                 =  0,
+/* 中文逐项-枚举项 X1180：ncclUnhandledCudaError
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：1
+ */
                ncclUnhandledCudaError      =  1,
+/* 中文逐项-枚举项 X1181：ncclSystemError
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：2
+ */
                ncclSystemError             =  2,
+/* 中文逐项-枚举项 X1182：ncclInternalError
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：3
+ */
                ncclInternalError           =  3,
+/* 中文逐项-枚举项 X1183：ncclInvalidArgument
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：4
+ */
                ncclInvalidArgument         =  4,
+/* 中文逐项-枚举项 X1184：ncclInvalidUsage
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：5
+ */
                ncclInvalidUsage            =  5,
+/* 中文逐项-枚举项 X1185：ncclNumResults
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：6
+ */
                ncclNumResults              =  6 } ncclResult_t;
 
 /* Return the NCCL_VERSION_CODE of the NCCL library in the supplied integer.
  * This integer is coded with the MAJOR, MINOR and PATCH level of the
  * NCCL library
+ */
+/* 中文逐项-接口 X1186：ncclGetVersion
+ * 接口职责：把本库编译版本写到用户输出参数，帮助应用确认实际链接的 NCCL 版本。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclGetVersion(int *version);
  */
 ncclResult_t  ncclGetVersion(int *version);
 ncclResult_t pncclGetVersion(int *version);
@@ -50,6 +121,10 @@ ncclResult_t pncclGetVersion(int *version);
 /* Generates an Id to be used in ncclCommInitRank. ncclGetUniqueId should be
  * called once and the Id should be distributed to all ranks in the
  * communicator before calling ncclCommInitRank. */
+/* 中文逐项-接口 X1187：ncclGetUniqueId
+ * 接口职责：先完成库级初始化，再生成应用需要分发给全组 rank 的 bootstrap 标识。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclGetUniqueId(ncclUniqueId* uniqueId);
+ */
 ncclResult_t  ncclGetUniqueId(ncclUniqueId* uniqueId);
 ncclResult_t pncclGetUniqueId(ncclUniqueId* uniqueId);
 
@@ -59,6 +134,11 @@ ncclResult_t pncclGetUniqueId(ncclUniqueId* uniqueId);
  * ncclCommInitRank.
  * ncclCommInitRank implicitly syncronizes with other ranks, so it must be
  * called by different threads/processes or use ncclGroupStart/ncclGroupEnd. */
+/* 中文逐项-接口 X1188：ncclCommInitRank
+ * 接口职责：公开多进程/多机初始化入口，使用当前设备、全组规模和 uniqueId 建立当前 rank。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId,
+ * int rank);
+ */
 ncclResult_t  ncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank);
 ncclResult_t pncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank);
 
@@ -68,84 +148,230 @@ ncclResult_t pncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId
  * comm should be pre-allocated with size at least ndev*sizeof(ncclComm_t).
  * If devlist is NULL, the first ndev CUDA devices are used.
  * Order of devlist defines user-order of processors within the communicator. */
+/* 中文逐项-接口 X1189：ncclCommInitAll
+ * 接口职责：单进程本地多 GPU 便捷初始化，使用同一 uniqueId 和 Group 协调各设备加入同一通信组。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommInitAll(ncclComm_t* comm, int ndev, const int* devlist);
+ */
 ncclResult_t  ncclCommInitAll(ncclComm_t* comm, int ndev, const int* devlist);
 ncclResult_t pncclCommInitAll(ncclComm_t* comm, int ndev, const int* devlist);
 
 /* Frees resources associated with communicator object, but waits for any operations
  * that might still be running on the device. */
+/* 中文逐项-接口 X1190：ncclCommDestroy
+ * 接口职责：正常销毁公开 communicator 句柄，按本版生命周期要求回收长期通信对象。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommDestroy(ncclComm_t comm);
+ */
 ncclResult_t  ncclCommDestroy(ncclComm_t comm);
 ncclResult_t pncclCommDestroy(ncclComm_t comm);
 
 /* Frees resources associated with communicator object and aborts any operations
  * that might still be running on the device. */
+/* 中文逐项-接口 X1191：ncclCommAbort
+ * 接口职责：设置共享中止标志并执行异常清理，帮助 GPU/Proxy/socket 等待退出。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommAbort(ncclComm_t comm);
+ */
 ncclResult_t  ncclCommAbort(ncclComm_t comm);
 ncclResult_t pncclCommAbort(ncclComm_t comm);
 
 /* Returns a human-readable error message. */
+/* 中文逐项-变量 V3562：ncclGetErrorString
+ * ncclGetErrorString（char；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ */
 const char*  ncclGetErrorString(ncclResult_t result);
+/* 中文逐项-变量 V3563：pncclGetErrorString
+ * pncclGetErrorString（char；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ */
 const char* pncclGetErrorString(ncclResult_t result);
 
 /* Checks whether the comm has encountered any asynchronous errors */
+/* 中文逐项-接口 X1192：ncclCommGetAsyncError
+ * 接口职责：查询 communicator 已记录的异步失败，使应用可在提交成功后检测后台错误。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError);
+ */
 ncclResult_t  ncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError);
 ncclResult_t pncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError);
 
 /* Gets the number of ranks in the communicator clique. */
+/* 中文逐项-接口 X1193：ncclCommCount
+ * 接口职责：读取通信组 rank 总数到用户输出参数，返回的是逻辑参与规模。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommCount(const ncclComm_t comm, int* count);
+ */
 ncclResult_t  ncclCommCount(const ncclComm_t comm, int* count);
 ncclResult_t pncclCommCount(const ncclComm_t comm, int* count);
 
 /* Returns the cuda device number associated with the communicator. */
+/* 中文逐项-接口 X1194：ncclCommCuDevice
+ * 接口职责：查询该 communicator 所属本地 CUDA 设备序号，不能把它等同于全局 rank。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommCuDevice(const ncclComm_t comm, int* device);
+ */
 ncclResult_t  ncclCommCuDevice(const ncclComm_t comm, int* device);
 ncclResult_t pncclCommCuDevice(const ncclComm_t comm, int* device);
 
 /* Returns the user-ordered "rank" associated with the communicator. */
+/* 中文逐项-接口 X1195：ncclCommUserRank
+ * 接口职责：查询本 communicator 当前对象对应的用户 rank 编号。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclCommUserRank(const ncclComm_t comm, int* rank);
+ */
 ncclResult_t  ncclCommUserRank(const ncclComm_t comm, int* rank);
 ncclResult_t pncclCommUserRank(const ncclComm_t comm, int* rank);
 
 /* Reduction operation selector */
-typedef enum { ncclNumOps_dummy = 5 } ncclRedOp_dummy_t;
-typedef enum { ncclSum        = 0,
+typedef /* 中文逐项-类型 T0396：ncclRedOp_dummy_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum { /* 中文逐项-枚举项 X1196：ncclNumOps_dummy
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：5
+ */ncclNumOps_dummy = 5 } ncclRedOp_dummy_t;
+typedef /* 中文逐项-类型 T0397：ncclRedOp_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum { /* 中文逐项-枚举项 X1197：ncclSum
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */ncclSum        = 0,
+/* 中文逐项-枚举项 X1198：ncclProd
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：1
+ */
                ncclProd       = 1,
+/* 中文逐项-枚举项 X1199：ncclMax
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：2
+ */
                ncclMax        = 2,
+/* 中文逐项-枚举项 X1200：ncclMin
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：3
+ */
                ncclMin        = 3,
+/* 中文逐项-枚举项 X1201：ncclAvg
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：4
+ */
                ncclAvg        = 4,
                /* ncclNumOps: The number of built-in ncclRedOp_t values. Also
                 * serves as the least possible value for dynamic ncclRedOp_t's
                 * as constructed by ncclRedOpCreate*** functions. */
+/* 中文逐项-枚举项 X1202：ncclNumOps
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：5
+ */
                ncclNumOps     = 5,
                /* ncclMaxRedOp: The largest valid value for ncclRedOp_t.
                 * It is defined to be the largest signed value (since compilers
                 * are permitted to use signed enums) that won't grow
                 * sizeof(ncclRedOp_t) when compared to previous NCCL versions to
                 * maintain ABI compatibility. */
+/* 中文逐项-枚举项 X1203：ncclMaxRedOp
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0x7fffffff>>(32-8*sizeof(ncclRedOp_dummy_t))
+ */
                ncclMaxRedOp   = 0x7fffffff>>(32-8*sizeof(ncclRedOp_dummy_t))
              } ncclRedOp_t;
 
 /* Data types */
-typedef enum { ncclInt8       = 0, ncclChar       = 0,
+typedef /* 中文逐项-类型 T0398：ncclDataType_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum { /* 中文逐项-枚举项 X1204：ncclInt8
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */ncclInt8       = 0, /* 中文逐项-枚举项 X1205：ncclChar
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */ncclChar       = 0,
+/* 中文逐项-枚举项 X1206：ncclUint8
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：1
+ */
                ncclUint8      = 1,
-               ncclInt32      = 2, ncclInt        = 2,
+/* 中文逐项-枚举项 X1207：ncclInt32
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：2
+ */
+               ncclInt32      = 2, /* 中文逐项-枚举项 X1208：ncclInt
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：2
+ */ncclInt        = 2,
+/* 中文逐项-枚举项 X1209：ncclUint32
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：3
+ */
                ncclUint32     = 3,
+/* 中文逐项-枚举项 X1210：ncclInt64
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：4
+ */
                ncclInt64      = 4,
+/* 中文逐项-枚举项 X1211：ncclUint64
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：5
+ */
                ncclUint64     = 5,
-               ncclFloat16    = 6, ncclHalf       = 6,
-               ncclFloat32    = 7, ncclFloat      = 7,
-               ncclFloat64    = 8, ncclDouble     = 8,
+/* 中文逐项-枚举项 X1212：ncclFloat16
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：6
+ */
+               ncclFloat16    = 6, /* 中文逐项-枚举项 X1213：ncclHalf
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：6
+ */ncclHalf       = 6,
+/* 中文逐项-枚举项 X1214：ncclFloat32
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：7
+ */
+               ncclFloat32    = 7, /* 中文逐项-枚举项 X1215：ncclFloat
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：7
+ */ncclFloat      = 7,
+/* 中文逐项-枚举项 X1216：ncclFloat64
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：8
+ */
+               ncclFloat64    = 8, /* 中文逐项-枚举项 X1217：ncclDouble
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：8
+ */ncclDouble     = 8,
 #if defined(__CUDA_BF16_TYPES_EXIST__)
+/* 中文逐项-枚举项 X1218：ncclBfloat16
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：9
+ */
                ncclBfloat16   = 9,
+/* 中文逐项-枚举项 X1219：ncclNumTypes
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：10
+ */
                ncclNumTypes   = 10
 #else
+/* 中文逐项-枚举项 X1220：ncclNumTypes
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：9
+ */
                ncclNumTypes   = 9
 #endif
 } ncclDataType_t;
 
 /* ncclScalarResidence_t: Location and dereferencing logic for scalar arguments. */
-typedef enum {
+typedef /* 中文逐项-类型 T0399：ncclScalarResidence_t
+ * 类型职责：本作用域的状态/类别/能力枚举。命名常量固定表示法，下面逐项标明值；按使用字段判断是互斥状态还是可组合位掩码。
+ * 取值规则：显式赋值以右侧常量/位表达式为准，未显式赋值的项按C/C++枚举顺序递增；使用是否按位组合取决于消费者。
+ */enum {
   /* ncclScalarDevice: The scalar is in device-visible memory and will be
    * dereferenced while the collective is running. */
+/* 中文逐项-枚举项 X1221：ncclScalarDevice
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：0
+ */
   ncclScalarDevice = 0,
 
   /* ncclScalarHostImmediate: The scalar is in host-visible memory and will be
    * dereferenced before the ncclRedOpCreate***() function returns. */
+/* 中文逐项-枚举项 X1222：ncclScalarHostImmediate
+ * 所属枚举中的命名取值；名称表达对应状态/能力/类别，使用字段和下方值决定协议编码。
+ * 显式值：1
+ */
   ncclScalarHostImmediate = 1
 } ncclScalarResidence_t;
 
@@ -159,6 +385,11 @@ typedef enum {
  * will be dereferenced. Upon return, the newly created operator's handle
  * is stored in *op*.
  */
+/* 中文逐项-接口 X1223：ncclRedOpCreatePreMulSum
+ * 接口职责：在 communicator 中分配并保存先乘标量再求和的操作句柄，按 residence 保存值或设备指针。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclRedOpCreatePreMulSum(ncclRedOp_t *op, void *scalar, ncclDataType_t
+ * datatype, ncclScalarResidence_t residence, ncclComm_t comm);
+ */
 ncclResult_t  ncclRedOpCreatePreMulSum(ncclRedOp_t *op, void *scalar, ncclDataType_t datatype, ncclScalarResidence_t residence, ncclComm_t comm);
 ncclResult_t pncclRedOpCreatePreMulSum(ncclRedOp_t *op, void *scalar, ncclDataType_t datatype, ncclScalarResidence_t residence, ncclComm_t comm);
 
@@ -168,6 +399,10 @@ ncclResult_t pncclRedOpCreatePreMulSum(ncclRedOp_t *op, void *scalar, ncclDataTy
  * Destroys the reduction operator *op*. The operator must have been created by
  * ncclRedOpCreatePreMul with the matching communicator *comm*. An operator may be
  * destroyed as soon as the last NCCL function which is given that operator returns.
+ */
+/* 中文逐项-接口 X1224：ncclRedOpDestroy
+ * 接口职责：验证并归还用户归约句柄槽，不会销毁已在入队时复制到任务中的操作状态。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclRedOpDestroy(ncclRedOp_t op, ncclComm_t comm);
  */
 ncclResult_t ncclRedOpDestroy(ncclRedOp_t op, ncclComm_t comm);
 ncclResult_t pncclRedOpDestroy(ncclRedOp_t op, ncclComm_t comm);
@@ -196,6 +431,11 @@ ncclResult_t pncclRedOpDestroy(ncclRedOp_t op, ncclComm_t comm);
  *
  * In-place operation will happen if sendbuff == recvbuff.
  */
+/* 中文逐项-接口 X1225：ncclReduce
+ * 接口职责：沿选定通信路径把全部贡献归约到 root，其他 rank 不保证持有完整结果。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclReduce(const void* sendbuff, void* recvbuff, size_t count,
+ * ncclDataType_t datatype, ncclRedOp_t op, int root, ncclComm_t comm, cudaStream_t stream);
+ */
 ncclResult_t  ncclReduce(const void* sendbuff, void* recvbuff, size_t count, ncclDataType_t datatype,
     ncclRedOp_t op, int root, ncclComm_t comm, cudaStream_t stream);
 ncclResult_t pncclReduce(const void* sendbuff, void* recvbuff, size_t count, ncclDataType_t datatype,
@@ -209,6 +449,11 @@ ncclResult_t pncclReduce(const void* sendbuff, void* recvbuff, size_t count, ncc
  * operation is started.
  *
  * This operation is implicitely in place.
+ */
+/* 中文逐项-接口 X1226：ncclBcast
+ * 接口职责：把同一缓冲作为输入/输出转调 Broadcast，保留旧式原地 API 的兼容行为。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclBcast(void* buff, size_t count, ncclDataType_t datatype, int root,
+ * ncclComm_t comm, cudaStream_t stream);
  */
 ncclResult_t  ncclBcast(void* buff, size_t count, ncclDataType_t datatype, int root,
     ncclComm_t comm, cudaStream_t stream);
@@ -224,6 +469,11 @@ ncclResult_t pncclBcast(void* buff, size_t count, ncclDataType_t datatype, int r
  *
  * In-place operation will happen if sendbuff == recvbuff.
  */
+/* 中文逐项-接口 X1227：ncclBroadcast
+ * 接口职责：从 root 将同一输入分片流水传播到所有参与者，非 root 无需提供有效广播输入。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclBroadcast(const void* sendbuff, void* recvbuff, size_t count,
+ * ncclDataType_t datatype, int root, ncclComm_t comm, cudaStream_t stream);
+ */
 ncclResult_t  ncclBroadcast(const void* sendbuff, void* recvbuff, size_t count, ncclDataType_t datatype, int root,
     ncclComm_t comm, cudaStream_t stream);
 ncclResult_t pncclBroadcast(const void* sendbuff, void* recvbuff, size_t count, ncclDataType_t datatype, int root,
@@ -236,6 +486,11 @@ ncclResult_t pncclBroadcast(const void* sendbuff, void* recvbuff, size_t count, 
  * leaves identical copies of result on each recvbuff.
  *
  * In-place operation will happen if sendbuff == recvbuff.
+ */
+/* 中文逐项-接口 X1228：ncclAllReduce
+ * 接口职责：把每个 rank 的同尺寸输入归约为每个 rank 都持有的结果，API 先封装任务再交给统一调度。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
+ * ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream);
  */
 ncclResult_t  ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream);
@@ -252,6 +507,11 @@ ncclResult_t pncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
  * should have a size of at least nranks*recvcount elements.
  *
  * In-place operations will happen if recvbuff == sendbuff + rank * recvcount.
+ */
+/* 中文逐项-接口 X1229：ncclReduceScatter
+ * 接口职责：先归约各 rank 的完整输入，再只把属于当前用户 rank 的结果段保留在本地输出。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclReduceScatter(const void* sendbuff, void* recvbuff, size_t
+ * recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream);
  */
 ncclResult_t  ncclReduceScatter(const void* sendbuff, void* recvbuff,
     size_t recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm,
@@ -270,6 +530,11 @@ ncclResult_t pncclReduceScatter(const void* sendbuff, void* recvbuff,
  *
  * In-place operations will happen if sendbuff == recvbuff + rank * sendcount.
  */
+/* 中文逐项-接口 X1230：ncclAllGather
+ * 接口职责：收集每个 rank 的贡献到所有 rank 的输出，输出按用户 rank 分段；复制型任务不做数值求和。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcount,
+ * ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream);
+ */
 ncclResult_t  ncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcount,
     ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream);
 ncclResult_t pncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcount,
@@ -286,6 +551,11 @@ ncclResult_t pncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcou
  * This operation is blocking for the GPU. If multiple ncclSend and ncclRecv operations
  * need to progress concurrently to complete, they must be fused within a ncclGroupStart/
  * ncclGroupEnd section.
+ */
+/* 中文逐项-接口 X1231：ncclSend
+ * 接口职责：把消息按 peer 加入 P2P 排队，通过嵌套 Group 支持批量匹配发射；不在此直接执行网络发送。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype,
+ * int peer, ncclComm_t comm, cudaStream_t stream);
  */
 ncclResult_t  ncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,
     ncclComm_t comm, cudaStream_t stream);
@@ -306,6 +576,11 @@ ncclResult_t pncclSend(const void* sendbuff, size_t count, ncclDataType_t dataty
  */
 ncclResult_t pncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
     ncclComm_t comm, cudaStream_t stream);
+/* 中文逐项-接口 X1232：ncclRecv
+ * 接口职责：把匹配 peer 的接收加入 P2P 排队，实际缓冲搬运在设备原语与必要的 Proxy 中完成。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int
+ * peer, ncclComm_t comm, cudaStream_t stream);
+ */
 ncclResult_t  ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
     ncclComm_t comm, cudaStream_t stream);
 
@@ -338,6 +613,10 @@ ncclResult_t  ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, in
  * a single NCCL operation. Nothing will be started on the CUDA stream until
  * ncclGroupEnd.
  */
+/* 中文逐项-接口 X1233：ncclGroupStart
+ * 接口职责：进入线程局部 Group 嵌套，最外层首次进入时清理组任务状态。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclGroupStart();
+ */
 ncclResult_t  ncclGroupStart();
 ncclResult_t pncclGroupStart();
 
@@ -347,6 +626,10 @@ ncclResult_t pncclGroupStart();
  * End a group call. Start a fused NCCL operation consisting of all calls since
  * ncclGroupStart. Operations on the CUDA stream depending on the NCCL operations
  * need to be called after ncclGroupEnd.
+ */
+/* 中文逐项-接口 X1234：ncclGroupEnd
+ * 接口职责：最外层出口统一执行初始化、P2P 预建链、消息分块、collective 聚合、Proxy 发布和 kernel 发射。
+ * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t ncclGroupEnd();
  */
 ncclResult_t  ncclGroupEnd();
 ncclResult_t pncclGroupEnd();

@@ -14,41 +14,116 @@
  * p2p setup/connect 将映射结果填到 conn.buffs/head/tail，再由 GPU 原语访问。
  * NVLink/PCIe 是实际硬件路径，IPC 是建立地址映射的机制，两者解决的问题不同。
  */
+/* 中文逐项-类型 T0452：ncclP2pBuff
+ * 类型职责：GPU内存直接指针/IPC句柄及P2P建链策略摘要，用于导入对端分配。
+ * 声明内可见成员（含嵌套成员）：directPtr、devIpc。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 struct ncclP2pBuff {
+/* 中文逐项-变量 V4572：directPtr
+ * directPtr（void；成员 ncclP2pBuff）：同进程可直接使用的GPU指针，跨进程应经IPC导入建立自己的地址视图。
+ */
   void* directPtr;
+/* 中文逐项-变量 V4573：devIpc
+ * devIpc（cudaIpcMemHandle_t；成员 ncclP2pBuff）：可跨进程交换的CUDA内存导出句柄，与导入后本进程实际地址不同。
+ */
   cudaIpcMemHandle_t devIpc;
 };
 
+/* 中文逐项-类型 T0453：p2pConnectInfo
+ * 类型职责：GPU内存直接指针/IPC句柄及P2P建链策略摘要，用于导入对端分配。
+ * 声明内可见成员（含嵌套成员）：rank、read、p2pBuff。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 struct p2pConnectInfo {
+/* 中文逐项-变量 V4574：rank
+ * rank（int；成员 p2pConnectInfo）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ */
   int rank;
+/* 中文逐项-变量 V4575：read
+ * read（int；成员 p2pConnectInfo）：P2P/GDR方向是否采用读/拉取策略，发送读显存和接收写显存可能有不同能力条件。
+ */
   int read;
+/* 中文逐项-变量 V4576：p2pBuff
+ * p2pBuff（struct ncclP2pBuff；成员 p2pConnectInfo）：P2P GPU分配的直接指针与IPC句柄摘要，connect时转换成本进程可用映射。
+ */
   struct ncclP2pBuff p2pBuff;
 };
 static_assert(sizeof(p2pConnectInfo) <= CONNECT_SIZE, "P2P Connect info is too large");
 
+/* 中文逐项-类型 T0454：p2pSendResources
+ * 类型职责：对应方向的P2P控制区和导入映射，需按拥有分配/导入引用分别释放。
+ * 声明内可见成员（含嵌套成员）：devMem、sendMemIpc、recvMemIpc。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 struct p2pSendResources {
+/* 中文逐项-变量 V4577：devMem
+ * devMem（struct ncclSendMem；成员 p2pSendResources）：当前方向拥有的主机或设备分配，地址空间由字段名及类型共同确认。
+ */
   struct ncclSendMem* devMem;
+/* 中文逐项-变量 V4578：sendMemIpc
+ * sendMemIpc（void；成员 p2pSendResources）：P2P导入控制区的CUDA IPC映射，释放时需要关闭对应句柄。
+ */
   void* sendMemIpc;
+/* 中文逐项-变量 V4579：recvMemIpc
+ * recvMemIpc（void；成员 p2pSendResources）：P2P导入控制区的CUDA IPC映射，释放时需要关闭对应句柄。
+ */
   void* recvMemIpc;
 };
 
+/* 中文逐项-类型 T0455：p2pRecvResources
+ * 类型职责：对应方向的P2P控制区和导入映射，需按拥有分配/导入引用分别释放。
+ * 声明内可见成员（含嵌套成员）：devMem、sendMemIpc、recvMemIpc。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
+ */
 struct p2pRecvResources {
+/* 中文逐项-变量 V4580：devMem
+ * devMem（struct ncclRecvMem；成员 p2pRecvResources）：当前方向拥有的主机或设备分配，地址空间由字段名及类型共同确认。
+ */
   struct ncclRecvMem* devMem;
+/* 中文逐项-变量 V4581：sendMemIpc
+ * sendMemIpc（void；成员 p2pRecvResources）：P2P导入控制区的CUDA IPC映射，释放时需要关闭对应句柄。
+ */
   void* sendMemIpc;
+/* 中文逐项-变量 V4582：recvMemIpc
+ * recvMemIpc（void；成员 p2pRecvResources）：P2P导入控制区的CUDA IPC映射，释放时需要关闭对应句柄。
+ */
   void* recvMemIpc;
 };
 
 #include <sys/types.h>
 
 /* Convert a PCI busId string into a local cudaDev device index (cf. CUDA_VISIBLE_DEVICES) */
+/* 中文逐项-函数 F1153：busIdToCudaDev
+ * 用途与位置：把 GPU PCI busId 映射到本进程 CUDA_VISIBLE_DEVICES 下可见设备序号。
+ * 参数 busId（int64_t busId）：PCI BDF 的整数标识，用于将 CUDA、NVML 与拓扑中的同一设备关联。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/transport/p2p.cc::p2pCanConnect。
+ * 本体直接出现的调用/包装：NCCLCHECK；busIdToInt64；cudaDeviceGetPCIBusId；cudaGetDeviceCount。
+ * 需要对照的边界/推进条件：cudaGetDeviceCount(&ndev) != cudaSuccess；i < ndev；cudaDeviceGetPCIBusId(devBusIdStr,
+ * NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE, i) != cudaSuccess；busId == devBusId。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return -1;；return i;。CHECK类宏还可能提前返回/跳转。
+ */
 static int busIdToCudaDev(int64_t busId) {
+/* 中文逐项-变量 V4583：ndev
+ * ndev（int；函数 busIdToCudaDev 内）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 此处未显式给初值；后续首个文本使用点：if (cudaGetDeviceCount(&ndev) != cudaSuccess)。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int ndev;
   if (cudaGetDeviceCount(&ndev) != cudaSuccess)
     return -1;
-  for (int i = 0; i < ndev; i++) {
+  for (/* 中文逐项-变量 V4584：i
+ * i（int；函数 busIdToCudaDev 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i < ndev；循环体与增量表达式决定每轮如何推进。
+ */int i = 0; i < ndev; i++) {
+/* 中文逐项-变量 V4585：devBusIdStr
+ * devBusIdStr（char；函数 busIdToCudaDev 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：if (cudaDeviceGetPCIBusId(devBusIdStr, NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE, i) !=
+ * cudaSuccess)。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     char devBusIdStr[NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE];
     if (cudaDeviceGetPCIBusId(devBusIdStr, NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE, i) != cudaSuccess)
       return -1;
+/* 中文逐项-变量 V4586：devBusId
+ * devBusId（int64_t；函数 busIdToCudaDev 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(busIdToInt64(devBusIdStr, &devBusId));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     int64_t devBusId;
     NCCLCHECK(busIdToInt64(devBusIdStr, &devBusId));
     if (busId == devBusId) return i;
@@ -62,6 +137,19 @@ static int busIdToCudaDev(int64_t busId) {
  * 判断两个 GPU 是否能走 P2P，包括拓扑、CUDA peer access/IPC 能力等条件。
  * 这里的 GPU P2P transport 与公开 ncclSend/ncclRecv 的点对点语义不是同一个层次。
  */
+/* 中文逐项-函数 F1154：p2pCanConnect
+ * 用途与位置：检查同机/共享环境、拓扑策略、CUDA peer access 与 IPC 支持，决定能否走 GPU P2P transport。
+ * 参数 ret（int* ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 参数 topo（struct ncclTopoSystem* topo）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 graph（struct ncclTopoGraph* graph）：通信搜索图或 CUDA Graph 句柄；请按声明类型区分两个不同层次的图。
+ * 参数 info1（struct ncclPeerInfo* info1）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 info2（struct ncclPeerInfo* info2）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；busIdToCudaDev；cudaDeviceCanAccessPeer；cudaFree；cudaIpcGetMemHandle；ncclCudaCalloc；ncclTopoCheckP2p。
+ * 需要对照的边界/推进条件：info1->hostHash != info2->hostHash || info1->shmDev != info2->shmDev；*ret == 0；intermediateRank !=
+ * -1；cudaDev1 == -1 || cudaDev2 == -1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t p2pCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTopoGraph* graph, struct ncclPeerInfo* info1, struct ncclPeerInfo* info2) {
   // Rule out different nodes / isolated containers
   if (info1->hostHash != info2->hostHash || info1->shmDev != info2->shmDev) {
@@ -70,13 +158,26 @@ ncclResult_t p2pCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTop
   }
 
   // Check topology / p2p level.
+/* 中文逐项-变量 V4587：intermediateRank
+ * intermediateRank（int；函数 p2pCanConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCheckP2p(topo, info1->busId, info2->busId, ret, NULL,
+ * &intermediateRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int intermediateRank;
   NCCLCHECK(ncclTopoCheckP2p(topo, info1->busId, info2->busId, ret, NULL, &intermediateRank));
   if (*ret == 0) return ncclSuccess;
   if (intermediateRank != -1) return ncclSuccess;
 
   // Convert the peer's busId into a local cudaDev index (cf. CUDA_VISIBLE_DEVICES)
+/* 中文逐项-变量 V4588：cudaDev1
+ * cudaDev1（int；函数 p2pCanConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 cudaDev1 = busIdToCudaDev(info1->busId)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int cudaDev1 = busIdToCudaDev(info1->busId);
+/* 中文逐项-变量 V4589：cudaDev2
+ * cudaDev2（int；函数 p2pCanConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 cudaDev2 = busIdToCudaDev(info2->busId)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int cudaDev2 = busIdToCudaDev(info2->busId);
   if (cudaDev1 == -1 || cudaDev2 == -1) {
 #if CUDART_VERSION >= 10010
@@ -90,6 +191,10 @@ ncclResult_t p2pCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTop
   }
 
   // Check that CUDA can do P2P
+/* 中文逐项-变量 V4590：p2p
+ * p2p（int；函数 p2pCanConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：if (cudaDeviceCanAccessPeer(&p2p, cudaDev1, cudaDev2) != cudaSuccess) {。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int p2p;
   if (cudaDeviceCanAccessPeer(&p2p, cudaDev1, cudaDev2) != cudaSuccess) {
     INFO(NCCL_INIT|NCCL_P2P,"peer query failed between dev %d(=%lx) and dev %d(=%lx)",
@@ -100,13 +205,25 @@ ncclResult_t p2pCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTop
 
   if (p2p != 0) {
     // Cached result of the legacyIPC detection
+/* 中文逐项-变量 V4591：legacyIPC
+ * legacyIPC（int；函数 p2pCanConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 legacyIPC = -1；以该实现约定的无效/未选择值起步，后续检查后才可作为合法索引使用。
+ */
     static int legacyIPC = -1;
     if (legacyIPC >= 0) {
       *ret = legacyIPC;
       return ncclSuccess;
     }
     // Check that legacy IPC support is available (WSL WAR)
+/* 中文逐项-变量 V4592：dummy
+ * dummy（char；函数 p2pCanConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCudaCalloc(&dummy, CUDA_IPC_MIN));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     char *dummy;
+/* 中文逐项-变量 V4593：ipc
+ * ipc（cudaIpcMemHandle_t；函数 p2pCanConnect 内）：可跨进程交换的CUDA内存导出句柄，与导入后本进程实际地址不同。
+ * 此处未显式给初值；后续首个文本使用点：if (cudaIpcGetMemHandle(&ipc, dummy) != cudaSuccess) {。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     cudaIpcMemHandle_t ipc;
     NCCLCHECK(ncclCudaCalloc(&dummy, CUDA_IPC_MIN));
     if (cudaIpcGetMemHandle(&ipc, dummy) != cudaSuccess) {
@@ -127,6 +244,10 @@ ncclResult_t p2pCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTop
   return ncclSuccess;
 }
 
+/* 中文逐项-宏 M0160：TRACE_DUMP_IPC
+ * 宏职责：用下面的参数与展开式生成编译期表达式/调用包装；调用实参会原样替换，必须注意括号、求值次数及返回/跳转副作用。
+ * 原始宏名 TRACE_DUMP_IPC；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
+ */
 #define TRACE_DUMP_IPC(DEVIPC)                                                             \
   do {                                                                                     \
     unsigned long *devIpc = (unsigned long *) (DEVIPC);                                    \
@@ -136,15 +257,46 @@ ncclResult_t p2pCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTop
 
 
 // Setting this to non zero causes P2P to use Reads rather than Writes
+/* 中文逐项-参数getter P0054：P2pReadEnable
+ * 生成函数 ncclParamP2pReadEnable()，读取 NCCL_P2P_READ_ENABLE，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(P2pReadEnable, "P2P_READ_ENABLE", -2);
+/* 中文逐项-参数getter P0055：P2pDirectDisable
+ * 生成函数 ncclParamP2pDirectDisable()，读取 NCCL_P2P_DIRECT_DISABLE，编译默认值为 0。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(P2pDirectDisable, "P2P_DIRECT_DISABLE", 0);
 
+/* 中文逐项-函数 F1155：p2pGetInfo
+ * 用途与位置：查询 GPU 对的 P2P 可达性、读写模式及可能的中间 rank，把拓扑结果提供给 setup。
+ * 参数 topo（struct ncclTopoSystem* topo）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
+ * 参数 info1（struct ncclPeerInfo* info1）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 info2（struct ncclPeerInfo* info2）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 read（int* read）：P2P/GDR方向是否采用读/拉取策略，发送读显存和接收写显存可能有不同能力条件。
+ * 参数 intermediateRank（int* intermediateRank）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/transport/p2p.cc::p2pSendSetup；src/transport/p2p.cc::p2pRecvSetup。
+ * 本体直接出现的调用/包装：NCCLCHECK；ncclParamP2pReadEnable；ncclTopoCheckP2p。
+ * 需要对照的边界/推进条件：readEnable != -2。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t p2pGetInfo(struct ncclTopoSystem* topo, struct ncclPeerInfo* info1, struct ncclPeerInfo* info2, int* read, int* intermediateRank) {
+/* 中文逐项-变量 V4594：p2p
+ * p2p（int；函数 p2pGetInfo 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclTopoCheckP2p(topo, info1->busId, info2->busId, &p2p, read,
+ * intermediateRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int p2p;
   // Queries the topology to see if the GPUs are Ampere and
   // connected via NVLink, if so we enable P2P Read by default
   NCCLCHECK(ncclTopoCheckP2p(topo, info1->busId, info2->busId, &p2p, read, intermediateRank));
 
+/* 中文逐项-变量 V4595：readEnable
+ * readEnable（int；函数 p2pGetInfo 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 readEnable = ncclParamP2pReadEnable()；调用对应接口取得结果；成功、容量与生命周期要按该接口返回契约判断。
+ */
   int readEnable = ncclParamP2pReadEnable();
   if (readEnable != -2) *read = readEnable;
   return ncclSuccess;
@@ -154,10 +306,27 @@ static ncclResult_t p2pGetInfo(struct ncclTopoSystem* topo, struct ncclPeerInfo*
  * 把对端 GPU 缓冲区映射到本进程可用的设备地址，同进程直连与跨进程 CUDA IPC 分开处理。
  * 跨进程交换 IPC handle 后在本地打开映射，不是把另一个进程的裸虚拟地址直接拿来解引用。
  */
+/* 中文逐项-函数 F1156：p2pMap
+ * 用途与位置：同进程直接使用/启用 peer 访问，跨进程打开 CUDA IPC 句柄得到本进程可用映射。
+ * 参数 myInfo（struct ncclPeerInfo* myInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 peerInfo（struct ncclPeerInfo* peerInfo）：初始化收集的参与者身份和能力摘要表，用于建图与选择传输。
+ * 参数 p2pBuff（struct ncclP2pBuff* p2pBuff）：P2P GPU分配的直接指针与IPC句柄摘要，connect时转换成本进程可用映射。
+ * 参数 devMem（void** devMem）：当前方向拥有的主机或设备分配，地址空间由字段名及类型共同确认。
+ * 参数 ipcPtr（void** ipcPtr）：对应数据或控制字段的缓存地址，先确认主机/设备地址空间，再看后续读写位置。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/transport/p2p.cc::p2pSendSetup；src/transport/p2p.cc::p2pRecvSetup；src/transport/p2p.cc::p2pSendConnect；src/transport/p2p.cc::p2pRecvConnect。
+ * 本体直接出现的调用/包装：CUDACHECK；cudaDeviceEnablePeerAccess；cudaGetErrorString；cudaGetLastError；cudaIpcOpenMemHandle。
+ * 需要对照的边界/推进条件：myInfo->pidHash == peerInfo->pidHash；peerInfo->cudaDev != myInfo->cudaDev；err ==
+ * cudaErrorPeerAccessAlreadyEnabled；err != cudaSuccess。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInternalError;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t p2pMap(struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclP2pBuff* p2pBuff, void** devMem, void** ipcPtr) {
   if (myInfo->pidHash == peerInfo->pidHash) {
     if (peerInfo->cudaDev != myInfo->cudaDev) {
       // Enable P2P access
+/* 中文逐项-变量 V4596：err
+ * err（cudaError_t；函数 p2pMap 内）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 初值/来源 err = cudaDeviceEnablePeerAccess(peerInfo->cudaDev, 0)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
       cudaError_t err = cudaDeviceEnablePeerAccess(peerInfo->cudaDev, 0);
       if (err == cudaErrorPeerAccessAlreadyEnabled) {
         cudaGetLastError();
@@ -177,21 +346,61 @@ static ncclResult_t p2pMap(struct ncclPeerInfo* myInfo, struct ncclPeerInfo* pee
 }
 
 /* Send: Create and return connect structures for this peer to connect to me */
+/* 中文逐项-函数 F1157：p2pSendSetup
+ * 用途与位置：按方向分配/导出 GPU P2P 控制和协议缓冲，必要时借助中间 GPU 代理准备资源。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 graph（struct ncclTopoGraph* graph）：通信搜索图或 CUDA Graph 句柄；请按声明类型区分两个不同层次的图。
+ * 参数 myInfo（struct ncclPeerInfo* myInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 peerInfo（struct ncclPeerInfo* peerInfo）：初始化收集的参与者身份和能力摘要表，用于建图与选择传输。
+ * 参数 connectInfo（struct ncclConnect* connectInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 send（struct ncclConnector* send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 参数 channelId（int channelId）：实际 channels 数组下标；与一次操作内的分片编号 bid 区分。
+ * 参数 connIndex（int connIndex）：同一 peer/方向内的连接槽编号；本版普通集合用0，常规 P2P 用1。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：ALIGN_SIZE；NCCLCHECK；ncclCalloc；ncclParamP2pDirectDisable；ncclProxyCall；ncclProxyConnect；p2pGetInfo；p2pMap。
+ * 需要对照的边界/推进条件：graph && connIndex == 1；info->read；intermediateRank == -1；myInfo->pidHash ==
+ * peerInfo->pidHash。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t p2pSendSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo,
     struct ncclConnect* connectInfo, struct ncclConnector* send, int channelId, int connIndex) {
+/* 中文逐项-变量 V4597：resources
+ * resources（struct p2pSendResources；函数 p2pSendSetup 内）：具体 transport 私有资源；先依据实际后端类型再读取其中成员。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&resources, 1));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct p2pSendResources* resources;
   NCCLCHECK(ncclCalloc(&resources, 1));
   send->transportResources = resources;
+/* 中文逐项-变量 V4598：useRead、intermediateRank
+ * useRead（int；函数 p2pSendSetup 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead,
+ * &intermediateRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * intermediateRank（int；函数 p2pSendSetup 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead,
+ * &intermediateRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int useRead, intermediateRank;
   NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead, &intermediateRank));
 
   static_assert(sizeof(struct p2pConnectInfo) <= sizeof(struct ncclConnect), "p2p Connect Info is too big");
+/* 中文逐项-变量 V4599：info
+ * info（struct p2pConnectInfo；函数 p2pSendSetup 内）：当前函数处理的任务/属性描述对象，按ncclInfo、PeerInfo、QP信息或XML类型区分其所属阶段。
+ * 初值/来源 info = (struct p2pConnectInfo*)connectInfo；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;
   info->read = useRead;
   // For CollNet, use write for scatter-reduce (conn 1), read for broadcast-gather (conn 0)
   if (graph && connIndex == 1) info->read = 0;
+/* 中文逐项-变量 V4600：useReadStr
+ * useReadStr（char；函数 p2pSendSetup 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 useReadStr = info->read ? "/read" : ""；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   const char* useReadStr = info->read ? "/read" : "";
 
+/* 中文逐项-变量 V4601：sendSize
+ * sendSize（int；函数 p2pSendSetup 内）：当前对象或片段的容量，初始化式中的sizeof/乘除关系确定字节或元素单位。
+ * 初值/来源 sendSize = sizeof(struct ncclSendMem)；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
   int sendSize = sizeof(struct ncclSendMem);
   // For P2P Read the SIMPLE buffer is tagged on the end of the ncclSendMem structure
   if (info->read) sendSize += send->comm->buffSizes[NCCL_PROTO_SIMPLE];
@@ -223,23 +432,63 @@ ncclResult_t p2pSendSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, st
 }
 
 /* Create and return connect structures for this peer to connect to me */
+/* 中文逐项-函数 F1158：p2pRecvSetup
+ * 用途与位置：按方向分配/导出 GPU P2P 控制和协议缓冲，必要时借助中间 GPU 代理准备资源。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 graph（struct ncclTopoGraph* graph）：通信搜索图或 CUDA Graph 句柄；请按声明类型区分两个不同层次的图。
+ * 参数 myInfo（struct ncclPeerInfo* myInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 peerInfo（struct ncclPeerInfo* peerInfo）：初始化收集的参与者身份和能力摘要表，用于建图与选择传输。
+ * 参数 connectInfo（struct ncclConnect* connectInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 recv（struct ncclConnector * recv）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 参数 channelId（int channelId）：实际 channels 数组下标；与一次操作内的分片编号 bid 区分。
+ * 参数 connIndex（int connIndex）：同一 peer/方向内的连接槽编号；本版普通集合用0，常规 P2P 用1。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：ALIGN_SIZE；NCCLCHECK；ncclCalloc；ncclParamP2pDirectDisable；ncclProxyCall；ncclProxyConnect；p2pGetInfo；p2pMap。
+ * 需要对照的边界/推进条件：graph && connIndex == 1；p<NCCL_NUM_PROTOCOLS；!(info->read && p == NCCL_PROTO_SIMPLE；intermediateRank
+ * == -1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t p2pRecvSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo,
     struct ncclConnect* connectInfo, struct ncclConnector * recv, int channelId, int connIndex) {
+/* 中文逐项-变量 V4602：resources
+ * resources（struct p2pRecvResources；函数 p2pRecvSetup 内）：具体 transport 私有资源；先依据实际后端类型再读取其中成员。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&resources, 1));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct p2pRecvResources* resources;
   NCCLCHECK(ncclCalloc(&resources, 1));
   recv->transportResources = resources;
+/* 中文逐项-变量 V4603：useRead、intermediateRank
+ * useRead（int；函数 p2pRecvSetup 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead,
+ * &intermediateRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * intermediateRank（int；函数 p2pRecvSetup 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead,
+ * &intermediateRank));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int useRead, intermediateRank;
   NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead, &intermediateRank));
 
   static_assert(sizeof(struct p2pConnectInfo) <= sizeof(struct ncclConnect), "p2p Connect Info is too big");
+/* 中文逐项-变量 V4604：info
+ * info（struct p2pConnectInfo；函数 p2pRecvSetup 内）：当前函数处理的任务/属性描述对象，按ncclInfo、PeerInfo、QP信息或XML类型区分其所属阶段。
+ * 初值/来源 info = (struct p2pConnectInfo*)connectInfo；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;
   info->read = useRead;
   // For CollNet, use write for scatter-reduce (conn 1), read for broadcast-gather (conn 0)
   if (graph && connIndex == 1) info->read = 0;
 
+/* 中文逐项-变量 V4605：recvSize
+ * recvSize（int；函数 p2pRecvSetup 内）：当前对象或片段的容量，初始化式中的sizeof/乘除关系确定字节或元素单位。
+ * 初值/来源 recvSize = sizeof(struct ncclRecvMem)；通过类型字节宽度换算元素、物理字节或对齐粒度，单位按完整乘除表达式确认。
+ */
   int recvSize = sizeof(struct ncclRecvMem);
   // For P2P Read the SIMPLE buffer is tagged on the end of the ncclSendMem structure
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) if (!(info->read && p == NCCL_PROTO_SIMPLE)) recvSize += recv->comm->buffSizes[p];
+  for (/* 中文逐项-变量 V4606：p
+ * p（int；函数 p2pRecvSetup 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<NCCL_NUM_PROTOCOLS；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<NCCL_NUM_PROTOCOLS; p++) if (!(info->read && p == NCCL_PROTO_SIMPLE)) recvSize += recv->comm->buffSizes[p];
   ALIGN_SIZE(recvSize, CUDA_IPC_MIN);
 
   if (intermediateRank == -1) {
@@ -261,15 +510,48 @@ ncclResult_t p2pRecvSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, st
 }
 
 /* Connect/Send to this peer */
+/* 中文逐项-函数 F1159：p2pSendConnect
+ * 用途与位置：导入对端 GPU 分配并填充协议缓冲、head/tail 和直接访问指针交换区。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 connectInfo（struct ncclConnect* connectInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 nranks（int nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 send（struct ncclConnector* send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；p2pMap。
+ * 需要对照的边界/推进条件：p<NCCL_NUM_PROTOCOLS；info->read && p == NCCL_PROTO_SIMPLE。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t p2pSendConnect(struct ncclComm* comm, struct ncclConnect* connectInfo, int nranks, int rank, struct ncclConnector* send) {
+/* 中文逐项-变量 V4607：resources
+ * resources（struct p2pSendResources；函数 p2pSendConnect 内）：具体 transport 私有资源；先依据实际后端类型再读取其中成员。
+ * 初值/来源 resources = (struct p2pSendResources*)send->transportResources；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct p2pSendResources* resources = (struct p2pSendResources*)send->transportResources;
+/* 中文逐项-变量 V4608：remDevMem
+ * remDevMem（struct ncclRecvMem；函数 p2pSendConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(p2pMap(comm->peerInfo+rank, comm->peerInfo+info->rank, &info->p2pBuff,
+ * (void**)&remDevMem, &resources->recvMemIpc));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclRecvMem* remDevMem;
+/* 中文逐项-变量 V4609：info
+ * info（struct p2pConnectInfo；函数 p2pSendConnect 内）：当前函数处理的任务/属性描述对象，按ncclInfo、PeerInfo、QP信息或XML类型区分其所属阶段。
+ * 初值/来源 info = (struct p2pConnectInfo*)connectInfo；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;
 
   NCCLCHECK(p2pMap(comm->peerInfo+rank, comm->peerInfo+info->rank, &info->p2pBuff, (void**)&remDevMem, &resources->recvMemIpc));
 
+/* 中文逐项-变量 V4610：buff
+ * buff（char；函数 p2pSendConnect 内）：当前工作范围的缓冲起点；P2P 任务通常已经按 Int8 把 count 归一为字节。
+ * 初值/来源 buff = (char*)(remDevMem+1)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   char* buff = (char*)(remDevMem+1);
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
+  for (/* 中文逐项-变量 V4611：p
+ * p（int；函数 p2pSendConnect 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<NCCL_NUM_PROTOCOLS；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
     if (info->read && p == NCCL_PROTO_SIMPLE) {
       /* For P2P Read the SIMPLE buffer is local (ncclSendMem) */
       send->conn.buffs[p] = (char*)(resources->devMem+1);
@@ -286,15 +568,48 @@ static ncclResult_t p2pSendConnect(struct ncclComm* comm, struct ncclConnect* co
 }
 
 /* Connect/Recv from this peer */
+/* 中文逐项-函数 F1160：p2pRecvConnect
+ * 用途与位置：导入对端 GPU 分配并填充协议缓冲、head/tail 和直接访问指针交换区。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 connectInfo（struct ncclConnect* connectInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 nranks（int nranks）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 参数 recv（struct ncclConnector* recv）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：NCCLCHECK；p2pMap。
+ * 需要对照的边界/推进条件：p<NCCL_NUM_PROTOCOLS；info->read && p == NCCL_PROTO_SIMPLE。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t p2pRecvConnect(struct ncclComm* comm, struct ncclConnect* connectInfo, int nranks, int rank, struct ncclConnector* recv) {
+/* 中文逐项-变量 V4612：resources
+ * resources（struct p2pRecvResources；函数 p2pRecvConnect 内）：具体 transport 私有资源；先依据实际后端类型再读取其中成员。
+ * 初值/来源 resources = (struct p2pRecvResources*)recv->transportResources；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct p2pRecvResources* resources = (struct p2pRecvResources*)recv->transportResources;
+/* 中文逐项-变量 V4613：remDevMem
+ * remDevMem（struct ncclSendMem；函数 p2pRecvConnect 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(p2pMap(comm->peerInfo+rank, comm->peerInfo+info->rank, &info->p2pBuff,
+ * (void**)&remDevMem, &resources->sendMemIpc));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   struct ncclSendMem* remDevMem;
+/* 中文逐项-变量 V4614：info
+ * info（struct p2pConnectInfo；函数 p2pRecvConnect 内）：当前函数处理的任务/属性描述对象，按ncclInfo、PeerInfo、QP信息或XML类型区分其所属阶段。
+ * 初值/来源 info = (struct p2pConnectInfo*)connectInfo；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;
 
   NCCLCHECK(p2pMap(comm->peerInfo+rank, comm->peerInfo+info->rank, &info->p2pBuff, (void**)&remDevMem, &resources->sendMemIpc));
 
+/* 中文逐项-变量 V4615：buff
+ * buff（char；函数 p2pRecvConnect 内）：当前工作范围的缓冲起点；P2P 任务通常已经按 Int8 把 count 归一为字节。
+ * 初值/来源 buff = (char*)(resources->devMem+1)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   char* buff = (char*)(resources->devMem+1);
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
+  for (/* 中文逐项-变量 V4616：p
+ * p（int；函数 p2pRecvConnect 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 p = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：p<NCCL_NUM_PROTOCOLS；循环体与增量表达式决定每轮如何推进。
+ */int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
     if (info->read && p == NCCL_PROTO_SIMPLE) {
       /* For P2P Read the SIMPLE buffer is remote (ncclSendMem) */
       recv->conn.buffs[p] = (char*)(remDevMem+1);
@@ -310,7 +625,19 @@ ncclResult_t p2pRecvConnect(struct ncclComm* comm, struct ncclConnect* connectIn
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1161：p2pSendFree
+ * 用途与位置：关闭导入的 IPC 映射并归还拥有的 GPU 分配或代理资源。
+ * 参数 send（struct ncclConnector* send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：CUDACHECK；cudaIpcCloseMemHandle；free。
+ * 需要对照的边界/推进条件：resources->sendMemIpc；resources->recvMemIpc。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t p2pSendFree(struct ncclConnector* send) {
+/* 中文逐项-变量 V4617：resources
+ * resources（struct p2pSendResources；函数 p2pSendFree 内）：具体 transport 私有资源；先依据实际后端类型再读取其中成员。
+ * 初值/来源 resources = (struct p2pSendResources*)send->transportResources；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct p2pSendResources* resources = (struct p2pSendResources*)send->transportResources;
   if (resources->sendMemIpc) CUDACHECK(cudaIpcCloseMemHandle(resources->sendMemIpc));
   if (resources->recvMemIpc) CUDACHECK(cudaIpcCloseMemHandle(resources->recvMemIpc));
@@ -318,7 +645,19 @@ ncclResult_t p2pSendFree(struct ncclConnector* send) {
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1162：p2pRecvFree
+ * 用途与位置：关闭导入的 IPC 映射并归还拥有的 GPU 分配或代理资源。
+ * 参数 recv（struct ncclConnector* recv）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：CUDACHECK；cudaIpcCloseMemHandle；free。
+ * 需要对照的边界/推进条件：resources->sendMemIpc；resources->recvMemIpc。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t p2pRecvFree(struct ncclConnector* recv) {
+/* 中文逐项-变量 V4618：resources
+ * resources（struct p2pRecvResources；函数 p2pRecvFree 内）：具体 transport 私有资源；先依据实际后端类型再读取其中成员。
+ * 初值/来源 resources = (struct p2pRecvResources*)recv->transportResources；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct p2pRecvResources* resources = (struct p2pRecvResources*)recv->transportResources;
   if (resources->sendMemIpc) CUDACHECK(cudaIpcCloseMemHandle(resources->sendMemIpc));
   if (resources->recvMemIpc) CUDACHECK(cudaIpcCloseMemHandle(resources->recvMemIpc));
@@ -326,13 +665,39 @@ ncclResult_t p2pRecvFree(struct ncclConnector* recv) {
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1163：p2pProxySetup
+ * 用途与位置：由资源所属代理分配/导出 GPU 内存，供主线程建立 P2P/中间 GPU 路径。
+ * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 reqBuff（void* reqBuff）：代理控制请求/回复的字节长度和缓冲；属于建链等控制RPC，不是完整张量。
+ * 参数 reqSize（int reqSize）：代理控制请求/回复的字节长度和缓冲；属于建链等控制RPC，不是完整张量。
+ * 参数 respBuff（void* respBuff）：代理控制请求/回复的字节长度和缓冲；属于建链等控制RPC，不是完整张量。
+ * 参数 respSize（int respSize）：代理控制请求/回复的字节长度和缓冲；属于建链等控制RPC，不是完整张量。
+ * 参数 done（int* done）：完成状态输出地址；实现写1表示当前异步请求已完成，写0表示还要继续推进，不能把它当成已传输字节数。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；cudaFree；cudaGetErrorString；cudaIpcGetMemHandle；free；ncclCudaCalloc。
+ * 需要对照的边界/推进条件：reqSize != sizeof(int；respSize != sizeof(struct ncclP2pBuff；res != cudaSuccess。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclInternalError;；return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t p2pProxySetup(struct ncclProxyConnection* connection, struct ncclComm* comm, void* reqBuff, int reqSize, void* respBuff, int respSize, int* done) {
   if (reqSize != sizeof(int)) return ncclInternalError;
+/* 中文逐项-变量 V4619：size
+ * size（int；函数 p2pProxySetup 内）：当前对象/消息范围的尺寸；按声明及初始化式辨认字节数、元素数或条目数。
+ * 初值/来源 size = *((int*)reqBuff)；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   int size = *((int*)reqBuff);
   if (respSize != sizeof(struct ncclP2pBuff)) return ncclInternalError;
+/* 中文逐项-变量 V4620：p2pBuff
+ * p2pBuff（struct ncclP2pBuff；函数 p2pProxySetup 内）：P2P GPU分配的直接指针与IPC句柄摘要，connect时转换成本进程可用映射。
+ * 初值/来源 p2pBuff = (struct ncclP2pBuff*)respBuff；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   struct ncclP2pBuff* p2pBuff = (struct ncclP2pBuff*)respBuff;
   NCCLCHECK(ncclCudaCalloc((char**)&p2pBuff->directPtr, size));
   connection->transportResources = p2pBuff->directPtr;
+/* 中文逐项-变量 V4621：res
+ * res（cudaError_t；函数 p2pProxySetup 内）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
+ * 初值/来源 res = cudaIpcGetMemHandle(&p2pBuff->devIpc, p2pBuff->directPtr)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   cudaError_t res = cudaIpcGetMemHandle(&p2pBuff->devIpc, p2pBuff->directPtr);
   if (res != cudaSuccess) {
     WARN("cudaIpcGetMemHandle failed : %s", cudaGetErrorString(res));
@@ -344,12 +709,26 @@ static ncclResult_t p2pProxySetup(struct ncclProxyConnection* connection, struct
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F1164：p2pProxyFree
+ * 用途与位置：由拥有分配的代理回收 P2P GPU 资源，与映射导入方的解除映射分工。
+ * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
+ * 本体直接出现的调用/包装：cudaFree。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t p2pProxyFree(struct ncclProxyConnection* connection, struct ncclComm* comm) {
   // Do not check return code as CUDA may have already shut down
   cudaFree(connection->transportResources);
   return ncclSuccess;
 }
 
+/* 中文逐项-变量 V4622：p2pTransport
+ * p2pTransport（struct ncclTransport；文件/静态存储作用域）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 p2pTransport = { "P2P", p2pCanConnect, { p2pSendSetup, p2pSendConnect, p2pSendFree, NULL, p2pProxySetup,
+ * NULL, p2pProxyFree, NULL }, { p2pRecvSetup, p2pRecvConnect, p2pRecvFree, NULL, p2pProxySetup, NULL, p2pProxyFree,
+ * NULL } }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
+ */
 struct ncclTransport p2pTransport = {
   "P2P",
   p2pCanConnect,

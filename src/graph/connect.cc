@@ -20,29 +20,84 @@
  * 各 rank 交换该摘要后，Postset 才知道每台机器应与哪些远端端点拼接。
  * 先本地搜索、后全局拼接，避免每个 rank 独立猜测一个互不一致的完整集群拓扑。
  */
+/* 中文逐项-函数 F0429：ncclTopoPreset
+ * 用途与位置：将本机搜索图转成可交换的局部环/树端点摘要，为跨节点拼接准备元数据。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 treeGraph（struct ncclTopoGraph* treeGraph）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 ringGraph（struct ncclTopoGraph* ringGraph）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 topoRanks（struct ncclTopoRanks* topoRanks）：该rank的局部拓扑端点摘要，初始化AllGather后供全局Ring/Tree拼接。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：memcpy。
+ * 需要对照的边界/推进条件：c<nChannels；i<NCCL_MAX_TREE_ARITY；i<NCCL_MAX_DIRECT_ARITY；i<NCCL_MAX_DIRECT_ARITY。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoPreset(struct ncclComm* comm,
     struct ncclTopoGraph* treeGraph, struct ncclTopoGraph* ringGraph,
     struct ncclTopoRanks* topoRanks) {
+/* 中文逐项-变量 V1075：rank
+ * rank（int；函数 ncclTopoPreset 内）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 初值/来源 rank = comm->rank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int rank = comm->rank;
+/* 中文逐项-变量 V1076：localRanks
+ * localRanks（int；函数 ncclTopoPreset 内）：当前节点内参与此 communicator 的 rank 数。
+ * 初值/来源 localRanks = comm->topo->nodes[GPU].count；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int localRanks = comm->topo->nodes[GPU].count;
+/* 中文逐项-变量 V1077：nChannels
+ * nChannels（int；函数 ncclTopoPreset 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = comm->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nChannels = comm->nChannels;
 
-  for (int c=0; c<nChannels; c++) {
+  for (/* 中文逐项-变量 V1078：c
+ * c（int；函数 ncclTopoPreset 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<nChannels; c++) {
+/* 中文逐项-变量 V1079：channel
+ * channel（struct ncclChannel；函数 ncclTopoPreset 内）：当前逻辑通信流水线对象，包含邻居、连接表和工作 FIFO。
+ * 初值/来源 channel = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclChannel* channel = comm->channels+c;
     channel->ring.prev = channel->ring.next = -1;
     channel->tree.up = -1;
-    for (int i=0; i<NCCL_MAX_TREE_ARITY; i++) channel->tree.down[i] = -1;
+    for (/* 中文逐项-变量 V1080：i
+ * i（int；函数 ncclTopoPreset 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<NCCL_MAX_TREE_ARITY；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<NCCL_MAX_TREE_ARITY; i++) channel->tree.down[i] = -1;
     channel->collTree.out = -1;
     channel->collTree.headRank = -1;
     channel->collTree.nHeads = 0;
     channel->collTree.shift = 0;
-    for (int i=0; i<NCCL_MAX_DIRECT_ARITY; i++) channel->collTree.up[i] = -1;
-    for (int i=0; i<NCCL_MAX_DIRECT_ARITY; i++) channel->collTree.down[i] = -1;
+    for (/* 中文逐项-变量 V1081：i
+ * i（int；函数 ncclTopoPreset 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<NCCL_MAX_DIRECT_ARITY；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<NCCL_MAX_DIRECT_ARITY; i++) channel->collTree.up[i] = -1;
+    for (/* 中文逐项-变量 V1082：i
+ * i（int；函数 ncclTopoPreset 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<NCCL_MAX_DIRECT_ARITY；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<NCCL_MAX_DIRECT_ARITY; i++) channel->collTree.down[i] = -1;
 
+/* 中文逐项-变量 V1083：ringIntra
+ * ringIntra（int；函数 ncclTopoPreset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 ringIntra = ringGraph->intra+c*localRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int* ringIntra = ringGraph->intra+c*localRanks;
+/* 中文逐项-变量 V1084：treeIntra
+ * treeIntra（int；函数 ncclTopoPreset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 treeIntra = treeGraph->intra+c*localRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int* treeIntra = treeGraph->intra+c*localRanks;
 
-    for (int i=0; i<localRanks; i++) {
+    for (/* 中文逐项-变量 V1085：i
+ * i（int；函数 ncclTopoPreset 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<localRanks；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<localRanks; i++) {
       if (ringIntra[i] == rank) {
         topoRanks->ringRecv[c] = ringIntra[0];
         topoRanks->ringSend[c] = ringIntra[localRanks-1];
@@ -50,8 +105,20 @@ ncclResult_t ncclTopoPreset(struct ncclComm* comm,
         channel->ring.next = (i == localRanks-1) ? -1 : ringIntra[i+1];
       }
       if (treeIntra[i] == rank) {
+/* 中文逐项-变量 V1086：parentIndex
+ * parentIndex（int；函数 ncclTopoPreset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 parentIndex = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
         int parentIndex = 0;
+/* 中文逐项-变量 V1087：child0Index
+ * child0Index（int；函数 ncclTopoPreset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 child0Index = treeGraph->pattern == NCCL_TOPO_PATTERN_TREE ? 0 : 1；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         int child0Index = treeGraph->pattern == NCCL_TOPO_PATTERN_TREE ? 0 : 1;
+/* 中文逐项-变量 V1088：child1Index
+ * child1Index（int；函数 ncclTopoPreset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 child1Index = treeGraph->pattern == NCCL_TOPO_PATTERN_SPLIT_TREE ? 1 : 0；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         int child1Index = treeGraph->pattern == NCCL_TOPO_PATTERN_SPLIT_TREE ? 1 : 0;
 
         topoRanks->treeToParent[c] = treeIntra[parentIndex];
@@ -65,7 +132,15 @@ ncclResult_t ncclTopoPreset(struct ncclComm* comm,
     topoRanks->ringNext[c] = channel->ring.next;
   }
   // Duplicate channels rings/trees
+/* 中文逐项-变量 V1089：channel0
+ * channel0（struct ncclChannel；函数 ncclTopoPreset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channel0 = comm->channels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   struct ncclChannel* channel0 = comm->channels;
+/* 中文逐项-变量 V1090：channel1
+ * channel1（struct ncclChannel；函数 ncclTopoPreset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channel1 = channel0+nChannels；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
   struct ncclChannel* channel1 = channel0+nChannels;
   memcpy(channel1, channel0, nChannels*sizeof(struct ncclChannel));
   return ncclSuccess;
@@ -77,25 +152,94 @@ ncclResult_t ncclTopoPreset(struct ncclComm* comm,
  * 每个 rank 最终只需要知道本 channel 的直接前驱和后继；完整顺序再由 BuildRings 检查生成。
  * 环中节点很多并不意味着每个 rank 都直接连接所有 rank。
  */
+/* 中文逐项-函数 F0430：connectRings
+ * 用途与位置：把各节点局部 GPU 链的出口接到下一节点入口，补全完整环的前驱/后继。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 ringRecv（int* ringRecv）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 参数 ringSend（int* ringSend）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 参数 ringPrev（int* ringPrev）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 参数 ringNext（int* ringNext）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 参数 firstRanks（int* firstRanks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::ncclTopoPostset。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：c<nChannels；n<nNodes；comm->rank == recvRank；comm->rank == sendRank。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t connectRings(struct ncclComm* comm, int* ringRecv, int* ringSend, int* ringPrev, int* ringNext, int* firstRanks) {
+/* 中文逐项-变量 V1091：nChannels
+ * nChannels（int；函数 connectRings 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = comm->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nChannels = comm->nChannels;
+/* 中文逐项-变量 V1092：nNodes
+ * nNodes（int；函数 connectRings 内）：当前 communicator 跨越的节点数量；节点编号不等于 GPU rank。
+ * 初值/来源 nNodes = comm->nNodes；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nNodes = comm->nNodes;
-  for (int c=0; c<nChannels; c++) {
+  for (/* 中文逐项-变量 V1093：c
+ * c（int；函数 connectRings 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<nChannels; c++) {
+/* 中文逐项-变量 V1094：recv
+ * recv（int；函数 connectRings 内）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 初值/来源 recv = ringRecv+c*comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int* recv = ringRecv+c*comm->nRanks;
+/* 中文逐项-变量 V1095：send
+ * send（int；函数 connectRings 内）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
+ * 初值/来源 send = ringSend+c*comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int* send = ringSend+c*comm->nRanks;
+/* 中文逐项-变量 V1096：prev
+ * prev（int；函数 connectRings 内）：环前后继或链表前后项，准确含义由所属 ring/队列类型决定。
+ * 初值/来源 prev = ringPrev+c*comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int* prev = ringPrev+c*comm->nRanks;
+/* 中文逐项-变量 V1097：next
+ * next（int；函数 connectRings 内）：队列/请求链的后继地址；环算法结构中则表示后继rank，按所属对象区分。
+ * 初值/来源 next = ringNext+c*comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int* next = ringNext+c*comm->nRanks;
+/* 中文逐项-变量 V1098：channel0
+ * channel0（struct ncclChannel；函数 connectRings 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channel0 = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclChannel* channel0 = comm->channels+c;
+/* 中文逐项-变量 V1099：channel1
+ * channel1（struct ncclChannel；函数 connectRings 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channel1 = channel0+nChannels；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
     struct ncclChannel* channel1 = channel0+nChannels;
-    for (int n=0; n<nNodes; n++) {
+    for (/* 中文逐项-变量 V1100：n
+ * n（int；函数 connectRings 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<nNodes；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<nNodes; n++) {
+/* 中文逐项-变量 V1101：recvRank
+ * recvRank（int；函数 connectRings 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 recvRank = recv[firstRanks[n]]；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
       int recvRank = recv[firstRanks[n]];
+/* 中文逐项-变量 V1102：prevSendRank
+ * prevSendRank（int；函数 connectRings 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 prevSendRank = send[firstRanks[(n-1+nNodes)%nNodes]]；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
       int prevSendRank = send[firstRanks[(n-1+nNodes)%nNodes]];
       prev[recvRank] = prevSendRank;
       if (comm->rank == recvRank) {
         channel0->ring.prev = prevSendRank;
         channel1->ring.prev = prevSendRank;
       }
+/* 中文逐项-变量 V1103：sendRank
+ * sendRank（int；函数 connectRings 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 sendRank = send[firstRanks[n]]；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
       int sendRank = send[firstRanks[n]];
+/* 中文逐项-变量 V1104：nextRecvRank
+ * nextRecvRank（int；函数 connectRings 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 nextRecvRank = recv[firstRanks[(n+1)%nNodes]]；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
       int nextRecvRank = recv[firstRanks[(n+1)%nNodes]];
       next[sendRank] = nextRecvRank;
       if (comm->rank == sendRank) {
@@ -109,19 +253,58 @@ static ncclResult_t connectRings(struct ncclComm* comm, int* ringRecv, int* ring
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0431：getIndexes
+ * 用途与位置：把树连接端点的用户 rank 映射到节点索引，供节点级双树关系查表。
+ * 参数 ranks（int* ranks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 indexes（int* indexes）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 nNodes（int nNodes）：当前 communicator 跨越的节点数量；节点编号不等于 GPU rank。
+ * 参数 firstRanks（int* firstRanks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::connectTrees。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：n<nNodes。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t getIndexes(int* ranks, int* indexes, int nNodes, int* firstRanks) {
- for (int n=0; n<nNodes; n++) indexes[n] = ranks[firstRanks[n]];
+ for (/* 中文逐项-变量 V1105：n
+ * n（int；函数 getIndexes 内）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
+ * 初值/来源 n = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：n<nNodes；循环体与增量表达式决定每轮如何推进。
+ */int n=0; n<nNodes; n++) indexes[n] = ranks[firstRanks[n]];
  return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0432：setTreeUp
+ * 用途与位置：把节点级父端点映射成当前 GPU 树的 up 邻居，保留无父节点的 -1 语义。
+ * 参数 tree（struct ncclTree* tree）：本 channel 的树邻接关系，up/down 决定向上归约和向下广播。
+ * 参数 indexes（int* indexes）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 u（int u）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::connectTrees。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：u == -1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t setTreeUp(struct ncclTree* tree, int* indexes, int u) {
   if (u == -1) return ncclSuccess;
   tree->up = indexes[u];
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0433：setTreeDown
+ * 用途与位置：把节点级孩子端点追加到树 down 槽，检查最大邻居度以避免越界。
+ * 参数 tree（struct ncclTree* tree）：本 channel 的树邻接关系，up/down 决定向上归约和向下广播。
+ * 参数 indexes（int* indexes）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 d（int d）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::connectTrees。
+ * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
+ * 需要对照的边界/推进条件：d == -1；x < NCCL_MAX_TREE_ARITY && tree->down[x] >= 0；x == NCCL_MAX_TREE_ARITY。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;；return ncclInternalError;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t setTreeDown(struct ncclTree* tree, int* indexes, int d) {
   if (d == -1) return ncclSuccess;
+/* 中文逐项-变量 V1106：x
+ * x（int；函数 setTreeDown 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 x = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int x = 0;
   while (x < NCCL_MAX_TREE_ARITY && tree->down[x] >= 0) x++;
   if (x == NCCL_MAX_TREE_ARITY) {
@@ -138,8 +321,38 @@ static ncclResult_t setTreeDown(struct ncclTree* tree, int* indexes, int d) {
  * 两个 channel 集合承载两棵树的不同数据部分；这不是对同一个完整张量重复归约两次。
  * 请同时阅读 graph/trees.cc 的 GetBtree/GetDtree，以及 device/all_reduce.h 的上下行线程拆分。
  */
+/* 中文逐项-函数 F0434：connectTrees
+ * 用途与位置：用互补二叉树连接各节点的本地树片段，并复制通道来分摊中间节点负载。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 treeToParent（int* treeToParent）：节点局部树连接到父/两个孩子节点所用的GPU端点摘要。
+ * 参数 treeToChild0（int* treeToChild0）：节点局部树连接到父/两个孩子节点所用的GPU端点摘要。
+ * 参数 treeToChild1（int* treeToChild1）：节点局部树连接到父/两个孩子节点所用的GPU端点摘要。
+ * 参数 firstRanks（int* firstRanks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 treePatterns（int* treePatterns）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::ncclTopoPostset。
+ * 本体直接出现的调用/包装：NCCLCHECK；free；getIndexes；log2i；ncclCalloc；ncclGetDtree；setTreeDown；setTreeUp。
+ * 需要对照的边界/推进条件：c<nChannels；comm->rank == ranksToParent[node]；comm->rank == ranksToChild0[node]；comm->rank ==
+ * ranksToChild1[node]。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t connectTrees(struct ncclComm* comm, int* treeToParent, int* treeToChild0, int* treeToChild1, int* firstRanks, int* treePatterns) {
+/* 中文逐项-变量 V1107：nChannels、nNodes、node
+ * nChannels（int；函数 connectTrees 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = comm->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * nNodes（int；函数 connectTrees 内）：当前 communicator 跨越的节点数量；节点编号不等于 GPU rank。
+ * 初值/来源 nNodes = comm->nNodes；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ * node（int；函数 connectTrees 内）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
+ * 初值/来源 node = comm->node；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   const int nChannels = comm->nChannels, nNodes = comm->nNodes, node = comm->node;
+/* 中文逐项-变量 V1108：ranksToParent、ranksToChild0、ranksToChild1
+ * ranksToParent（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ranksToParent, nNodes));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * ranksToChild0（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ranksToChild0, nNodes));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * ranksToChild1（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ranksToChild1, nNodes));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int* ranksToParent, *ranksToChild0, *ranksToChild1;
   NCCLCHECK(ncclCalloc(&ranksToParent, nNodes));
   NCCLCHECK(ncclCalloc(&ranksToChild0, nNodes));
@@ -147,12 +360,54 @@ static ncclResult_t connectTrees(struct ncclComm* comm, int* treeToParent, int* 
 
   // Compute tree depth. Not an exact value but a good approximation in most
   // cases
+/* 中文逐项-变量 V1109：depth
+ * depth（int；函数 connectTrees 内）：通信树估计深度，用于分片和流水调优。
+ * 初值/来源 depth = comm->nRanks/nNodes - 1 + log2i(nNodes)；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int depth = comm->nRanks/nNodes - 1 + log2i(nNodes);
 
+/* 中文逐项-变量 V1110：t0u、t0d0、t0d1、t0ChildType、t1u、t1d0、t1d1、t1ChildType
+ * t0u（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * t0d0（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * t0d1（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * t0ChildType（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * t1u（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * t1d0（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * t1d1（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * t1ChildType（int；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1,
+ * &t1ChildType));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int t0u, t0d0, t0d1, t0ChildType, t1u, t1d0, t1d1, t1ChildType;
   NCCLCHECK(ncclGetDtree(nNodes, node, &t0u, &t0d0, &t0d1, &t0ChildType, &t1u, &t1d0, &t1d1, &t1ChildType));
-  for (int c=0; c<nChannels; c++) {
+  for (/* 中文逐项-变量 V1111：c
+ * c（int；函数 connectTrees 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<nChannels; c++) {
+/* 中文逐项-变量 V1112：channel0
+ * channel0（struct ncclChannel；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channel0 = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
      struct ncclChannel* channel0 = comm->channels+c;
+/* 中文逐项-变量 V1113：channel1
+ * channel1（struct ncclChannel；函数 connectTrees 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 channel1 = channel0+nChannels；按该式计算本轮范围/数量/位置；乘除和取整顺序会影响尾块与数组边界。
+ */
      struct ncclChannel* channel1 = channel0+nChannels;
      NCCLCHECK(getIndexes(treeToParent+c*comm->nRanks, ranksToParent, nNodes, firstRanks));
      NCCLCHECK(getIndexes(treeToChild0+c*comm->nRanks, ranksToChild0, nNodes, firstRanks));
@@ -183,31 +438,92 @@ static ncclResult_t connectTrees(struct ncclComm* comm, int* treeToParent, int* 
   return ncclSuccess;
 }
 
+/* 中文逐项-函数 F0435：connectCollNet
+ * 用途与位置：把本节点 GPU 组织为多个网络 head 的分散/归约/广播/收集关系。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 collNetGraph（struct ncclTopoGraph* collNetGraph）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::ncclTopoPostset。
+ * 本体直接出现的调用/包装：NCCLCHECK；free；ncclCalloc；sprintf；strlen。
+ * 需要对照的边界/推进条件：c<nHeads；c<comm->nChannels；i<nHeads；rank == heads[i]。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 static ncclResult_t connectCollNet(struct ncclComm* comm, struct ncclTopoGraph* collNetGraph) {
+/* 中文逐项-变量 V1114：rank
+ * rank（int；函数 connectCollNet 内）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
+ * 初值/来源 rank = comm->rank；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int rank = comm->rank;
+/* 中文逐项-变量 V1115：localRanks
+ * localRanks（int；函数 connectCollNet 内）：当前节点内参与此 communicator 的 rank 数。
+ * 初值/来源 localRanks = comm->localRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int localRanks = comm->localRanks;
+/* 中文逐项-变量 V1116：nHeads
+ * nHeads（int；函数 connectCollNet 内）：当前 CollNet 分工的网络 head 数，额外参与一轮数据块数量计算。
+ * 初值/来源 nHeads = collNetGraph->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nHeads = collNetGraph->nChannels;
+/* 中文逐项-变量 V1117：heads
+ * heads（int；函数 connectCollNet 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&heads, nHeads));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int *heads;
   NCCLCHECK(ncclCalloc(&heads, nHeads));
   // Find all head ranks
   // Head index is always 0
-  for (int c=0; c<nHeads; c++) {
+  for (/* 中文逐项-变量 V1118：c
+ * c（int；函数 connectCollNet 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<nHeads；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<nHeads; c++) {
+/* 中文逐项-变量 V1119：collNetIntra
+ * collNetIntra（int；函数 connectCollNet 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 collNetIntra = collNetGraph->intra+c*localRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     int* collNetIntra = collNetGraph->intra+c*localRanks;
     heads[c] = collNetIntra[0];
   }
   // For all channels
-  for (int c=0; c<comm->nChannels; c++) {
+  for (/* 中文逐项-变量 V1120：c
+ * c（int；函数 connectCollNet 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<comm->nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<comm->nChannels; c++) {
+/* 中文逐项-变量 V1121：channel
+ * channel（struct ncclChannel；函数 connectCollNet 内）：当前逻辑通信流水线对象，包含邻居、连接表和工作 FIFO。
+ * 初值/来源 channel = comm->channels+c；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
     struct ncclChannel* channel = comm->channels+c;
+/* 中文逐项-变量 V1122：line
+ * line（char；函数 connectCollNet 内）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
+ * 此处未显式给初值；后续首个文本使用点：sprintf(line, "CollNet channel %d rank %d ", c, rank);。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
     char line[1024];
     sprintf(line, "CollNet channel %d rank %d ", c, rank);
+/* 中文逐项-变量 V1123：nDown
+ * nDown（int；函数 connectCollNet 内）：对应对象/条目的数量，用于限制后续循环、数组容量或并行度。
+ * 初值/来源 nDown = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int nDown = 0;
-    for (int i=0; i<nHeads; i++) {
+    for (/* 中文逐项-变量 V1124：i
+ * i（int；函数 connectCollNet 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<nHeads；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<nHeads; i++) {
       if (rank == heads[i]) { // is head
         channel->collTree.headRank = i; // Mark the index for deciding offset in the CUDA kernel
         channel->collTree.out = comm->nRanks; // Set root of collTree to id nranks
+/* 中文逐项-变量 V1125：collNetIntra
+ * collNetIntra（int；函数 connectCollNet 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 collNetIntra = collNetGraph->intra+i*localRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
         int* collNetIntra = collNetGraph->intra+i*localRanks;
         sprintf(line+strlen(line), "down ");
-        for (int r=0; r<localRanks; r++) {
+        for (/* 中文逐项-变量 V1126：r
+ * r（int；函数 connectCollNet 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 r = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：r<localRanks；循环体与增量表达式决定每轮如何推进。
+ */int r=0; r<localRanks; r++) {
           if (collNetIntra[r] == rank) continue;
           channel->collTree.down[nDown++] = collNetIntra[r];  // connect to all peers
           sprintf(line+strlen(line), " %d ", collNetIntra[r]);
@@ -217,9 +533,17 @@ static ncclResult_t connectCollNet(struct ncclComm* comm, struct ncclTopoGraph* 
       }
     }
     // Connect to all heads
+/* 中文逐项-变量 V1127：nUp
+ * nUp（int；函数 connectCollNet 内）：对应对象/条目的数量，用于限制后续循环、数组容量或并行度。
+ * 初值/来源 nUp = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
     int nUp = 0;
     sprintf(line+strlen(line), "up ");
-    for (int h=0; h<nHeads; h++) {
+    for (/* 中文逐项-变量 V1128：h
+ * h（int；函数 connectCollNet 内）：GDRCopy固定缓冲句柄的内部表示，必须用匹配的unpin接口回收。
+ * 初值/来源 h = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：h<nHeads；循环体与增量表达式决定每轮如何推进。
+ */int h=0; h<nHeads; h++) {
       if (rank == heads[h]) continue;
       channel->collTree.up[nUp++] = heads[h];
       sprintf(line+strlen(line), " %d ", heads[h]);
@@ -236,13 +560,46 @@ static ncclResult_t connectCollNet(struct ncclComm* comm, struct ncclTopoGraph* 
 }
 
 // Legacy naming
+/* 中文逐项-参数getter P0003：MinNrings
+ * 生成函数 ncclParamMinNrings()，读取 NCCL_MIN_NRINGS，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(MinNrings, "MIN_NRINGS", -2);
+/* 中文逐项-参数getter P0004：MaxNrings
+ * 生成函数 ncclParamMaxNrings()，读取 NCCL_MAX_NRINGS，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(MaxNrings, "MAX_NRINGS", -2);
 // New naming
+/* 中文逐项-参数getter P0005：MinNchannels
+ * 生成函数 ncclParamMinNchannels()，读取 NCCL_MIN_NCHANNELS，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(MinNchannels, "MIN_NCHANNELS", -2);
+/* 中文逐项-参数getter P0006：MaxNchannels
+ * 生成函数 ncclParamMaxNchannels()，读取 NCCL_MAX_NCHANNELS，编译默认值为 -2。
+ * 首次调用解析并缓存，后续读取静态缓存；应在初始化/首次调用前设置环境，不保证进程中途修改后重新读取。
+ * 这个宏生成getter，不会仅因声明参数就在这里分配QP、MR或数据缓冲；作用取决于getter的调用位置。
+ */
 NCCL_PARAM(MaxNchannels, "MAX_NCHANNELS", -2);
 
+/* 中文逐项-函数 F0436：ncclMinNchannels
+ * 用途与位置：读取并校验集合通信 channel 上下限，兼容旧 NRINGS 配置名后限制到编译期容量。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::ncclTopoPostset。
+ * 本体直接出现的调用/包装：ncclParamMinNchannels；ncclParamMinNrings。
+ * 需要对照的边界/推进条件：ncclParamMinNrings() != -2；ncclParamMinNchannels() != -2；minNchannels > MAXCHANNELS；minNchannels <
+ * 0。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return minNchannels;。CHECK类宏还可能提前返回/跳转。
+ */
 int ncclMinNchannels() {
+/* 中文逐项-变量 V1129：minNchannels
+ * minNchannels（int；函数 ncclMinNchannels 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 minNchannels = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ */
   int minNchannels = 0;
   if (ncclParamMinNrings() != -2) minNchannels = ncclParamMinNrings();
   if (ncclParamMinNchannels() != -2) minNchannels = ncclParamMinNchannels();
@@ -253,7 +610,20 @@ int ncclMinNchannels() {
   if (minNchannels < 0) minNchannels = 0;
   return minNchannels;
 }
+/* 中文逐项-函数 F0437：ncclMaxNchannels
+ * 用途与位置：读取并校验集合通信 channel 上下限，兼容旧 NRINGS 配置名后限制到编译期容量。
+ * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::ncclTopoPostset。
+ * 本体直接出现的调用/包装：ncclParamMaxNchannels；ncclParamMaxNrings。
+ * 需要对照的边界/推进条件：ncclParamMaxNrings() != -2；ncclParamMaxNchannels() != -2；maxNchannels > MAXCHANNELS；maxNchannels <
+ * 1。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return maxNchannels;。CHECK类宏还可能提前返回/跳转。
+ */
 int ncclMaxNchannels() {
+/* 中文逐项-变量 V1130：maxNchannels
+ * maxNchannels（int；函数 ncclMaxNchannels 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 maxNchannels = MAXCHANNELS；从该常量/已有表达式取值，后续使用保持本作用域的类型和编号空间。
+ */
   int maxNchannels = MAXCHANNELS;
   if (ncclParamMaxNrings() != -2) maxNchannels = ncclParamMaxNrings();
   if (ncclParamMaxNchannels() != -2) maxNchannels = ncclParamMaxNchannels();
@@ -265,8 +635,28 @@ int ncclMaxNchannels() {
   return maxNchannels;
 }
 
+/* 中文逐项-函数 F0438：copyChannels
+ * 用途与位置：把已有通道的邻居关系复制到新增逻辑 channel，使最小并行度要求有可用上下文。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 start（int start）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 参数 end（int end）：本任务结束序号或范围末端，通常由 base 与总步数推导。
+ * 参数 ringPrev（int* ringPrev）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 参数 ringNext（int* ringNext）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/connect.cc::ncclTopoPostset。
+ * 本体直接出现的调用/包装：memcpy。
+ * 需要对照的边界/推进条件：c<end。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return c;。CHECK类宏还可能提前返回/跳转。
+ */
 static int copyChannels(struct ncclComm* comm, int start, int end, int* ringPrev, int* ringNext) {
+/* 中文逐项-变量 V1131：nranks
+ * nranks（int；函数 copyChannels 内）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 初值/来源 nranks = comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nranks = comm->nRanks;
+/* 中文逐项-变量 V1132：c
+ * c（int；函数 copyChannels 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 此处未显式给初值；后续首个文本使用点：for (c=start; c<end; c++) {。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int c;
   for (c=start; c<end; c++) {
     memcpy(ringPrev+c*nranks, ringPrev+(c-start)*nranks, nranks*sizeof(int));
@@ -280,10 +670,48 @@ static int copyChannels(struct ncclComm* comm, int start, int end, int* ringPrev
  * 把各节点的局部拓扑结果拼成全局 Ring/Tree，并应用 channel 数限制/复制策略。
  * 这是硬件局部搜索结果变成每 rank 可执行邻居关系的关键阶段，随后才进入 transport 建链。
  */
+/* 中文逐项-函数 F0439：ncclTopoPostset
+ * 用途与位置：汇总全部节点的端点信息并拼接全局 Ring/Tree，复制/裁剪通道后验证环完整性。
+ * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
+ * 参数 firstRanks（int* firstRanks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 treePatterns（int* treePatterns）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 allTopoRanks（struct ncclTopoRanks** allTopoRanks）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 rings（int* rings）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 参数 collNetGraph（struct ncclTopoGraph* collNetGraph）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
+ * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::initTransportsRank。
+ * 本体直接出现的调用/包装：NCCLCHECK；connectCollNet；connectRings；connectTrees；copyChannels；free；memcpy；ncclBuildRings；ncclCalloc；ncclMaxNchannels；ncclMinNchannels；std::min。
+ * 需要对照的边界/推进条件：i<nranks；c<nChannels；comm->collNetSupport == 1；collNetGraph->speedIntra > collNetGraph->speedInter &&
+ * comm->nRanks > comm->nNodes。各条件所属分支见紧邻函数体。
+ * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
+ */
 ncclResult_t ncclTopoPostset(struct ncclComm* comm, int* firstRanks, int* treePatterns, struct ncclTopoRanks** allTopoRanks, int* rings, struct ncclTopoGraph* collNetGraph) {
   // Gather data from all ranks
+/* 中文逐项-变量 V1133：ringRecv、ringSend、ringPrev、ringNext、treeToParent、treeToChild0、treeToChild1
+ * ringRecv（int；函数 ncclTopoPostset 内）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ringRecv, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * ringSend（int；函数 ncclTopoPostset 内）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ringSend, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * ringPrev（int；函数 ncclTopoPostset 内）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ringPrev, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * ringNext（int；函数 ncclTopoPostset 内）：全局拼接时每节点入口/出口与各rank前后继摘要，按channel/rank二维索引。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&ringNext, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * treeToParent（int；函数 ncclTopoPostset 内）：节点局部树连接到父/两个孩子节点所用的GPU端点摘要。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&treeToParent, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * treeToChild0（int；函数 ncclTopoPostset 内）：节点局部树连接到父/两个孩子节点所用的GPU端点摘要。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&treeToChild0, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ * treeToChild1（int；函数 ncclTopoPostset 内）：节点局部树连接到父/两个孩子节点所用的GPU端点摘要。
+ * 此处未显式给初值；后续首个文本使用点：NCCLCHECK(ncclCalloc(&treeToChild1, nranks*MAXCHANNELS));。若由输出参数填入，必须先检查填充调用成功再读值。
+ */
   int *ringRecv, *ringSend, *ringPrev, *ringNext, *treeToParent, *treeToChild0, *treeToChild1;
+/* 中文逐项-变量 V1134：nranks
+ * nranks（int；函数 ncclTopoPostset 内）：当前通信组参与 rank 总数；用于环步数、数组分段与全局规模。
+ * 初值/来源 nranks = comm->nRanks；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nranks = comm->nRanks;
+/* 中文逐项-变量 V1135：nChannels
+ * nChannels（int；函数 ncclTopoPostset 内）：当前作用域的通道数量；comm 表示配置结果，info/work 表示本次任务使用数，graph 表示搜索结果。
+ * 初值/来源 nChannels = comm->nChannels；由已有上下文/数组成员读取或定位本轮对象，复用的是该字段引用/值。
+ */
   int nChannels = comm->nChannels;
   NCCLCHECK(ncclCalloc(&ringRecv, nranks*MAXCHANNELS));
   NCCLCHECK(ncclCalloc(&ringSend, nranks*MAXCHANNELS));
@@ -292,8 +720,16 @@ ncclResult_t ncclTopoPostset(struct ncclComm* comm, int* firstRanks, int* treePa
   NCCLCHECK(ncclCalloc(&treeToParent, nranks*MAXCHANNELS));
   NCCLCHECK(ncclCalloc(&treeToChild0, nranks*MAXCHANNELS));
   NCCLCHECK(ncclCalloc(&treeToChild1, nranks*MAXCHANNELS));
-  for (int i=0; i<nranks; i++) {
-    for (int c=0; c<nChannels;c++) {
+  for (/* 中文逐项-变量 V1136：i
+ * i（int；函数 ncclTopoPostset 内）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
+ * 初值/来源 i = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：i<nranks；循环体与增量表达式决定每轮如何推进。
+ */int i=0; i<nranks; i++) {
+    for (/* 中文逐项-变量 V1137：c
+ * c（int；函数 ncclTopoPostset 内）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
+ * 初值/来源 c = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
+ * 所在for循环的继续条件：c<nChannels；循环体与增量表达式决定每轮如何推进。
+ */int c=0; c<nChannels;c++) {
       ringRecv[c*nranks+i] = allTopoRanks[i]->ringRecv[c];
       ringSend[c*nranks+i] = allTopoRanks[i]->ringSend[c];
       ringPrev[c*nranks+i] = allTopoRanks[i]->ringPrev[c];
@@ -325,6 +761,10 @@ ncclResult_t ncclTopoPostset(struct ncclComm* comm, int* firstRanks, int* treePa
   if (comm->collNetSupport == 1) {
     // Add more channels to saturate intra-node bandwidth, except the 1 PPN case
     if (collNetGraph->speedIntra > collNetGraph->speedInter && comm->nRanks > comm->nNodes) {
+/* 中文逐项-变量 V1138：collNetNchannels
+ * collNetNchannels（int；函数 ncclTopoPostset 内）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 初值/来源 collNetNchannels = std::min(MAXCHANNELS, nChannels+nChannels/2)；取候选与剩余/上限中的较小值，避免本轮范围超过可用容量。
+ */
       int collNetNchannels = std::min(MAXCHANNELS, nChannels+nChannels/2);
       nChannels = comm->nChannels = copyChannels(comm, nChannels, collNetNchannels, ringPrev, ringNext);
     }

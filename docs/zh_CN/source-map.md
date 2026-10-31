@@ -1,132 +1,139 @@
-# 中文注释源码阅读入口
+# 按问题进入源码
 
-基线：`04832308d0885226169b9376c1ba4f17b0cb6484`，NCCL 2.12.12、打包修订 1。
+源码中的详细说明以 `中文逐项-函数/类型/变量`、`中文精读` 和 `中文导读` 标记。若默认master中看不到，请打开 [根目录阅读入口](../../START_HERE_ZH.md)确认分支和下载方式。
 
-讲解直接写在代码的 `中文精读` / `中文导读` 块注释中。本页只做导航。注释说明函数在调用链中的位置、输入输出及单位、关键分支、数据和对象生命周期，以及为什么使用这种组织方式。
-
-## 按问题进入源码
-
-| 要理解的问题 | 推荐阅读顺序 |
+| 问题 | 主要入口 |
 | --- | --- |
-| 一次调用到底做了什么 | `collectives/*.cc` → `misc/argcheck.cc` → `enqueue.cc::ncclEnqueueCheck` |
-| 每种 API 的数据布局 | 各 API 的 `.cc` 入口示例 → `collectives/device/` 同名 `.h` |
-| channel 怎样生成 | `init.cc::initTransportsRank` → `graph/search.cc` → `graph/connect.cc` → `channel.cc` |
-| 为什么这次没用满所有 channel | `graph/tuning.cc` → `enqueue.cc::getAlgoInfo / ncclSetupAsyncKernels` |
-| chunk、slice、step 如何对应 | `enqueue.cc::computeColl` → `device/primitives.h` → `device/prims_simple.h::genericOp` |
-| 每个块对应哪段地址 | `device/all_reduce.h::calcOffset`，再比较 `all_gather.h` 和 `reduce_scatter.h` |
-| Group 如何拆 P2P 消息 | `group.cc::getP2pChunkSize / ncclGroupEnd` → `include/channel.h` → `device/sendrecv.h` |
-| 怎样发射 kernel | `enqueue.cc::ncclSetupCollKernel / setupLaunch / ncclLaunchKernel` → `device/common.h` |
-| 为什么 kernel 名称不等于实际算法 | `include/collectives.h::FUNC_INDEX` → `device/functions.cu` → `device/common.h::ncclKernel` |
-| 谁触发 Proxy | `enqueue.cc::ncclEnqueueHostSetup / ncclLaunchProxy` → `proxy.cc::ncclProxyStart / ncclProxyPost` |
-| Proxy 如何等 GPU 再发网络 | `transport/net.cc::sendProxyProgress` → `transport/net_ib.cc::ncclIbIsend` |
-| 网络收完 GPU 为什么还在等 | `transport/net.cc::recvProxyProgress` → `net_ib.cc::ncclIbIflush` → `prims_simple.h::waitPeer` |
-| 原语怎样组合收、发、归约 | `device/primitives.h` → `prims_simple.h` → `common_kernel.h::ReduceOrCopyMulti` |
-| LL/LL128 与 Simple 有什么不同 | `include/devcomm.h` 的 FIFO 格式 → `device/prims_ll.h / prims_ll128.h` |
-| Tree/CollNet 的线程怎样分工 | `device/all_reduce.h::runTreeSplit` 与 CollNet 特化 → `transport/coll_net.cc` |
-| 结构体怎样串起来 | `include/comm.h` → `devcomm.h` → `enqueue.h` → `proxy.h` → `transport.h` |
-| 谁分配、共享和释放内存 | `include/alloc.h` → `transport/*::setup/connect/free` → `channel.cc::freeChannel` → `init.cc::commFree` |
-| 为什么会创建 QP、MR | `transport/net.cc` → `transport/net_ib.cc`；先分清逻辑 connector、后端 comm 和 verbs 对象 |
+| 各API输入输出与调用流程 | [collectives](../../src/collectives)、[argcheck.cc](../../src/misc/argcheck.cc)、[enqueue.cc](../../src/enqueue.cc) |
+| channel如何生成、复制和限量 | [init.cc](../../src/init.cc)、[search.cc](../../src/graph/search.cc)、[connect.cc](../../src/graph/connect.cc) |
+| 分片公式、地址和尾块 | [enqueue.cc](../../src/enqueue.cc)、[all_reduce.h](../../src/collectives/device/all_reduce.h)、[all_gather.h](../../src/collectives/device/all_gather.h)、[reduce_scatter.h](../../src/collectives/device/reduce_scatter.h) |
+| Group和P2P调度 | [group.cc](../../src/group.cc)、[channel.h](../../src/include/channel.h)、[sendrecv.h](../../src/collectives/device/sendrecv.h) |
+| kernel怎样触发并解释FIFO | [enqueue.cc](../../src/enqueue.cc)、[common.h](../../src/collectives/device/common.h)、[functions.cu](../../src/collectives/device/functions.cu) |
+| 原语怎样等待、复制、归约与发布 | [prims_simple.h](../../src/collectives/device/prims_simple.h)、[primitives.h](../../src/collectives/device/primitives.h)、[common_kernel.h](../../src/collectives/device/common_kernel.h) |
+| LL/LL128行格式和流控 | [devcomm.h](../../src/include/devcomm.h)、[prims_ll.h](../../src/collectives/device/prims_ll.h)、[prims_ll128.h](../../src/collectives/device/prims_ll128.h) |
+| Proxy由谁发布、如何推进 | [proxy.cc](../../src/proxy.cc)、[net.cc](../../src/transport/net.cc) |
+| QP/MR和网络完成 | [net_ib.cc](../../src/transport/net_ib.cc)、[ibvwrap.h](../../src/include/ibvwrap.h) |
+| 全部结构体和变量 | [comm.h](../../src/include/comm.h)、[devcomm.h](../../src/include/devcomm.h)、[proxy.h](../../src/include/proxy.h)、[完整索引](symbol-index.md) |
+| 构建怎样实例化所有设备函数 | [gen_rules.sh](../../src/collectives/device/gen_rules.sh)、[设备Makefile](../../src/collectives/device/Makefile) |
+| 附带SDK/兼容ABI的用途 | [nvtx3.hpp](../../src/include/nvtx3.hpp)、[nvmlwrap.h](../../src/include/nvmlwrap.h)、[gdrwrap.h](../../src/include/gdrwrap.h)、[enhcompat.cc](../../src/enhcompat.cc) |
 
-表中的路径省略了共同前缀 `src/`。下面可直接点击具体文件。
+## 逐文件覆盖
 
-## API 范围与理解边界
-
-本版公开数据通信包括 AllReduce、AllGather、ReduceScatter、Broadcast/Bcast、Reduce、Send、Recv；另外有 communicator 初始化/查询/销毁/中止、Group 和 PreMulSum 操作管理。源码注释区分这些路径。
-
-本版没有公开 `ncclAllToAll`、`ncclGather`、`ncclScatter`：这类模式可由上层组合 Send/Recv，不能把较新版 API 的调用链安到本版本。NVLS、较新的 nonblocking communicator 和专用 EP 后端同样不属于这里的实现。
-
-普通非图路径的顺序以实际调用点为准：HostSetup 装 FIFO、发布 Proxy 操作，然后发射 GPU kernel。`ncclLaunchProxy` 附近原有英文注释提到的先后顺序与此调用点有出入，已在旁边加入中文说明；图路径则按 host node 与 kernel 的依赖执行。
-
-本分支重点覆盖 NCCL 自身的主干和辅助模块；不逐行翻译第三方 NVTX SDK，也不把函数级注释等同于每条指令已完成硬件验证。
-
-## 源码注释目录
-
-数字是本分支相对基线新增的中文注释块数，不包含原有英文注释。链接指向该文件第一段中文注释；同文件其余注释可搜索“中文精读”。
-
-| 源码文件 | 注释块数 | 首个阅读点 |
-| --- | ---: | --- |
-| [src/bootstrap.cc](../../src/bootstrap.cc#L173) | 6 | 中文导读： |
-| [src/channel.cc](../../src/channel.cc#L14) | 2 | 中文导读： |
-| [src/collectives/all_gather.cc](../../src/collectives/all_gather.cc#L12) | 2 | 中文导读： |
-| [src/collectives/all_reduce.cc](../../src/collectives/all_reduce.cc#L11) | 2 | 中文导读： |
-| [src/collectives/broadcast.cc](../../src/collectives/broadcast.cc#L12) | 2 | 中文导读： |
-| [src/collectives/device/all_gather.cu](../../src/collectives/device/all_gather.cu#L11) | 1 | 中文精读：这个短 .cu 文件是模板实例化入口 |
-| [src/collectives/device/all_gather.h](../../src/collectives/device/all_gather.h#L13) | 2 | 中文导读： |
-| [src/collectives/device/all_reduce.cu](../../src/collectives/device/all_reduce.cu#L11) | 1 | 中文精读：这个短 .cu 文件是模板实例化入口 |
-| [src/collectives/device/all_reduce.h](../../src/collectives/device/all_reduce.h#L13) | 9 | 中文导读： |
-| [src/collectives/device/broadcast.cu](../../src/collectives/device/broadcast.cu#L11) | 1 | 中文精读：这个短 .cu 文件是模板实例化入口 |
-| [src/collectives/device/broadcast.h](../../src/collectives/device/broadcast.h#L47) | 1 | 中文精读：Broadcast 如何把环变成从 root 开始的流水线 |
-| [src/collectives/device/common.h](../../src/collectives/device/common.h#L117) | 4 | 中文精读：共享内存装的是元数据和小块暂存 |
-| [src/collectives/device/common_kernel.h](../../src/collectives/device/common_kernel.h#L630) | 1 | 中文精读：最终负责读、归约、写的线程搬运层 |
-| [src/collectives/device/functions.cu](../../src/collectives/device/functions.cu#L89) | 1 | 中文精读：设备函数表怎样被填满 |
-| [src/collectives/device/onerank_reduce.cu](../../src/collectives/device/onerank_reduce.cu#L14) | 1 | 中文精读：只有一个 rank 时仍可能需要 GPU 运算 |
-| [src/collectives/device/op128.h](../../src/collectives/device/op128.h#L10) | 1 | 中文精读：读 PTX 内联汇编的方法 |
-| [src/collectives/device/primitives.h](../../src/collectives/device/primitives.h#L23) | 3 | 中文精读：算法与协议通过模板解耦 |
-| [src/collectives/device/prims_ll.h](../../src/collectives/device/prims_ll.h#L58) | 3 | 中文精读：LL 仍然需要空间流控 |
-| [src/collectives/device/prims_ll128.h](../../src/collectives/device/prims_ll128.h#L9) | 2 | 中文精读：LL128 如何提高有效载荷比例 |
-| [src/collectives/device/prims_simple.h](../../src/collectives/device/prims_simple.h#L72) | 11 | 中文导读： |
-| [src/collectives/device/reduce.cu](../../src/collectives/device/reduce.cu#L11) | 1 | 中文精读：这个短 .cu 文件是模板实例化入口 |
-| [src/collectives/device/reduce.h](../../src/collectives/device/reduce.h#L44) | 1 | 中文精读：Reduce 的流水线起点在 root 的后继 |
-| [src/collectives/device/reduce_kernel.h](../../src/collectives/device/reduce_kernel.h#L24) | 3 | 中文精读：数值操作层不负责通信 |
-| [src/collectives/device/reduce_scatter.cu](../../src/collectives/device/reduce_scatter.cu#L11) | 1 | 中文精读：这个短 .cu 文件是模板实例化入口 |
-| [src/collectives/device/reduce_scatter.h](../../src/collectives/device/reduce_scatter.h#L13) | 2 | 中文导读： |
-| [src/collectives/device/sendrecv.cu](../../src/collectives/device/sendrecv.cu#L11) | 1 | 中文精读：这个短 .cu 文件是模板实例化入口 |
-| [src/collectives/device/sendrecv.h](../../src/collectives/device/sendrecv.h#L12) | 3 | 中文导读： |
-| [src/collectives/reduce.cc](../../src/collectives/reduce.cc#L12) | 2 | 中文导读： |
-| [src/collectives/reduce_scatter.cc](../../src/collectives/reduce_scatter.cc#L12) | 2 | 中文导读： |
-| [src/collectives/sendrecv.cc](../../src/collectives/sendrecv.cc#L13) | 3 | 中文导读： |
-| [src/debug.cc](../../src/debug.cc#L18) | 1 | 中文精读：日志开关如何帮助对应源码阶段 |
-| [src/enqueue.cc](../../src/enqueue.cc#L166) | 24 | 中文精读：工作 FIFO 的生产者与槽位复用 |
-| [src/graph/connect.cc](../../src/graph/connect.cc#L17) | 5 | 中文精读：先构造机内片段，再交换跨机拼接信息 |
-| [src/graph/paths.cc](../../src/graph/paths.cc#L34) | 5 | 中文精读：硬件图上的路径预计算 |
-| [src/graph/rings.cc](../../src/graph/rings.cc#L22) | 1 | 中文精读：最终环的完整性检查 |
-| [src/graph/search.cc](../../src/graph/search.cc#L65) | 5 | 中文精读：搜索阶段如何扣减链路带宽 |
-| [src/graph/topo.cc](../../src/graph/topo.cc#L595) | 1 | 中文导读： |
-| [src/graph/topo.h](../../src/graph/topo.h#L99) | 2 | 中文精读：硬件节点、边与缓存路径 |
-| [src/graph/trees.cc](../../src/graph/trees.cc#L31) | 2 | 中文精读：用 rank 位模式生成二叉树 |
-| [src/graph/tuning.cc](../../src/graph/tuning.cc#L77) | 4 | 中文导读： |
-| [src/graph/xml.cc](../../src/graph/xml.cc#L14) | 1 | 中文精读：从系统发现信息到图搜索输入 |
-| [src/graph/xml.h](../../src/graph/xml.h#L26) | 1 | 中文精读：硬件 XML 与通信图 XML 的区别 |
-| [src/group.cc](../../src/group.cc#L96) | 6 | 中文导读： |
-| [src/include/alloc.h](../../src/include/alloc.h#L19) | 2 | 中文精读：三类常见内存的区别 |
-| [src/include/channel.h](../../src/include/channel.h#L13) | 2 | 中文导读： |
-| [src/include/checks.h](../../src/include/checks.h#L12) | 1 | 中文精读：阅读错误处理宏时要展开控制流 |
-| [src/include/collectives.h](../../src/include/collectives.h#L21) | 1 | 中文精读：主机和设备必须一致的函数表下标 |
-| [src/include/comm.h](../../src/include/comm.h#L34) | 5 | 中文导读： |
-| [src/include/core.h](../../src/include/core.h#L17) | 1 | 中文精读：公开符号与实现函数的关系 |
-| [src/include/devcomm.h](../../src/include/devcomm.h#L30) | 14 | 中文精读：两种循环队列，不要混淆 |
-| [src/include/enqueue.h](../../src/include/enqueue.h#L43) | 2 | 中文精读：一项操作为什么保存两份执行描述 |
-| [src/include/graph.h](../../src/include/graph.h#L65) | 2 | 中文导读： |
-| [src/include/info.h](../../src/include/info.h#L28) | 2 | 中文导读： |
-| [src/include/net.h](../../src/include/net.h#L20) | 1 | 中文导读： |
-| [src/include/param.h](../../src/include/param.h#L18) | 1 | 中文精读：NCCL_ 环境参数怎样变成 C++ 函数 |
-| [src/include/proxy.h](../../src/include/proxy.h#L23) | 6 | 中文导读： |
-| [src/include/transport.h](../../src/include/transport.h#L30) | 3 | 中文精读：初始化时交换的参与者摘要 |
-| [src/include/utils.h](../../src/include/utils.h#L49) | 1 | 中文精读：排队链表为何 recycle 而非每轮 free |
-| [src/init.cc](../../src/init.cc#L187) | 19 | 中文导读： |
-| [src/misc/argcheck.cc](../../src/misc/argcheck.cc#L36) | 2 | 中文导读： |
-| [src/misc/gdrwrap.cc](../../src/misc/gdrwrap.cc#L52) | 1 | 中文精读：GDRCopy 与 GPUDirect RDMA 不是同一接口 |
-| [src/misc/ibvwrap.cc](../../src/misc/ibvwrap.cc#L44) | 2 | 中文导读： |
-| [src/misc/nvmlwrap.cc](../../src/misc/nvmlwrap.cc#L48) | 1 | 中文精读：NVML 在 NCCL 中负责发现硬件 |
-| [src/misc/param.cc](../../src/misc/param.cc#L51) | 1 | 中文精读：配置文件与环境变量的优先级 |
-| [src/misc/profiler.cc](../../src/misc/profiler.cc#L7) | 1 | 中文精读：内置 Proxy profiling 的观察范围 |
-| [src/misc/shmutils.cc](../../src/misc/shmutils.cc#L55) | 1 | 中文精读：同一共享内存在 CPU/GPU 上的地址视图 |
-| [src/misc/socket.cc](../../src/misc/socket.cc#L489) | 1 | 中文精读：TCP 是字节流，必须保存部分完成的 offset |
-| [src/net.cc](../../src/net.cc#L110) | 2 | 中文精读：插件是网络函数表的动态替换 |
-| [src/proxy.cc](../../src/proxy.cc#L278) | 7 | 中文精读：CPU 怎样唤醒数据面代理线程 |
-| [src/transport.cc](../../src/transport.cc#L26) | 4 | 中文导读： |
-| [src/transport/coll_net.cc](../../src/transport/coll_net.cc#L304) | 3 | 中文精读：CollNet 连接共享的作用域 |
-| [src/transport/net.cc](../../src/transport/net.cc#L165) | 12 | 中文导读： |
-| [src/transport/net_ib.cc](../../src/transport/net_ib.cc#L33) | 20 | 中文导读： |
-| [src/transport/net_socket.cc](../../src/transport/net_socket.cc#L483) | 2 | 中文精读：Socket 后端也实现异步 request/test 契约 |
-| [src/transport/p2p.cc](../../src/transport/p2p.cc#L11) | 3 | 中文精读：GPU 间共享内存地址如何跨进程表达 |
-| [src/transport/shm.cc](../../src/transport/shm.cc#L37) | 2 | 中文导读： |
-
-## 验证范围
-
-- 76 个源码文件，261 个中文注释块，新增 1384 行源码注释，共 54135 字符（含注释标记）。
-- 逐文件删除本分支新增的中文块注释后，与本地 Git 基线逐字节相同。原语、宏、结构体布局与执行语句没有改动。
-- 补丁还需通过干净基线重放、文件完整性与相对链接检查；结果见 [验证记录](verification.md)。
-- 当前环境没有 nvcc，未执行 CUDA 编译、GPU 正确性或多机性能测试。示例仅用于解释下标与调用流程。
-
-配套长文：[整体架构](README.md)、[初始化与执行](execution.md)、[Proxy 与 RDMA](rdma.md)。
+| 文件 | 函数定义 | 类型定义 | 变量项 |
+| --- | ---: | ---: | ---: |
+| [ext-net/dummy/plugin.c](../../ext-net/dummy/plugin.c) | 30 | 0 | 2 |
+| [src/bootstrap.cc](../../src/bootstrap.cc) | 17 | 4 | 80 |
+| [src/channel.cc](../../src/channel.cc) | 2 | 0 | 9 |
+| [src/collectives/all_gather.cc](../../src/collectives/all_gather.cc) | 1 | 0 | 1 |
+| [src/collectives/all_reduce.cc](../../src/collectives/all_reduce.cc) | 1 | 0 | 1 |
+| [src/collectives/broadcast.cc](../../src/collectives/broadcast.cc) | 2 | 0 | 1 |
+| [src/collectives/device/all_gather.cu](../../src/collectives/device/all_gather.cu) | 0 | 0 | 0 |
+| [src/collectives/device/all_gather.h](../../src/collectives/device/all_gather.h) | 4 | 3 | 21 |
+| [src/collectives/device/all_reduce.cu](../../src/collectives/device/all_reduce.cu) | 0 | 0 | 0 |
+| [src/collectives/device/all_reduce.h](../../src/collectives/device/all_reduce.h) | 10 | 7 | 123 |
+| [src/collectives/device/broadcast.cu](../../src/collectives/device/broadcast.cu) | 0 | 0 | 0 |
+| [src/collectives/device/broadcast.h](../../src/collectives/device/broadcast.h) | 4 | 3 | 19 |
+| [src/collectives/device/common.h](../../src/collectives/device/common.h) | 7 | 5 | 39 |
+| [src/collectives/device/common_kernel.h](../../src/collectives/device/common_kernel.h) | 49 | 40 | 168 |
+| [src/collectives/device/functions.cu](../../src/collectives/device/functions.cu) | 1 | 0 | 2 |
+| [src/collectives/device/onerank_reduce.cu](../../src/collectives/device/onerank_reduce.cu) | 1 | 0 | 14 |
+| [src/collectives/device/op128.h](../../src/collectives/device/op128.h) | 6 | 1 | 9 |
+| [src/collectives/device/primitives.h](../../src/collectives/device/primitives.h) | 21 | 6 | 16 |
+| [src/collectives/device/prims_ll.h](../../src/collectives/device/prims_ll.h) | 38 | 6 | 78 |
+| [src/collectives/device/prims_ll128.h](../../src/collectives/device/prims_ll128.h) | 32 | 1 | 91 |
+| [src/collectives/device/prims_simple.h](../../src/collectives/device/prims_simple.h) | 33 | 3 | 94 |
+| [src/collectives/device/reduce.cu](../../src/collectives/device/reduce.cu) | 0 | 0 | 0 |
+| [src/collectives/device/reduce.h](../../src/collectives/device/reduce.h) | 4 | 3 | 28 |
+| [src/collectives/device/reduce_kernel.h](../../src/collectives/device/reduce_kernel.h) | 106 | 45 | 113 |
+| [src/collectives/device/reduce_scatter.cu](../../src/collectives/device/reduce_scatter.cu) | 0 | 0 | 0 |
+| [src/collectives/device/reduce_scatter.h](../../src/collectives/device/reduce_scatter.h) | 4 | 3 | 19 |
+| [src/collectives/device/sendrecv.cu](../../src/collectives/device/sendrecv.cu) | 0 | 0 | 0 |
+| [src/collectives/device/sendrecv.h](../../src/collectives/device/sendrecv.h) | 3 | 1 | 19 |
+| [src/collectives/reduce.cc](../../src/collectives/reduce.cc) | 1 | 0 | 1 |
+| [src/collectives/reduce_scatter.cc](../../src/collectives/reduce_scatter.cc) | 1 | 0 | 1 |
+| [src/collectives/sendrecv.cc](../../src/collectives/sendrecv.cc) | 2 | 0 | 4 |
+| [src/debug.cc](../../src/debug.cc) | 3 | 0 | 29 |
+| [src/enhcompat.cc](../../src/enhcompat.cc) | 5 | 1 | 0 |
+| [src/enqueue.cc](../../src/enqueue.cc) | 40 | 2 | 188 |
+| [src/graph/connect.cc](../../src/graph/connect.cc) | 11 | 0 | 81 |
+| [src/graph/paths.cc](../../src/graph/paths.cc) | 20 | 1 | 149 |
+| [src/graph/rings.cc](../../src/graph/rings.cc) | 2 | 0 | 10 |
+| [src/graph/rings.h](../../src/graph/rings.h) | 0 | 0 | 0 |
+| [src/graph/search.cc](../../src/graph/search.cc) | 31 | 1 | 190 |
+| [src/graph/topo.cc](../../src/graph/topo.cc) | 30 | 1 | 132 |
+| [src/graph/topo.h](../../src/graph/topo.h) | 3 | 10 | 43 |
+| [src/graph/trees.cc](../../src/graph/trees.cc) | 2 | 0 | 12 |
+| [src/graph/tuning.cc](../../src/graph/tuning.cc) | 4 | 0 | 67 |
+| [src/graph/xml.cc](../../src/graph/xml.cc) | 37 | 5 | 122 |
+| [src/graph/xml.h](../../src/graph/xml.h) | 20 | 4 | 41 |
+| [src/group.cc](../../src/group.cc) | 11 | 5 | 98 |
+| [src/include/align.h](../../src/include/align.h) | 3 | 0 | 0 |
+| [src/include/alloc.h](../../src/include/alloc.h) | 7 | 0 | 8 |
+| [src/include/argcheck.h](../../src/include/argcheck.h) | 0 | 0 | 0 |
+| [src/include/bootstrap.h](../../src/include/bootstrap.h) | 0 | 0 | 0 |
+| [src/include/channel.h](../../src/include/channel.h) | 3 | 0 | 8 |
+| [src/include/checks.h](../../src/include/checks.h) | 0 | 0 | 0 |
+| [src/include/coll_net.h](../../src/include/coll_net.h) | 14 | 0 | 1 |
+| [src/include/collectives.h](../../src/include/collectives.h) | 0 | 2 | 3 |
+| [src/include/comm.h](../../src/include/comm.h) | 1 | 14 | 117 |
+| [src/include/core.h](../../src/include/core.h) | 1 | 0 | 0 |
+| [src/include/cpuset.h](../../src/include/cpuset.h) | 3 | 0 | 10 |
+| [src/include/debug.h](../../src/include/debug.h) | 0 | 0 | 6 |
+| [src/include/devcomm.h](../../src/include/devcomm.h) | 0 | 23 | 104 |
+| [src/include/enqueue.h](../../src/include/enqueue.h) | 3 | 3 | 20 |
+| [src/include/gdrwrap.h](../../src/include/gdrwrap.h) | 20 | 3 | 35 |
+| [src/include/graph.h](../../src/include/graph.h) | 0 | 2 | 23 |
+| [src/include/group.h](../../src/include/group.h) | 0 | 0 | 0 |
+| [src/include/ibvwrap.h](../../src/include/ibvwrap.h) | 5 | 91 | 372 |
+| [src/include/info.h](../../src/include/info.h) | 0 | 2 | 23 |
+| [src/include/nccl_net.h](../../src/include/nccl_net.h) | 0 | 8 | 76 |
+| [src/include/net.h](../../src/include/net.h) | 15 | 0 | 3 |
+| [src/include/nvmlwrap.h](../../src/include/nvmlwrap.h) | 0 | 8 | 19 |
+| [src/include/nvtx.h](../../src/include/nvtx.h) | 0 | 1 | 1 |
+| [src/include/nvtx3/nvToolsExt.h](../../src/include/nvtx3/nvToolsExt.h) | 0 | 9 | 27 |
+| [src/include/nvtx3/nvToolsExtCuda.h](../../src/include/nvtx3/nvToolsExtCuda.h) | 0 | 1 | 0 |
+| [src/include/nvtx3/nvToolsExtCudaRt.h](../../src/include/nvtx3/nvToolsExtCudaRt.h) | 0 | 1 | 0 |
+| [src/include/nvtx3/nvToolsExtOpenCL.h](../../src/include/nvtx3/nvToolsExtOpenCL.h) | 0 | 1 | 0 |
+| [src/include/nvtx3/nvToolsExtSync.h](../../src/include/nvtx3/nvToolsExtSync.h) | 0 | 4 | 4 |
+| [src/include/nvtx3/nvtxDetail/nvtxImpl.h](../../src/include/nvtx3/nvtxDetail/nvtxImpl.h) | 3 | 1 | 77 |
+| [src/include/nvtx3/nvtxDetail/nvtxImplCore.h](../../src/include/nvtx3/nvtxDetail/nvtxImplCore.h) | 30 | 0 | 30 |
+| [src/include/nvtx3/nvtxDetail/nvtxImplCudaRt_v3.h](../../src/include/nvtx3/nvtxDetail/nvtxImplCudaRt_v3.h) | 6 | 0 | 6 |
+| [src/include/nvtx3/nvtxDetail/nvtxImplCuda_v3.h](../../src/include/nvtx3/nvtxDetail/nvtxImplCuda_v3.h) | 8 | 0 | 8 |
+| [src/include/nvtx3/nvtxDetail/nvtxImplOpenCL_v3.h](../../src/include/nvtx3/nvtxDetail/nvtxImplOpenCL_v3.h) | 14 | 0 | 14 |
+| [src/include/nvtx3/nvtxDetail/nvtxImplSync_v3.h](../../src/include/nvtx3/nvtxDetail/nvtxImplSync_v3.h) | 6 | 0 | 6 |
+| [src/include/nvtx3/nvtxDetail/nvtxInit.h](../../src/include/nvtx3/nvtxDetail/nvtxInit.h) | 2 | 0 | 21 |
+| [src/include/nvtx3/nvtxDetail/nvtxInitDecls.h](../../src/include/nvtx3/nvtxDetail/nvtxInitDecls.h) | 0 | 0 | 0 |
+| [src/include/nvtx3/nvtxDetail/nvtxInitDefs.h](../../src/include/nvtx3/nvtxDetail/nvtxInitDefs.h) | 65 | 0 | 34 |
+| [src/include/nvtx3/nvtxDetail/nvtxLinkOnce.h](../../src/include/nvtx3/nvtxDetail/nvtxLinkOnce.h) | 0 | 0 | 0 |
+| [src/include/nvtx3/nvtxDetail/nvtxTypes.h](../../src/include/nvtx3/nvtxDetail/nvtxTypes.h) | 0 | 10 | 4 |
+| [src/include/nvtx3.hpp](../../src/include/nvtx3.hpp) | 60 | 14 | 28 |
+| [src/include/p2p.h](../../src/include/p2p.h) | 1 | 1 | 3 |
+| [src/include/param.h](../../src/include/param.h) | 0 | 0 | 1 |
+| [src/include/profiler.h](../../src/include/profiler.h) | 0 | 1 | 0 |
+| [src/include/proxy.h](../../src/include/proxy.h) | 0 | 15 | 105 |
+| [src/include/shm.h](../../src/include/shm.h) | 0 | 0 | 0 |
+| [src/include/socket.h](../../src/include/socket.h) | 0 | 3 | 9 |
+| [src/include/timer.h](../../src/include/timer.h) | 2 | 0 | 9 |
+| [src/include/transport.h](../../src/include/transport.h) | 0 | 5 | 24 |
+| [src/include/trees.h](../../src/include/trees.h) | 0 | 0 | 0 |
+| [src/include/utils.h](../../src/include/utils.h) | 9 | 3 | 11 |
+| [src/init.cc](../../src/init.cc) | 28 | 2 | 144 |
+| [src/misc/argcheck.cc](../../src/misc/argcheck.cc) | 3 | 0 | 3 |
+| [src/misc/gdrwrap.cc](../../src/misc/gdrwrap.cc) | 12 | 1 | 24 |
+| [src/misc/ibvwrap.cc](../../src/misc/ibvwrap.cc) | 25 | 1 | 27 |
+| [src/misc/nvmlwrap.cc](../../src/misc/nvmlwrap.cc) | 8 | 1 | 21 |
+| [src/misc/param.cc](../../src/misc/param.cc) | 4 | 0 | 13 |
+| [src/misc/profiler.cc](../../src/misc/profiler.cc) | 4 | 1 | 24 |
+| [src/misc/shmutils.cc](../../src/misc/shmutils.cc) | 6 | 0 | 4 |
+| [src/misc/socket.cc](../../src/misc/socket.cc) | 20 | 0 | 89 |
+| [src/misc/utils.cc](../../src/misc/utils.cc) | 12 | 0 | 25 |
+| [src/nccl.h.in](../../src/nccl.h.in) | 0 | 6 | 3 |
+| [src/net.cc](../../src/net.cc) | 11 | 0 | 33 |
+| [src/proxy.cc](../../src/proxy.cc) | 38 | 5 | 167 |
+| [src/transport/coll_net.cc](../../src/transport/coll_net.cc) | 22 | 11 | 192 |
+| [src/transport/net.cc](../../src/transport/net.cc) | 22 | 7 | 251 |
+| [src/transport/net_ib.cc](../../src/transport/net_ib.cc) | 34 | 19 | 256 |
+| [src/transport/net_socket.cc](../../src/transport/net_socket.cc) | 23 | 10 | 126 |
+| [src/transport/p2p.cc](../../src/transport/p2p.cc) | 12 | 4 | 53 |
+| [src/transport/shm.cc](../../src/transport/shm.cc) | 7 | 3 | 35 |
+| [src/transport.cc](../../src/transport.cc) | 7 | 2 | 75 |
