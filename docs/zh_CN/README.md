@@ -212,3 +212,7 @@ CPU 并不是把整个 `ncclInfo` 复制到 GPU 后让 GPU 再搜索拓扑。拓
 注释覆盖初始化、bootstrap、拓扑搜索、调优、group、调度、GPU Ring/Tree/P2P、Simple/LL/LL128、transport、网络插件选择、Proxy、IB 连接及 MR 缓存等核心路径。并非给第三方 NVTX 头文件或每一个辅助函数逐行加注释。
 
 验证首先保证已有源码在去掉新增“中文导读”块后与基线逐字节一致，并检查 Git 补丁格式及文档引用。本环境没有 nvcc/CUDA GPU，因此不把静态验证表述为完整编译或多机通信测试。读性能和硬件资源时，最终仍要用目标硬件、后端、环境配置及运行日志验证。
+
+## V3：图解与函数内部步骤
+
+[42张关键路径图解](visual-guide.md) · [离线图解](visual-guide.html) · [1178个函数内部步骤](function-logic-index.md) · [离线函数搜索](function-logic.html)。所有内部步骤也在源码的“中文内部逻辑”注释中。

@@ -87,6 +87,15 @@ int parseStringList(const char* string, struct netIf* ifList, int maxList);
  */
 bool matchIfList(const char* string, int port, struct netIf* ifList, int listSize, bool matchExact);
 
+/* 中文内部逻辑 F0872：log2i
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：long l = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 ；继续条件 (n>>=1)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 调用 / 计算 / 写入：l++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 5. 函数返回：return l;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0872
+ */
 /* 中文逐项-函数 F0872：log2i
  * 用途与位置：用移位计算整数以2为底的向下取整对数，供树深、性能分桶等离散决策使用。
  * 参数 n（long n）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
@@ -153,6 +162,12 @@ class ncclRecyclableList {
   int n;
 
  public:
+/* 中文内部逻辑 F0873：ncclRecyclableList
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：tail = cursor = head = NULL;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 2. 调用 / 计算 / 写入：n = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0873
+ */
 /* 中文逐项-函数 F0873：ncclRecyclableList
  * 用途与位置：建立空的可复用链表，分离已有容量、已用边界和遍历游标。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -164,6 +179,11 @@ class ncclRecyclableList {
     n = 0;
   }
 
+/* 中文内部逻辑 F0874：count
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return n;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0874
+ */
 /* 中文逐项-函数 F0874：count
  * 用途与位置：返回当前这轮列表已使用的元素数，而不是历史分配容量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -174,6 +194,24 @@ class ncclRecyclableList {
   int count() const { return n; }
 
   // Get a new element from the list and return pointer
+/* 中文内部逻辑 F0875：getNewElem
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(tail != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：*dataOut = &tail->data;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     4. 调用 / 计算 / 写入：memset(*dataOut, 0, sizeof(T));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   5. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     6. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&tail, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     7. 调用 / 计算 / 写入：*dataOut = &tail->data;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     8. 调用 / 计算 / 写入：cursor = head = tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 9. 条件判断：(tail->next == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&tail->next, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 12. 调用 / 计算 / 写入：tail = tail->next;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 13. 调用 / 计算 / 写入：n += 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0875
+ */
 /* 中文逐项-函数 F0875：getNewElem
  * 用途与位置：取可复用节点并清零 data，容量不足时扩展节点链，减少高频排队的动态分配。
  * 参数 dataOut（T** dataOut）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -199,6 +237,15 @@ class ncclRecyclableList {
     return ncclSuccess;
   }
 
+/* 中文内部逻辑 F0876：begin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(head == NULL || head == tail)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 调用 / 计算 / 写入：cursor = head->next;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 5. 函数返回：return &head->data;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0876
+ */
 /* 中文逐项-函数 F0876：begin
  * 用途与位置：定位本轮首个已用节点并初始化后续遍历游标，空列表返回 NULL。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -214,6 +261,16 @@ class ncclRecyclableList {
   }
 
   // Get next element from the list during an iteration
+/* 中文内部逻辑 F0877：getNext
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(cursor == NULL || cursor == tail)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：T* rv = &cursor->data;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：cursor = cursor->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 函数返回：return rv;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0877
+ */
 /* 中文逐项-函数 F0877：getNext
  * 用途与位置：返回游标处元素并向后推进，越过本轮已用边界时返回 NULL。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -235,6 +292,14 @@ class ncclRecyclableList {
     return rv;
   }
 
+/* 中文内部逻辑 F0878：peakNext
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(cursor == NULL || cursor == tail)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 函数返回：return &cursor->data;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0878
+ */
 /* 中文逐项-函数 F0878：peakNext
  * 用途与位置：只查看下一个元素是否存在而不推进游标，供队列耗尽后回收判断。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -249,6 +314,12 @@ class ncclRecyclableList {
   }
 
   // Recycle the list without freeing the space
+/* 中文内部逻辑 F0879：recycle
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：tail = cursor = head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 2. 调用 / 计算 / 写入：n = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0879
+ */
 /* 中文逐项-函数 F0879：recycle
  * 用途与位置：把本轮已用边界/游标复位到已分配链头，下轮复用现有节点而不释放容量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -260,6 +331,15 @@ class ncclRecyclableList {
     n = 0;
   }
 
+/* 中文内部逻辑 F0880：~ncclRecyclableList
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 ；继续条件 (head != NULL)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 准备局部状态：struct ncclListElem<T>* temp = head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *   3. 调用 / 计算 / 写入：head = head->next;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *   4. 调用 / 计算 / 写入：free(temp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__utils_h.md#f0880
+ */
 /* 中文逐项-函数 F0880：~ncclRecyclableList
  * 用途与位置：遍历并释放整条已分配链，和仅重置使用状态的 recycle 区分。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。

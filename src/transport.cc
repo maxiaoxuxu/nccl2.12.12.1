@@ -47,6 +47,29 @@ struct ncclTransport ncclTransports[NTRANSPORTS] = {
   collNetTransport
 };
 
+/* 中文内部逻辑 F1172：selectTransport
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclPeerInfo* myInfo = comm->peerInfo+comm->rank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclPeerInfo* peerInfo = comm->peerInfo+peer;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct ncclConnector* connector = (type == 1) ? comm->channels[channelId].peers[peer].send + connIndex : comm->channels[channelId].peers[peer].recv + connIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 循环：初始 int t=0;；继续条件 t<NTRANSPORTS；每轮更新 t++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   5. 准备局部状态：struct ncclTransport *transport = ncclTransports+t;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   6. 准备局部状态：struct ncclTransportComm* transportComm = type == 1 ? &transport->send : &transport->recv;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   7. 准备局部状态：int ret = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   8. 调用 / 计算 / 写入：NCCLCHECK(transport->canConnect(&ret, comm->topo, graph, myInfo, peerInfo));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   9. 条件判断：(ret)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     10. 真分支：；仅条件为真执行以下子项。
+ *       11. 调用 / 计算 / 写入：connector->transportComm = transportComm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       12. 调用 / 计算 / 写入：NCCLCHECK(transportComm->setup(comm, graph, myInfo, peerInfo, connect, connector, channelId, connIndex));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *       13. 条件判断：(transportType)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         14. 真分支：；仅条件为真执行以下子项。
+ *           15. 调用 / 计算 / 写入：*transportType = t;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 18. 调用 / 计算 / 写入：WARN("No transport found for rank %d[%lx] -> rank %d[%lx]", myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 19. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport_cc.md#f1172
+ */
 /* 中文逐项-函数 F1172：selectTransport
  * 用途与位置：按 P2P、SHM、NET、CollNet 顺序检查连接能力并调用首个可用后端的 setup。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -126,6 +149,27 @@ static ncclResult_t selectTransport(struct ncclComm* comm, struct ncclTopoGraph*
  * 集合通信预先标记拓扑邻居，Send/Recv 则可在首次遇到新 peer 时按需标记连接索引 1。
  * 所以 init 完成后的 QP/MR 不一定是未来所有 P2P 负载所需的峰值。
  */
+/* 中文内部逻辑 F1173：ncclTransportP2pConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "nsend %d nrecv %d", nsend, nrecv);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：uint32_t mask = 1 << channel->id;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 循环：初始 int i=0;；继续条件 i<nrecv；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 准备局部状态：int peer = peerRecv[i];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   5. 条件判断：(peer == -1 || peer >= comm->nRanks || peer == comm->rank || channel->peers[peer].recv[connIndex].connected)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     6. 真分支：；仅条件为真执行以下子项。
+ *       7. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   8. 调用 / 计算 / 写入：comm->connectRecv[peer] |= mask;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 10. 循环：初始 int i=0;；继续条件 i<nsend；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   11. 准备局部状态：int peer = peerSend[i];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   12. 条件判断：(peer == -1 || peer >= comm->nRanks || peer == comm->rank || channel->peers[peer].send[connIndex].connected)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     13. 真分支：；仅条件为真执行以下子项。
+ *       14. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   15. 调用 / 计算 / 写入：comm->connectSend[peer] |= mask;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 17. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport_cc.md#f1173
+ */
 /* 中文逐项-函数 F1173：ncclTransportP2pConnect
  * 用途与位置：为尚未连通的邻居方向/channel 设置建链需求位，真正资源创建留到 Setup。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -178,6 +222,18 @@ ncclResult_t ncclTransportP2pConnect(struct ncclComm* comm, struct ncclChannel* 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1174：dumpData
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int n=0;；继续条件 n<ndata；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 调用 / 计算 / 写入：printf("[%d] ", n);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   3. 准备局部状态：uint8_t* d = (uint8_t*)data;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   4. 循环：初始 int i=0;；继续条件 i<sizeof(struct ncclConnect)；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     5. 调用 / 计算 / 写入：printf("%02x", d[i]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   6. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   7. 调用 / 计算 / 写入：printf("\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport_cc.md#f1174
+ */
 /* 中文逐项-函数 F1174：dumpData
  * 用途与位置：按字节/机器字打印 transport 建链句柄内容，仅作控制元数据诊断。
  * 参数 data（struct ncclConnect* data）：当前对象的数据区或固定布局填充；看宿主类型区分用户条目、控制句柄和对齐空间。
@@ -210,6 +266,96 @@ void dumpData(struct ncclConnect* data, int ndata) {
 /* 中文导读：
  * 消费待连接位图：选择 transport/setup → bootstrap 交换连接句柄 → connect → 同步设备端 connector。
  * connIndex 区分连接用途；一次逻辑边可能使用本地 P2P，也可能落到网络后端的一组 QP。
+ */
+/* 中文内部逻辑 F1175：ncclTransportP2pSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：cudaStream_t transportSetupStream;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：CUDACHECK(cudaStreamCreateWithFlags(&transportSetupStream, cudaStreamNonBlocking));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 准备局部状态：int highestType = TRANSPORT_P2P;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：struct ncclConnect data[2*MAXCHANNELS];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 循环：初始 int i=1;；继续条件 i<comm->nRanks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   6. 准备局部状态：int bootstrapTag = (i<<8) + (graph ? graph->id+1 : 0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   7. 准备局部状态：int recvPeer = (comm->rank - i + comm->nRanks) % comm->nRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   8. 准备局部状态：int sendPeer = (comm->rank + i) % comm->nRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   9. 准备局部状态：uint32_t recvMask = comm->connectRecv[recvPeer];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   10. 准备局部状态：uint32_t sendMask = comm->connectSend[sendPeer];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   11. 准备局部状态：struct ncclConnect* recvData = data;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   12. 准备局部状态：int sendChannels = 0, recvChannels = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   13. 准备局部状态：int type;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   14. 调用 / 计算 / 写入：TIME_START(0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   15. 循环：初始 int c=0;；继续条件 c<MAXCHANNELS；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     16. 条件判断：(recvMask & (1<<c))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       17. 真分支：；仅条件为真执行以下子项。
+ *         18. 调用 / 计算 / 写入：NCCLCHECK(selectTransport<0>(comm, graph, recvData+recvChannels++, c, recvPeer, connIndex, &type));；失败时可能提前return，成功才继续；按 P2P、SHM、NET、CollNet 顺序检查连接能力并调用首个可用后端的 setup。
+ *         19. 条件判断：(type > highestType)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           20. 真分支：；仅条件为真执行以下子项。
+ *             21. 调用 / 计算 / 写入：highestType = type;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   22. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   23. 调用 / 计算 / 写入：TIME_STOP(0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   24. 调用 / 计算 / 写入：TIME_START(1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   25. 准备局部状态：struct ncclConnect* sendData = recvData+recvChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   26. 循环：初始 int c=0;；继续条件 c<MAXCHANNELS；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     27. 条件判断：(sendMask & (1<<c))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       28. 真分支：；仅条件为真执行以下子项。
+ *         29. 调用 / 计算 / 写入：NCCLCHECK(selectTransport<1>(comm, graph, sendData+sendChannels++, c, sendPeer, connIndex, &type));；失败时可能提前return，成功才继续；按 P2P、SHM、NET、CollNet 顺序检查连接能力并调用首个可用后端的 setup。
+ *         30. 条件判断：(type > highestType)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           31. 真分支：；仅条件为真执行以下子项。
+ *             32. 调用 / 计算 / 写入：highestType = type;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   33. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   34. 调用 / 计算 / 写入：TIME_STOP(1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   35. 调用 / 计算 / 写入：TIME_START(2);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   36. 条件判断：(sendPeer == recvPeer)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     37. 真分支：；仅条件为真执行以下子项。
+ *       38. 条件判断：(recvChannels+sendChannels)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         39. 真分支：；仅条件为真执行以下子项。
+ *           40. 调用 / 计算 / 写入：NCCLCHECK(bootstrapSend(comm->bootstrap, recvPeer, bootstrapTag, data, sizeof(struct ncclConnect)*(recvChannels+sendChannels)));；失败时可能提前return，成功才继续；向指定 rank 的控制监听地址建立连接，发送本 rank、tag 及消息内容以便对端匹配。
+ *           41. 调用 / 计算 / 写入：NCCLCHECK(bootstrapRecv(comm->bootstrap, recvPeer, bootstrapTag, data, sizeof(struct ncclConnect)*(recvChannels+sendChannels)));；失败时可能提前return，成功才继续；优先匹配暂存连接，否则接收新控制连接并按 peer/tag 分类后读取正确消息。
+ *           42. 调用 / 计算 / 写入：sendData = data;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           43. 调用 / 计算 / 写入：recvData = data+sendChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     44. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       45. 条件判断：(recvChannels)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         46. 真分支：；仅条件为真执行以下子项。
+ *           47. 调用 / 计算 / 写入：NCCLCHECK(bootstrapSend(comm->bootstrap, recvPeer, bootstrapTag, recvData, sizeof(struct ncclConnect)*recvChannels));；失败时可能提前return，成功才继续；向指定 rank 的控制监听地址建立连接，发送本 rank、tag 及消息内容以便对端匹配。
+ *       48. 条件判断：(sendChannels)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         49. 真分支：；仅条件为真执行以下子项。
+ *           50. 调用 / 计算 / 写入：NCCLCHECK(bootstrapSend(comm->bootstrap, sendPeer, bootstrapTag, sendData, sizeof(struct ncclConnect)*sendChannels));；失败时可能提前return，成功才继续；向指定 rank 的控制监听地址建立连接，发送本 rank、tag 及消息内容以便对端匹配。
+ *       51. 条件判断：(sendChannels)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         52. 真分支：；仅条件为真执行以下子项。
+ *           53. 调用 / 计算 / 写入：NCCLCHECK(bootstrapRecv(comm->bootstrap, sendPeer, bootstrapTag, sendData, sizeof(struct ncclConnect)*sendChannels));；失败时可能提前return，成功才继续；优先匹配暂存连接，否则接收新控制连接并按 peer/tag 分类后读取正确消息。
+ *       54. 条件判断：(recvChannels)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         55. 真分支：；仅条件为真执行以下子项。
+ *           56. 调用 / 计算 / 写入：NCCLCHECK(bootstrapRecv(comm->bootstrap, recvPeer, bootstrapTag, recvData, sizeof(struct ncclConnect)*recvChannels));；失败时可能提前return，成功才继续；优先匹配暂存连接，否则接收新控制连接并按 peer/tag 分类后读取正确消息。
+ *   57. 调用 / 计算 / 写入：TIME_STOP(2);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   58. 调用 / 计算 / 写入：TIME_START(3);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   59. 循环：初始 int c=0;；继续条件 c<MAXCHANNELS；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     60. 条件判断：(sendMask & (1<<c))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       61. 真分支：；仅条件为真执行以下子项。
+ *         62. 准备局部状态：struct ncclConnector* conn = comm->channels[c].peers[sendPeer].send + connIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         63. 调用 / 计算 / 写入：NCCLCHECK(conn->transportComm->connect(comm, sendData++, 1, comm->rank, conn));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *         64. 调用 / 计算 / 写入：conn->connected = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         65. 调用 / 计算 / 写入：CUDACHECK(cudaMemcpyAsync(comm->channels[c].devPeers[sendPeer].send+connIndex, conn, sizeof(struct ncclConnector), cudaMemcpyHostToDevice, transportSetupStream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   66. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   67. 调用 / 计算 / 写入：TIME_STOP(3);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   68. 调用 / 计算 / 写入：TIME_START(4);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   69. 循环：初始 int c=0;；继续条件 c<MAXCHANNELS；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     70. 条件判断：(recvMask & (1<<c))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       71. 真分支：；仅条件为真执行以下子项。
+ *         72. 准备局部状态：struct ncclConnector* conn = comm->channels[c].peers[recvPeer].recv + connIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         73. 调用 / 计算 / 写入：NCCLCHECK(conn->transportComm->connect(comm, recvData++, 1, comm->rank, conn));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *         74. 调用 / 计算 / 写入：conn->connected = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         75. 调用 / 计算 / 写入：CUDACHECK(cudaMemcpyAsync(comm->channels[c].devPeers[recvPeer].recv+connIndex, conn, sizeof(struct ncclConnector), cudaMemcpyHostToDevice, transportSetupStream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   76. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   77. 调用 / 计算 / 写入：TIME_STOP(4);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   78. 调用 / 计算 / 写入：comm->connectRecv[recvPeer] = comm->connectSend[sendPeer] = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 79. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 80. 调用 / 计算 / 写入：CUDACHECK(cudaStreamSynchronize(transportSetupStream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 81. 调用 / 计算 / 写入：CUDACHECK(cudaStreamDestroy(transportSetupStream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 82. 条件判断：(highestTransportType != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   83. 真分支：；仅条件为真执行以下子项。
+ *     84. 调用 / 计算 / 写入：*highestTransportType = highestType;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 85. 调用 / 计算 / 写入：TIME_PRINT("P2P Setup/Connect");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 86. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport_cc.md#f1175
  */
 /* 中文逐项-函数 F1175：ncclTransportP2pSetup
  * 用途与位置：按需求位批量选择 transport、交换建链句柄并 connect，将完成的连接复制给设备 peer 表。
@@ -391,6 +537,83 @@ extern struct ncclTransport collNetTransport;
 
 // All ranks must participate in collNetSetup call
 // We do not NCCLCHECK this call because we would fall back to P2P network in case CollNet setup fails
+/* 中文内部逻辑 F1176：ncclTransportCollNetSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int fail = 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int rank = comm->rank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：int nranks = comm->nRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int nMasters = comm->nNodes;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：int rankInCollNet = -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int isMaster = (rank == masterRank) ? 1 : 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：struct { int collNetRank; ncclConnect connect; } sendrecvExchange;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 准备局部状态：struct ncclPeerInfo *myInfo = comm->peerInfo+rank, *peerInfo = comm->peerInfo+nranks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 调用 / 计算 / 写入：peerInfo->rank = nranks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 准备局部状态：int support = 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 条件判断：(isMaster)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   12. 真分支：；仅条件为真执行以下子项。
+ *     13. 调用 / 计算 / 写入：NCCLCHECK(collNetTransport.canConnect(&support, comm->topo, collNetGraph, myInfo, peerInfo));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 14. 条件判断：(isMaster && type == collNetSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 调用 / 计算 / 写入：NCCLCHECK(bootstrapRecv(comm->bootstrap, masterPeer, collNetGraph->id, &sendrecvExchange, sizeof(sendrecvExchange)));；失败时可能提前return，成功才继续；优先匹配暂存连接，否则接收新控制连接并按 peer/tag 分类后读取正确消息。
+ *     17. 调用 / 计算 / 写入：rankInCollNet = sendrecvExchange.collNetRank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     18. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "CollNet [send] : rank %d collNetRank %d collNetNranks %d received connect from rank %d", rank, rankInCollNet, nMasters, masterPeer);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 19. 准备局部状态：struct ncclPeer* root = channel->peers+nranks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 20. 准备局部状态：struct ncclConnector* conn = (type == collNetRecv) ? root->recv+type : root->send+type;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 21. 准备局部状态：struct ncclTransportComm* transportComm = (type == collNetRecv) ? &(collNetTransport.recv) : &(collNetTransport.send);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 22. 调用 / 计算 / 写入：conn->transportComm = transportComm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 23. 准备局部状态：struct ncclConnect myConnect;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 24. 条件判断：(isMaster && support)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   25. 真分支：；仅条件为真执行以下子项。
+ *     26. 调用 / 计算 / 写入：NCCLCHECK(transportComm->setup(comm, collNetGraph, myInfo, peerInfo, &myConnect, conn, collNetGraphChannelId, type));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 27. 准备局部状态：ncclResult_t res;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 28. 准备局部状态：struct { int isMaster; ncclConnect connect; } *allConnects = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 29. 准备局部状态：ncclConnect *masterConnects = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 30. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&masterConnects, nMasters));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 31. 条件判断：(type == collNetRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   32. 真分支：；仅条件为真执行以下子项。
+ *     33. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&allConnects, nranks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     34. 调用 / 计算 / 写入：allConnects[rank].isMaster = isMaster;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     35. 调用 / 计算 / 写入：memcpy(&(allConnects[rank].connect), &myConnect, sizeof(struct ncclConnect));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     36. 调用 / 计算 / 写入：NCCLCHECKGOTO(bootstrapAllGather(comm->bootstrap, allConnects, sizeof(*allConnects)), res, cleanup);；失败时保存错误并跳到清理标签，成功才继续；沿控制 socket 环逐轮交换每个 rank 的固定尺寸元数据，最终每方拥有全组摘要。
+ *     37. 准备局部状态：int c = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     38. 循环：初始 int r = 0;；继续条件 r < nranks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       39. 条件判断：(allConnects[r].isMaster)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         40. 真分支：；仅条件为真执行以下子项。
+ *           41. 调用 / 计算 / 写入：memcpy(masterConnects+c, &(allConnects[r].connect), sizeof(struct ncclConnect));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           42. 条件判断：(r == rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             43. 真分支：；仅条件为真执行以下子项。
+ *               44. 调用 / 计算 / 写入：rankInCollNet = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           45. 调用 / 计算 / 写入：c++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     46. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   47. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     48. 条件判断：(isMaster)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       49. 真分支：；仅条件为真执行以下子项。
+ *         50. 调用 / 计算 / 写入：memcpy(masterConnects+rankInCollNet, &(sendrecvExchange.connect), sizeof(struct ncclConnect));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 51. 条件判断：(isMaster && support)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   52. 真分支：；仅条件为真执行以下子项。
+ *     53. 调用 / 计算 / 写入：NCCLCHECKGOTO(transportComm->connect(comm, masterConnects, nMasters, rankInCollNet, conn), res, cleanup);；执行被包装调用；失败时保存错误并跳到指定清理标签，成功才继续下一项。
+ *     54. 准备局部状态：struct ncclPeer* devRoot = channel->devPeers+nranks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     55. 准备局部状态：struct ncclConnector* devConn = (type == collNetRecv) ? devRoot->recv+type : devRoot->send+type;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     56. 调用 / 计算 / 写入：CUDACHECKGOTO(cudaMemcpy(devConn, conn, sizeof(struct ncclConnector), cudaMemcpyHostToDevice), res, cleanup);；执行被包装调用；失败时保存错误并跳到指定清理标签，成功才继续下一项。
+ * 57. 条件判断：(isMaster && type == collNetRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   58. 真分支：；仅条件为真执行以下子项。
+ *     59. 调用 / 计算 / 写入：sendrecvExchange.collNetRank = rankInCollNet;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     60. 调用 / 计算 / 写入：memcpy(&sendrecvExchange.connect, masterConnects+rankInCollNet, sizeof(struct ncclConnect));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     61. 调用 / 计算 / 写入：NCCLCHECKGOTO(bootstrapSend(comm->bootstrap, masterPeer, collNetGraph->id, &sendrecvExchange, sizeof(sendrecvExchange)), res, cleanup);；失败时保存错误并跳到清理标签，成功才继续；向指定 rank 的控制监听地址建立连接，发送本 rank、tag 及消息内容以便对端匹配。
+ *     62. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "CollNet [recv] : rank %d collNetRank %d collNetNranks %d sent connect to rank %d", rank, rankInCollNet, nMasters, masterPeer);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 63. 条件判断：(support)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   64. 真分支：；仅条件为真执行以下子项。
+ *     65. 调用 / 计算 / 写入：fail = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 66. 跳转标签：cleanup；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   67. 条件判断：(allConnects != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     68. 真分支：；仅条件为真执行以下子项。
+ *       69. 调用 / 计算 / 写入：free(allConnects);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 70. 条件判断：(masterConnects != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   71. 真分支：；仅条件为真执行以下子项。
+ *     72. 调用 / 计算 / 写入：free(masterConnects);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 73. 函数返回：return fail;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport_cc.md#f1176
+ */
 /* 中文逐项-函数 F1176：ncclTransportCollNetSetup
  * 用途与位置：为网络归约 head 建立特殊 CollNet 连接并交换网络参与者句柄。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -598,6 +821,26 @@ cleanup:
   return fail;
 }
 
+/* 中文内部逻辑 F1177：ncclTransportCollNetCheck
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int allGatherFailures[NCCL_MAX_LOCAL_RANKS] = {0};；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：allGatherFailures[comm->localRank] = collNetSetupFail;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(bootstrapIntraNodeAllGather(comm->bootstrap, comm->localRankToRank, comm->localRank, comm->localRanks, allGatherFailures, sizeof(int)));；失败时可能提前return，成功才继续；只在所选节点内 rank 集合交换固定大小控制信息，按局部索引映射到全局 rank。
+ * 4. 循环：初始 int i=0;；继续条件 i<comm->localRanks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   5. 条件判断：(allGatherFailures[i] != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     6. 真分支：；仅条件为真执行以下子项。
+ *       7. 调用 / 计算 / 写入：collNetSetupFail = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       8. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ * 9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 10. 条件判断：(collNetSetupFail)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 条件判断：(comm->localRank == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       13. 真分支：；仅条件为真执行以下子项。
+ *         14. 调用 / 计算 / 写入：WARN("Cannot initialize CollNet, using point-to-point network instead");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     15. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport_cc.md#f1177
+ */
 /* 中文逐项-函数 F1177：ncclTransportCollNetCheck
  * 用途与位置：全组汇总 CollNet 建链失败状态，一处不支持时一致回退，避免各 rank 选择不一致。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -633,6 +876,29 @@ ncclResult_t ncclTransportCollNetCheck(struct ncclComm* comm, int collNetSetupFa
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1178：ncclTransportCollNetFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int r=0;；继续条件 r<comm->nChannels；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 准备局部状态：struct ncclChannel* channel = comm->channels+r;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 准备局部状态：struct ncclPeer* peer = channel->peers+comm->nRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   4. 循环：初始 int b=0;；继续条件 b<NCCL_MAX_CONNS；每轮更新 b++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     5. 准备局部状态：struct ncclConnector* send = peer->send + b;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 条件判断：(send->transportResources && send->transportComm)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 调用 / 计算 / 写入：NCCLCHECK(send->transportComm->free(send));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     9. 调用 / 计算 / 写入：send->transportResources = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   10. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   11. 循环：初始 int b=0;；继续条件 b<NCCL_MAX_CONNS；每轮更新 b++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     12. 准备局部状态：struct ncclConnector* recv = peer->recv + b;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     13. 条件判断：(recv->transportResources && recv->transportComm)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       14. 真分支：；仅条件为真执行以下子项。
+ *         15. 调用 / 计算 / 写入：NCCLCHECK(recv->transportComm->free(recv));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     16. 调用 / 计算 / 写入：recv->transportResources = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport_cc.md#f1178
+ */
 /* 中文逐项-函数 F1178：ncclTransportCollNetFree
  * 用途与位置：关闭已创建的 CollNet 特殊连接，配合初始化失败回退或整体销毁。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。

@@ -184,6 +184,19 @@ ncclResult_t ncclTopoTrimXml(struct ncclXml* xml);
 /* Functions  */
 /**************/
 
+/* 中文内部逻辑 F0569：xmlGetAttrIndex
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*index = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 准备局部状态：const int nAttrs = node->nAttrs;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 循环：初始 int a=0;；继续条件 a<nAttrs；每轮更新 a++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 条件判断：(strncmp(node->attrs[a].key, attrName, MAX_STR_LEN) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 调用 / 计算 / 写入：*index = a;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0569
+ */
 /* 中文逐项-函数 F0569：xmlGetAttrIndex
  * 用途与位置：按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -214,6 +227,14 @@ static ncclResult_t xmlGetAttrIndex(struct ncclXmlNode* node, const char* attrNa
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0570：xmlGetAttr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 调用 / 计算 / 写入：*value = index == -1 ? NULL : node->attrs[index].value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0570
+ */
 /* 中文逐项-函数 F0570：xmlGetAttr
  * 用途与位置：读取可选字符串属性，缺失时返回空指针而不自动填默认值。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -234,6 +255,16 @@ static ncclResult_t xmlGetAttr(struct ncclXmlNode* node, const char* attrName, c
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0571：xmlGetAttrStr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(node, attrName, value));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 2. 条件判断：(*value == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("Attribute %s of node %s not found", attrName, node->name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0571
+ */
 /* 中文逐项-函数 F0571：xmlGetAttrStr
  * 用途与位置：读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -252,6 +283,14 @@ static ncclResult_t xmlGetAttrStr(struct ncclXmlNode* node, const char* attrName
   }
   return ncclSuccess;
 }
+/* 中文内部逻辑 F0572：xmlGetAttrInt
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const char* str;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(node, attrName, &str));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ * 3. 调用 / 计算 / 写入：*value = strtol(str, NULL, 0);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0572
+ */
 /* 中文逐项-函数 F0572：xmlGetAttrInt
  * 用途与位置：读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -272,6 +311,14 @@ static ncclResult_t xmlGetAttrInt(struct ncclXmlNode* node, const char* attrName
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0573：xmlGetAttrIntDefault
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const char* str;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(node, attrName, &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 3. 调用 / 计算 / 写入：*value = str ? strtol(str, NULL, 0) : defaultValue;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0573
+ */
 /* 中文逐项-函数 F0573：xmlGetAttrIntDefault
  * 用途与位置：读取可选整数属性，缺失时写调用者指定的默认值。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -294,6 +341,14 @@ static ncclResult_t xmlGetAttrIntDefault(struct ncclXmlNode* node, const char* a
 }
 
 
+/* 中文内部逻辑 F0574：xmlGetAttrFloat
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const char* str;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(node, attrName, &str));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ * 3. 调用 / 计算 / 写入：*value = strtof(str, NULL);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0574
+ */
 /* 中文逐项-函数 F0574：xmlGetAttrFloat
  * 用途与位置：读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -314,6 +369,19 @@ static ncclResult_t xmlGetAttrFloat(struct ncclXmlNode* node, const char* attrNa
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0575：xmlFindTag
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*node = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 循环：初始 int i=0;；继续条件 i<xml->maxIndex；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 准备局部状态：struct ncclXmlNode* n = xml->nodes+i;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   4. 条件判断：(strcmp(n->name, tagName) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 调用 / 计算 / 写入：*node = n;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0575
+ */
 /* 中文逐项-函数 F0575：xmlFindTag
  * 用途与位置：搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -344,6 +412,23 @@ static ncclResult_t xmlFindTag(struct ncclXml* xml, const char* tagName, struct 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0576：xmlFindTagKv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*node = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 循环：初始 int i=0;；继续条件 i<xml->maxIndex；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 准备局部状态：struct ncclXmlNode* n = xml->nodes+i;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   4. 条件判断：(strcmp(n->name, tagName) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 准备局部状态：const char* value;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       7. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(n, attrName, &value));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *       8. 条件判断：(value && strcmp(value, attrValue) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         9. 真分支：；仅条件为真执行以下子项。
+ *           10. 调用 / 计算 / 写入：*node = n;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0576
+ */
 /* 中文逐项-函数 F0576：xmlFindTagKv
  * 用途与位置：搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -384,6 +469,20 @@ static ncclResult_t xmlFindTagKv(struct ncclXml* xml, const char* tagName, struc
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0577：xmlSetAttr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：index = node->nAttrs++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：strncpy(node->attrs[index].key, attrName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：node->attrs[index].key[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：strncpy(node->attrs[index].value, value, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 调用 / 计算 / 写入：node->attrs[index].value[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0577
+ */
 /* 中文逐项-函数 F0577：xmlSetAttr
  * 用途与位置：在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -411,6 +510,21 @@ static ncclResult_t xmlSetAttr(struct ncclXmlNode* node, const char* attrName, c
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0578：xmlSetAttrIfUnset
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 调用 / 计算 / 写入：index = node->nAttrs++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：strncpy(node->attrs[index].key, attrName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 调用 / 计算 / 写入：node->attrs[index].key[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：strncpy(node->attrs[index].value, value, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 调用 / 计算 / 写入：node->attrs[index].value[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0578
+ */
 /* 中文逐项-函数 F0578：xmlSetAttrIfUnset
  * 用途与位置：只给缺失属性设置默认值，避免自动发现结果覆盖用户明确配置。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -437,6 +551,20 @@ static ncclResult_t xmlSetAttrIfUnset(struct ncclXmlNode* node, const char* attr
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0579：xmlSetAttrInt
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：index = node->nAttrs++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：strncpy(node->attrs[index].key, attrName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：node->attrs[index].key[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：snprintf(node->attrs[index].value, MAX_STR_LEN, "%d", value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 调用 / 计算 / 写入：node->attrs[index].value[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0579
+ */
 /* 中文逐项-函数 F0579：xmlSetAttrInt
  * 用途与位置：把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -464,6 +592,20 @@ static ncclResult_t xmlSetAttrInt(struct ncclXmlNode* node, const char* attrName
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0580：xmlSetAttrFloat
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：index = node->nAttrs++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：strncpy(node->attrs[index].key, attrName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：node->attrs[index].key[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：snprintf(node->attrs[index].value, MAX_STR_LEN, "%g", value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 调用 / 计算 / 写入：node->attrs[index].value[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0580
+ */
 /* 中文逐项-函数 F0580：xmlSetAttrFloat
  * 用途与位置：把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -491,6 +633,21 @@ static ncclResult_t xmlSetAttrFloat(struct ncclXmlNode* node, const char* attrNa
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0581：xmlUnsetAttr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 循环：初始 int i=index+1;；继续条件 i<node->nAttrs；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 调用 / 计算 / 写入：strcpy(node->attrs[i-1].key, node->attrs[i].key);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   8. 调用 / 计算 / 写入：strcpy(node->attrs[i-1].value, node->attrs[i].value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 10. 调用 / 计算 / 写入：node->nAttrs--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0581
+ */
 /* 中文逐项-函数 F0581：xmlUnsetAttr
  * 用途与位置：删除指定属性并整理数组，防止遗留键值参与之后的匹配/导出。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -520,6 +677,18 @@ static ncclResult_t xmlUnsetAttr(struct ncclXmlNode* node, const char* attrName)
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0582：xmlGetSub
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*sub = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 循环：初始 int s=0;；继续条件 s<node->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(strcmp(node->subs[s]->name, subName) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：*sub = node->subs[s];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0582
+ */
 /* 中文逐项-函数 F0582：xmlGetSub
  * 用途与位置：仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -545,6 +714,23 @@ static ncclResult_t xmlGetSub(struct ncclXmlNode* node, const char* subName, str
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0583：xmlGetSubKv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*sub = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 循环：初始 int s=0;；继续条件 s<node->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 准备局部状态：struct ncclXmlNode* subNode = node->subs[s];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   4. 条件判断：(strcmp(subNode->name, subName) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 准备局部状态：const char* value;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       7. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(subNode, attrName, &value));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *       8. 条件判断：(value && strcmp(value, attrValue) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         9. 真分支：；仅条件为真执行以下子项。
+ *           10. 调用 / 计算 / 写入：*sub = node->subs[s];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0583
+ */
 /* 中文逐项-函数 F0583：xmlGetSubKv
  * 用途与位置：仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -585,6 +771,14 @@ static ncclResult_t xmlGetSubKv(struct ncclXmlNode* node, const char* subName, s
   }
   return ncclSuccess;
 }
+/* 中文内部逻辑 F0584：xmlGetSubKvInt
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char strValue[10];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：snprintf(strValue, 10, "%d", attrValue);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSubKv(node, subName, sub, attrName, strValue));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0584
+ */
 /* 中文逐项-函数 F0584：xmlGetSubKvInt
  * 用途与位置：仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -607,6 +801,25 @@ static ncclResult_t xmlGetSubKvInt(struct ncclXmlNode* node, const char* subName
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0585：xmlAddNode
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(xml->maxIndex == MAX_NODES)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("Error : too many XML nodes (max %d)", MAX_NODES);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：struct ncclXmlNode* s = xml->nodes+xml->maxIndex++;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：s->nSubs = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：s->nAttrs = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：*sub = s;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：s->parent = parent;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 条件判断：(parent)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：parent->subs[parent->nSubs++] = s;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 调用 / 计算 / 写入：strncpy(s->name, subName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 调用 / 计算 / 写入：s->name[MAX_STR_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0585
+ */
 /* 中文逐项-函数 F0585：xmlAddNode
  * 用途与位置：从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -638,6 +851,27 @@ static ncclResult_t xmlAddNode(struct ncclXml* xml, struct ncclXmlNode* parent, 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0586：xmlRemoveNode
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：node->type = NODE_TYPE_NONE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 准备局部状态：struct ncclXmlNode* parent = node->parent;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 条件判断：(parent == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 准备局部状态：int shift = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 循环：初始 int s=0;；继续条件 s<parent->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   8. 条件判断：(parent->subs[s] == node)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     9. 真分支：；仅条件为真执行以下子项。
+ *       10. 调用 / 计算 / 写入：shift = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       12. 条件判断：(shift)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         13. 真分支：；仅条件为真执行以下子项。
+ *           14. 调用 / 计算 / 写入：parent->subs[s-1] = parent->subs[s];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 16. 调用 / 计算 / 写入：parent->nSubs--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0586
+ */
 /* 中文逐项-函数 F0586：xmlRemoveNode
  * 用途与位置：从父节点子项表摘除目标节点并整理关系，裁剪不需要的拓扑分支。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -688,6 +922,21 @@ struct kvDict {
   int value;
 };
 
+/* 中文内部逻辑 F0587：kvConvertToInt
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct kvDict* d = dict;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 ；继续条件 (d->str)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(strncmp(str, d->str, strlen(d->str)) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：*value = d->value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   7. 调用 / 计算 / 写入：d++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "KV Convert to int : could not find value of '%s' in dictionary, falling back to %d", str, d->value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 调用 / 计算 / 写入：*value = d->value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0587
+ */
 /* 中文逐项-函数 F0587：kvConvertToInt
  * 用途与位置：在名称/数值字典中双向转换枚举属性，使 XML 可读名称对应内部路径/模式常量。
  * 参数 str（const char* str）：string或接口前缀，用于环境配置、XML或接口过滤，比较时注意是否允许前缀匹配。
@@ -715,6 +964,20 @@ static ncclResult_t kvConvertToInt(const char* str, int* value, struct kvDict* d
   *value = d->value;
   return ncclSuccess;
 }
+/* 中文内部逻辑 F0588：kvConvertToStr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct kvDict* d = dict;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 ；继续条件 (d->str)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(value == d->value)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：*str = d->str;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   7. 调用 / 计算 / 写入：d++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 调用 / 计算 / 写入：WARN("KV Convert to str : could not find value %d in dictionary", value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_h.md#f0588
+ */
 /* 中文逐项-函数 F0588：kvConvertToStr
  * 用途与位置：在名称/数值字典中双向转换枚举属性，使 XML 可读名称对应内部路径/模式常量。
  * 参数 value（int value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。

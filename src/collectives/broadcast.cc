@@ -13,6 +13,13 @@ NCCL_API(ncclResult_t, ncclBroadcast, const void* sendbuff, void* recvbuff, size
  * Broadcast 将 root 的输入传播到各 rank，公开入口使用统一 ncclInfo 描述。
  * 实际沿环流水或树向下执行，取决于该版本可用实现与调度结果；它不进行跨 rank 求和。
  */
+/* 中文内部逻辑 F0052：ncclBroadcast
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：struct ncclInfo info = { ncclFuncBroadcast, "Broadcast", sendbuff, recvbuff, count, datatype, ncclSum, root, comm, stream, BROADCAST_CHUNKSTEPS, BROADCAST_SLICESTEPS };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 函数返回：return ncclEnqueueCheck(&info);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__broadcast_cc.md#f0052
+ */
 /* 中文逐项-函数 F0052：ncclBroadcast
  * 用途与位置：从 root 将同一输入分片流水传播到所有参与者，非 root 无需提供有效广播输入。
  * 参数 sendbuff（const void* sendbuff）：输入数据地址，偏移单位由实际指针元素类型和当前 API 的归一化结果决定。
@@ -49,6 +56,11 @@ ncclResult_t ncclBroadcast(const void* sendbuff, void* recvbuff, size_t count, n
 /* Deprecated original "in place" function, similar to MPI */
 NCCL_API(ncclResult_t, ncclBcast, void* buff, size_t count, ncclDataType_t datatype, int root,
     ncclComm_t comm, cudaStream_t stream);
+/* 中文内部逻辑 F0053：ncclBcast
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclBroadcast(buff, buff, count, datatype, root, comm, stream);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__broadcast_cc.md#f0053
+ */
 /* 中文逐项-函数 F0053：ncclBcast
  * 用途与位置：把同一缓冲作为输入/输出转调 Broadcast，保留旧式原地 API 的兼容行为。
  * 参数 buff（void* buff）：当前工作范围的缓冲起点；P2P 任务通常已经按 Int8 把 count 归一为字节。

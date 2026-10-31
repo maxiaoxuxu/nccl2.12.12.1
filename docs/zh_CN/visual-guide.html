@@ -1,0 +1,453 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NCCL中文图解 V3</title><style>body{margin:0;background:#f4f7fb;color:#172d43;font:17px/1.8 "Microsoft YaHei","Noto Sans SC",sans-serif}main{max-width:1100px;margin:auto;padding:28px}h1,h2,h3{line-height:1.45;color:#123b60}h2{margin-top:48px;border-bottom:2px solid #c8d8e7;padding-bottom:12px}a{color:#1256a1}img{display:block;max-width:100%;height:auto;background:white;margin:22px auto;border:1px solid #d6e1eb;border-radius:8px}table{border-collapse:collapse;width:100%;display:block;overflow:auto;background:white}td,th{padding:10px 14px;border:1px solid #d7e1ea;text-align:left;vertical-align:top}code{font-family:Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}pre{background:#e8eef5;padding:18px;overflow:auto;white-space:pre-wrap}nav,.panel{background:white;border:1px solid #c8d8e7;border-radius:12px;padding:20px;margin:20px 0}button,select,input{font:inherit;padding:8px 12px;max-width:100%;margin:5px;border:1px solid #9db4c9;border-radius:6px;background:white;color:#172d43}button{cursor:pointer;background:#e7f0fc}button:disabled{opacity:.4;cursor:default}.tag{color:#4b647c;font-size:14px}.step{border-left:3px solid #a0bddc;padding:8px 14px;margin:9px 0;background:#f4f7fb}.step code{display:block;white-space:pre-wrap}summary{cursor:pointer;padding:12px;font-weight:bold}.fn{border:1px solid #cad9e7;background:white;border-radius:9px;margin:12px 0}#results{min-height:200px}@media(max-width:650px){main{padding:14px}body{font-size:16px}.panel{padding:10px}h1{font-size:26px}td,th{padding:8px}}</style><body><main><nav><b>NCCL 2.12.12 · 中文图解 V3</b><br>完整文档和图均在本目录；本页无需联网。<a href="function-logic.html">搜索全部函数内部逻辑</a> · <a href="visual-guide.md">Markdown原文</a></nav>
+<section class="panel"><h2 style="margin-top:0">逐轮看：数据中包含谁的贡献？</h2><p>选择算法并逐步前进。块号 C 与贡献者 X 是两件事；箭头是逻辑传输，不表示所有rank锁步执行。</p><select id="collective"><option value="allreduce">Ring AllReduce</option><option value="allgather">Ring AllGather</option><option value="reducescatter">Ring ReduceScatter</option></select><button id="prev">上一轮</button><button id="next">下一轮</button><span id="counter"></span><p id="desc"></p><img id="frame" alt="集合通信逐轮数据流"><div id="ownership"></div></section>
+<section class="panel"><h2 style="margin-top:0">七种基础原语：读哪里，写哪里？</h2><select id="primitive"></select><img id="primitiveImage" alt="原语输入、归约与输出关系"><p>direct变体的省略条件与指针交换见正文第7节；接口名称不能替代模板位和连接状态的判断。</p></section><h1 id="nccl-21212">NCCL 2.12.12 图解与原语内部逻辑</h1>
+<p>本讲解与仓库基线 <code>04832308d0885226169b9376c1ba4f17b0cb6484</code> 对应。图与源码一同下载，SVG无需网络；另有可双击打开的 <a href="visual-guide.html">离线图解</a>，可逐轮观察结果传播。<a href="function-logic.html">每个函数内部步骤</a> 将文字说明定位回具体定义。</p>
+<p>图中的“传输轮”“块”“完成”有明确层次：逻辑块可以被原语继续切成slice，slice占若干FIFO step，后端还可拆成网络请求/数据包。图中一条箭头不等于一个QP、一个WQE或一条CUDA指令。下面的4-rank示例假设环顺序为 <code>0→1→2→3→0</code>。</p>
+<h2 id="1">1. 先定位：谁做调度，谁真的搬数据</h2>
+<p><img alt="提交分工" src="visuals/01-submit.svg" /></p>
+<p>普通、非Group、非CUDA Graph路径从 <code>ncclEnqueueCheck</code> 进入。<code>computeColl</code> 同时写出两份计划：<code>ncclWorkElem</code> 交给GPU执行数据运算，<code>ncclProxyOp</code> 交给CPU代理推进网络。HostSetup把模板展开到实际channel：<code>bid</code> 表示本次操作的片段编号，<code>channelId</code> 表示实际通道槽，二者不一定相同。</p>
+<p>这里必须按调用点辨认先后：HostSetup调用 <code>ncclLaunchProxy→ncclProxyStart</code> 发布队列，随后才进入LaunchBarrier/LaunchKernel。Proxy线程可以先准备接收或可写空间；发送数据时仍要等GPU就绪。邻近旧英文注释提到“发射kernel后启动代理”，不能用它推翻实际调用顺序。</p>
+<p><code>ncclLaunchKernel</code> 排入CUDA stream不等于GPU已经跑到该kernel，更不等于网络传输完成。图捕获模式把HostSetup放入图节点，在每次replay执行，不能照搬普通提交时CPU立即调用的时间轴。</p>
+<h2 id="2">2. 数据分片：先分地址，再按协议推进</h2>
+<p><img alt="分片层次" src="visuals/02-split-layers.svg" /></p>
+<p>先分清三个问题：</p>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>回答什么</th>
+<th>关键变量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>算法地址划分</td>
+<td>哪个channel负责哪些用户元素？环上先处理哪个块？</td>
+<td>bid、nChannels、nranks、gridOffset、chunk、realChunkSize</td>
+</tr>
+<tr>
+<td>原语片段</td>
+<td>这次组合收发/归约分几片流水？</td>
+<td>SlicePerChunk、sliceSize、offset、nelem</td>
+</tr>
+<tr>
+<td>循环缓冲进度</td>
+<td>可否写/读？复用哪一槽？</td>
+<td>step、StepPerSlice、head、tail、step%8</td>
+</tr>
+</tbody>
+</table>
+<p>“把1GiB平均分成16份”只描述最外面的一层，还没描述环中块次序、原语片数、尾部对齐和缓冲复用。</p>
+<h3 id="21-computecoll">2.1 主机computeColl怎样算协议容量</h3>
+<p><code>stepSize = buffSizes[protocol] / NCCL_STEPS</code>，这里是<strong>字节</strong>，本版 <code>NCCL_STEPS=8</code>。Simple+Ring从API传入chunkSteps和sliceSteps；其他组合在这一步先按1处理。<code>chunkSize = stepSize × chunkSteps</code>。</p>
+<p>Ring AllReduce使用 <code>chunkSteps=4</code>、<code>sliceSteps=2</code>，所以协议模板是 <code>ProtoSimple&lt;2,2&gt;</code>：一个算法原语块有两个slice，每片推进两步。它不意味着每片必须写满两个物理step的全部容量。</p>
+<p>LL的16字节行只装8字节有效载荷，LL128的128字节行装120字节。因此主机计算覆盖用户张量的 <code>chunkEffectiveSize</code> 时要扣flag开销。若不扣，Proxy会少算轮数。</p>
+<pre><code class="language-text">nLoops = ceil(nBytes / (nChannels × nchunksPerLoop × chunkEffectiveSize))
+Proxy.nsteps = nstepsPerLoop × nLoops × chunkSteps
+Ring AllReduce: nchunksPerLoop=P, nstepsPerLoop=2(P-1)
+</code></pre>
+<p>AG/RS的 <code>nBytes</code> 是P段总规模；AG的设备count还已变成字节数。不能把不同API的公开count直接塞进同一式子。</p>
+<h3 id="22-ring-allreduce">2.2 设备Ring AllReduce怎样计算真实地址</h3>
+<p><code>Proto::calcBytePerStep()/sizeof(T)</code> 已把有效字节转成<strong>T元素数</strong>。Simple设备循环先算本轮 <code>realChunkSize</code>，再按worker搬运粒度对齐：</p>
+<pre><code class="language-text">r = min(chunkSize, ceil((size-gridOffset)/(C×P)))
+r = roundUp(r, (nthreads-32)×8/sizeof(T))
+Simple offset = gridOffset + bid×P×r + chunk×r
+LL/LL128 offset = gridOffset + (chunk×C+bid)×r
+有效元素 nelem = min(r, size-offset)，进入原语后下限归零
+</code></pre>
+<p><img alt="布局差异" src="visuals/03-layout.svg" /></p>
+<p>上图只比较<strong>相同假设块长128</strong>时两种地址排列，不表示同一调优配置下LL与Simple必然得到相同块长。LL/LL128实际还按自身最小grain计算。Simple把同channel的P块连在一起，LL/LL128按块号与channel交错；两者都应恰好覆盖有效用户区间。</p>
+<h3 id="23-simple">2.3 一套可手算的Simple示例</h3>
+<p>为了验证公式，固定已选好的 <code>P=4、C=2、T=float、nthreads=96</code>，并用16KiB物理Simple缓冲作尺寸示例。<strong>这是固定内部变量的教学计算，不预测默认调度是否会给小消息选择两个channel，也不是要求设置生产缓冲大小。</strong></p>
+<table>
+<thead>
+<tr>
+<th>量</th>
+<th>计算</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一物理step</td>
+<td>16KiB/8</td>
+<td>2048B=512float</td>
+</tr>
+<tr>
+<td>算法块上限</td>
+<td>512float×4</td>
+<td>2048float</td>
+</tr>
+<tr>
+<td>对齐粒度</td>
+<td>(96-32)×8/4</td>
+<td>128float</td>
+</tr>
+<tr>
+<td>N=1024时本轮块长</td>
+<td>ceil(1024/(2×4))，再对齐</td>
+<td>128float</td>
+</tr>
+<tr>
+<td>channel0</td>
+<td>块0～3</td>
+<td>[0,512)</td>
+</tr>
+<tr>
+<td>channel1</td>
+<td>块0～3</td>
+<td>[512,1024)</td>
+</tr>
+<tr>
+<td>一原语slice有效长度</td>
+<td>max(ceil(128/(16×2))×16,512×2/32)</td>
+<td>64float=256B</td>
+</tr>
+<tr>
+<td>一个原语块</td>
+<td>2个slice</td>
+<td>各推进2step，合计4step</td>
+</tr>
+</tbody>
+</table>
+<p>这个例子中每slice实际只搬256B，仍按2个step更新协议进度。<strong>进度跨度、物理容量、有效字节数是三件事。</strong> nLoops=1，环每方向需要6次块传输，Proxy预算是6×4=24step。设备代码有7个组合原语调用位置：初始send、两次recvReduceSend、一次最终归约兼首次结果转发、两次recvCopySend、最后recv；因为有只发和只收端点，不能把7简单乘4当作每方向步数。</p>
+<h3 id="24-return">2.4 尾块和空块为何不能直接return</h3>
+<p><img alt="尾块" src="visuals/04-tail.svg" /></p>
+<p>当N=1000，其余假设不变，r仍对齐成128。最后块从896开始，只能读104元素。算法容量没有变，实际复制必须截短；若某块起点已超出N，原语将非正nelem归零，但仍按约定片数等待/发布，保持双方step一致。</p>
+<p><code>gridOffset</code> 每轮按基准 <code>loopSize=C×P×chunkSize</code> 前进；尾轮的r可缩小。不能把尾轮r反过来改写前面循环已经确定的步进。源码检查工具附带多种N的地址覆盖核对，确保没有漏元素或重复覆盖。</p>
+<h2 id="3">3. 通信原语是“源→计算→目标”的组合</h2>
+<p>API里的AllReduce是全组语义；原语 <code>recvReduceSend</code> 是当前GPU、当前线程组、当前数据范围的一次组合动作。它不会单独发射一个新kernel。</p>
+<table>
+<thead>
+<tr>
+<th>原语</th>
+<th>源</th>
+<th>中间操作</th>
+<th>目标</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>send</td>
+<td>本地input</td>
+<td>读/必要preOp</td>
+<td>下游</td>
+</tr>
+<tr>
+<td>recv</td>
+<td>上游</td>
+<td>读</td>
+<td>本地output</td>
+</tr>
+<tr>
+<td>copySend</td>
+<td>本地input</td>
+<td>一次读、多目标写</td>
+<td>output、下游</td>
+</tr>
+<tr>
+<td>recvCopySend</td>
+<td>上游</td>
+<td>不再加本地input</td>
+<td>output、下游</td>
+</tr>
+<tr>
+<td>recvReduceSend</td>
+<td>上游、本地input</td>
+<td>归约</td>
+<td>下游</td>
+</tr>
+<tr>
+<td>recvReduceCopy</td>
+<td>上游、本地input</td>
+<td>归约、必要postOp</td>
+<td>output</td>
+</tr>
+<tr>
+<td>recvReduceCopySend</td>
+<td>上游、本地input</td>
+<td>归约、必要postOp</td>
+<td>output、下游</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="融合归约及转发" src="visuals/11-recvReduceCopySend.svg" /></p>
+<p>所有七种源/目标图都在 <a href="visuals">图文件目录</a> 和离线图解中。名称里的Reduce表示合并本地原始贡献或多个接收源；Copy表示保留本地结果；Send表示同时向连接目标输出。</p>
+<h3 id="31-simple">3.1 Simple模板参数逐位拆解</h3>
+<p><code>genericOp&lt;DirectRecv,DirectSend,Recv,Send,SrcBuf,DstBuf&gt;</code> 的后两位选择Input/Output或-1，<strong>-1表示没有这类本地源/目标</strong>；不是远端rank=-1。</p>
+<table>
+<thead>
+<tr>
+<th>包装</th>
+<th>模板实参</th>
+<th>数据含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>send</td>
+<td><code>&lt;0,0,0,1,Input,-1&gt;</code></td>
+<td>仅本地原始输入到下游</td>
+</tr>
+<tr>
+<td>recv</td>
+<td><code>&lt;0,0,1,0,-1,Output&gt;</code></td>
+<td>仅接收并保留输出</td>
+</tr>
+<tr>
+<td>recvReduceSend</td>
+<td><code>&lt;0,0,1,1,Input,-1&gt;</code></td>
+<td>收到上游，加本地输入，继续发</td>
+</tr>
+<tr>
+<td>recvReduceCopy</td>
+<td><code>&lt;0,0,1,0,Input,Output&gt;</code></td>
+<td>收到上游，加本地输入，保留输出</td>
+</tr>
+<tr>
+<td>recvReduceCopySend</td>
+<td><code>&lt;0,0,1,1,Input,Output&gt;</code></td>
+<td>一次加载归约，写本地及下游</td>
+</tr>
+<tr>
+<td>directRecvCopySend</td>
+<td><code>&lt;1,1,1,1,-1,Output&gt;</code></td>
+<td>可直接接收/发送已完成结果，无本地输入归约</td>
+</tr>
+<tr>
+<td>directRecvReduceCopySend</td>
+<td><code>&lt;0,1,1,1,Input,Output&gt;</code></td>
+<td>此包装的direct只对<strong>发送部分</strong>生效；接收仍按其普通归约路径</td>
+</tr>
+</tbody>
+</table>
+<p>最后一行尤其容易被函数名误导：源码有注释“Direct is only for the send part”，不能把整个名字理解成所有内存访问都绕开中间缓冲。</p>
+<h3 id="32-preoppostop">3.2 归约为何要区分preOp和postOp</h3>
+<p>PreMulSum需要每个<strong>原始输入</strong>乘一次scale。一个输入沿环已经变成部分和后，不应再每跳重复乘scale。整数Avg则应等所有贡献相加完成才做除法，若每个输入先除会提前截断。</p>
+<p>原语把实际 <code>srcs/dsts</code> 交给 <code>ReduceOrCopyMulti</code>，模板Src/Recv/Send/Dst决定多少个源和目标。先在寄存器中合并源，再把同一个结果写多个目标，避免“归约写临时数组→另起kernel读取再转发”。这是融合的来源。</p>
+<h2 id="4-simple">4. Simple内部：不是所有线程执行同一份工作</h2>
+<p><img alt="Simple内部" src="visuals/12-simple-flow.svg" /></p>
+<p>按源码顺序阅读 <code>genericOp</code>：</p>
+<ol>
+<li>把nelem下限归零，计算sliceSize与有效片段上限。小尾块会缩小实际搬运长度。</li>
+<li>worker路径负责设置本地input/output指针、等连接、组装srcs/dsts。</li>
+<li><code>waitPeer</code>只由相应Wait角色真的执行流控/选地址。<code>subBarrier</code>让worker看见已经准备好的指针表。</li>
+<li>有三种数据路径：direct接收的源与目标重合时省复制；直接读的空发送特例；普通多源多目标融合路径。</li>
+<li>所有本组线程在匹配的barrier会合。非worker从另一个循环进入同一屏障，不能把它们当作提前退出。</li>
+<li>发送发布角色执行必要的系统fence，warp同步后postPeer，更新对外可见进度。</li>
+<li>offset和slice前进。worker没有数据后也要完成剩余空slice的同步/发布，直到约定片数结束。</li>
+</ol>
+<p>为什么把有效worker循环和剩余空片循环拆开？源码注释给出的目标是把worker热路径里的“是不是worker”“这片是否为空”重复判断移出循环，降低每个有效slice的分支开销；并非删除空slice的协议职责。</p>
+<h3 id="41-96">4.1 96线程的具体角色例子</h3>
+<p>对Ring 1收1发、nthreads=96，构造器会保留32个非worker线程，nworkers=64。同步角色按 <code>ThreadPerSync=8</code> 分配。下面只列有职责的代表线程；不是每个线程都有Wait/Post位。</p>
+<table>
+<thead>
+<tr>
+<th>线程</th>
+<th>g/index</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>tid0</td>
+<td>g0/index0</td>
+<td>RoleWaitRecv</td>
+</tr>
+<tr>
+<td>tid1</td>
+<td>g0/index1</td>
+<td>RoleInput，提供本地输入地址</td>
+</tr>
+<tr>
+<td>tid8</td>
+<td>g1/index0</td>
+<td>RoleWaitSend</td>
+</tr>
+<tr>
+<td>tid9</td>
+<td>g1/index1</td>
+<td>RoleOutput，提供本地输出地址</td>
+</tr>
+<tr>
+<td>tid80</td>
+<td>g10/index0</td>
+<td>RolePostRecv</td>
+</tr>
+<tr>
+<td>tid88</td>
+<td>g11/index0</td>
+<td>RolePostSend</td>
+</tr>
+</tbody>
+</table>
+<p>Wait线程属于worker集合，还参与搬运。最后warp中的Post线程帮助把数据搬运与发布开销重叠。其他模板邻居度/线程数会改变有效角色；不能把这组具体tid推广到所有原语。</p>
+<h3 id="42-waitpeer">4.2 waitPeer的不等式</h3>
+<p><img alt="等待条件" src="visuals/13-waitpeer.svg" /></p>
+<ul>
+<li>发送：<code>head+8 &gt;= step+StepPerSlice</code> 才有空间；head由消费方推进。</li>
+<li>接收：<code>tail &gt;= step+StepPerSlice</code> 才能读取；tail由生产方发布。</li>
+<li>循环中刷新缓存，并周期检查abortFlag，使异常时不必永久自旋。</li>
+<li>shared模式从offsFifo取得字节偏移；转成T*偏移时除sizeof(T)。普通模式使用 <code>(step%8)×stepSize</code>。</li>
+</ul>
+<p><img alt="八槽复用" src="visuals/14-fifo.svg" /></p>
+<p>head/tail不是全组屏障：一个连接可以因为自己的消费者慢而阻塞，与另一条独立连接的进度不同。</p>
+<h3 id="43-waitpeersteppostpeerstep">4.3 为什么waitPeer加step，postPeer也加step，却没有翻倍</h3>
+<p><img alt="独立线程的step" src="visuals/15-step-roles.svg" /></p>
+<p><code>step</code> 是原语对象在<strong>每个线程寄存器中的独立成员</strong>。Wait角色在waitPeer更新自己的step；Post角色在postPeer更新自己的step再写共享进度。它们通常不是同一个角色线程，也不是同一个内存变量从0连续加两次。析构时Post角色把最终step写回连接，下一操作接着用。</p>
+<h3 id="44-barriervolatilefence">4.4 barrier、volatile、fence分别保证什么</h3>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>本处职责</th>
+<th>不能替代什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>volatile加载/存储</td>
+<td>编译器应按协议重新观察共享进度</td>
+<td>不等于跨线程会合</td>
+</tr>
+<tr>
+<td>subBarrier/barrier</td>
+<td>参与组线程按相同阶段会合、看到指针/数据准备</td>
+<td>不独立证明NIC已经发送完成</td>
+</tr>
+<tr>
+<td>threadfence_system</td>
+<td>发送进度发布前满足对应数据写的系统可见性顺序</td>
+<td>不代表其他GPU已经消费</td>
+</tr>
+<tr>
+<td>head/tail/flag</td>
+<td>生产消费双方的协议进度</td>
+<td>不等于API返回或CUDA事件完成</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-ll16flag">5. LL：用每16字节行的两个flag等待载荷</h2>
+<p><img alt="行格式" src="visuals/16-lines.svg" /></p>
+<p>LL一行按 <code>data1,flag1,data2,flag2</code> 排列。接收者必须同时看到两个flag等于 <code>recvStep+1</code>，才取出两个data组成8字节有效值。对端可能尚未写完整行，看到其中一个新flag不足以接受另一半旧数据。</p>
+<p><img alt="LL内部" src="visuals/17-ll-flow.svg" /></p>
+<p><code>LLGenericOp</code>内部按线程分配行：<code>offset=tid</code>，每轮offset增加nthreads；用户元素地址按 <code>eltPerTrip=nthreads×EltPerLine</code> 前进。本地加载先Begin，等待接收行时可以与加载重叠，再Finish取值。多接收邻居时逐个检查对应行并合并，postOp仅在要求的最终输出点执行。SEND把数据和本轮flag写到下游；DST再保留用户结果。</p>
+<p>行内flag解决“这一行是否到达”，head仍负责“旧行能不能重写”。两种控制缺一不可。标记回绕时incSend清理未覆盖行，Proxy在清理轮可能需传整step，不能按本次有效用户字节过早裁掉。</p>
+<p>本版代码依赖其明示的数据/flag布局与网络写入假设；一次128-bit汇编加载/存储并不意味着任意观察者都获得整行128-bit原子性。</p>
+<h2 id="6-ll128warp120128">6. LL128：warp协作、120/128有效率和加载重叠</h2>
+<p><img alt="LL128内部" src="visuals/18-ll128-flow.svg" /></p>
+<p>LL128每行16个uint64：15个数据字、1个flag。<code>flagThread</code>负责相应标记检查和写出，warp通过 <code>__any_sync</code> 决定是否仍需重读。任一负责标记的线程看到旧序号，整轮不能直接继续消费。</p>
+<p><code>loadRegsBegin</code>在满足16B对齐时直接预取寄存器；不对齐时借共享内存暂存覆盖区域。<code>loadRegsFinish</code>延后重排，尽量把重排依赖停顿与等待接收隐藏。随后逐源归约、可选postOp，再store128连同行尾flag发出；本地结果经storeRegs恢复用户布局。</p>
+<p><code>GenericOp</code>按warp分配DataEltPerSlice，通过nwarps跨步处理后续片段。结束时barrier，更新收发step，再postSend/postRecv。postSend用的是其源码中的fence与tail路径；NET代理在系统内存LL128发送时还会检查行flag。不要把Simple的同步图原样套到LL128。</p>
+<h2 id="7-directgpu-p2pgdr">7. direct、GPU P2P和GDR的逻辑不能合并理解</h2>
+<p><img alt="直接访问" src="visuals/19-direct.svg" /></p>
+<p>Simple的setDataPtrs先确定四种角色：recvProvider/sendAcceptor用于直接写，sendProvider/recvAcceptor用于直接读。指针交换槽用nullptr表示空；因此编码时与slot地址异或，允许合法空指针与“槽尚未提供”区分。使用方取走后清槽，提供方才可放下一轮地址。</p>
+<p>直接读还要交换原始输入的缩放参数。标量拆成两部分，每部分额外设置非零有效标记，以便零标量也能与“未写入”区分。接收者重组标量，避免读取到旧参数或对原始贡献漏做preOp。</p>
+<p>waitPeer只在具体谓词满足时省掉部分等待：<code>DirectRecv &amp;&amp; Src &amp;&amp; DirectRead</code> 与 <code>DirectSend &amp;&amp; (DirectRead|DirectWrite)</code> 等；不是任何direct函数都无条件跳过同步。</p>
+<p>LL/LL128通过 <code>PrimitivesWithoutDirect</code> 把同名direct调用退化到普通协议原语。Simple的 <code>directRecvReduceCopySend</code> 也只让发送部分direct。函数名是组合接口，不是硬件能力证明。</p>
+<p><img alt="层次区分" src="visuals/20-transport.svg" /></p>
+<p>同机GPU P2P依赖可访问映射；跨进程通过CUDA IPC建立本进程地址。SHM使用GPU可映射的主机共享页。NET若支持GDR，NIC可访问注册GPU缓冲，但本版内置IB的WQE提交/CQ轮询仍在CPU Proxy中。GDRCopy是CPU映射显存的小数据/同步优化，不能与GPUDirect RDMA视作一个接口。</p>
+<h2 id="8-ring-allreduce">8. Ring AllReduce：把每个块的来源追到底</h2>
+<p><img alt="初始块" src="visuals/allreduce-step-0.svg" /></p>
+<p>用 <code>Xr(Ck)</code> 表示rank r输入中第k块。r首先发送C(r-1)，每跳接收者把自己的同一块加入部分和。经过P-1个归约传输轮，每个rank完成自己内部环编号的块。</p>
+<p><img alt="分散完成" src="visuals/allreduce-step-3.svg" /></p>
+<p>示例rank0的源码调用顺序如下。它描述7个原语调用点，不是7个独立kernel，也不是每方向7次网络传输。</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>块</th>
+<th>原语</th>
+<th>本地结果状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>C3</td>
+<td>send</td>
+<td>发自己的贡献</td>
+</tr>
+<tr>
+<td>1</td>
+<td>C2</td>
+<td>recvReduceSend</td>
+<td>加自己的贡献再转发</td>
+</tr>
+<tr>
+<td>2</td>
+<td>C1</td>
+<td>recvReduceSend</td>
+<td>加自己的贡献再转发</td>
+</tr>
+<tr>
+<td>3</td>
+<td>C0</td>
+<td>directRecvReduceCopySend(postOp=true)</td>
+<td>完整归约写本地，同时开始传播</td>
+</tr>
+<tr>
+<td>4</td>
+<td>C3</td>
+<td>directRecvCopySend</td>
+<td>已完整结果只复制，不重复相加</td>
+</tr>
+<tr>
+<td>5</td>
+<td>C2</td>
+<td>directRecvCopySend</td>
+<td>已完整结果只复制</td>
+</tr>
+<tr>
+<td>6</td>
+<td>C1</td>
+<td>directRecv</td>
+<td>收齐最后结果</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="最终收齐" src="visuals/allreduce-step-6.svg" /></p>
+<p>从一个块看，例如C0：rank1发X1(C0)→rank2加X2→rank3加X3→rank0加X0后成为完整结果，再复制到1、2、3。总共6条逻辑传输边，恰好是2(P-1)。最终“每rank都有结果”是第二阶段的效果，不是第一阶段每个rank都重复完成一遍所有块的归约。</p>
+<h2 id="9-allgatherreducescatter">9. AllGather与ReduceScatter：相似外形，不同语义</h2>
+<h3 id="91-allgather">9.1 AllGather没有归约</h3>
+<p><img alt="AG开始" src="visuals/allgather-step-0.svg" /></p>
+<p>每rank仅贡献一段，输出按贡献者用户rank排列。环顺序可优化，但 <code>offset=chunkOffset+rankDest×size</code> 保持用户布局。自己贡献已在正确输出段时可直接发，否则copySend同时保留本地；中间recvCopySend；最后recv。</p>
+<p><img alt="AG结束" src="visuals/allgather-step-3.svg" /></p>
+<p>X0、X1、X2、X3只是相邻拼接，不能把X0+X1画成求和结果。公开sendcount=8 float时，ArgsCheck后设备size=32字节、总模型nBytes=128字节（4rank）；该复制API使用Int8。</p>
+<h3 id="92-reducescatter">9.2 ReduceScatter归约后只保留本段</h3>
+<p><img alt="RS结束" src="visuals/reducescatter-step-3.svg" /></p>
+<p>公开recvcount=8 float时，每rank输入32 float、输出8 float。设备size仍为8个float；访问输入时加 <code>rankDest×size</code>，输出只写自己的 <code>chunkOffset</code>。它不继续传播其他rank的完整结果，所以rank2得到全局归约结果中的第2段，而不是一个没有归约的原始输入段。</p>
+<p>Ring AllReduce在单个设备算法中融合类似RS和AG的过程，并非主机真的先调用公开ReduceScatter再调用AllGather。</p>
+<h2 id="10-broadcastreduceroot">10. Broadcast与Reduce：在root处切断环</h2>
+<p><img alt="广播链" src="visuals/26-broadcast.svg" /></p>
+<p>Broadcast root=0，只有root提供有效输入。root是send/copySend，中间rank保存并继续发，root前驱只recv，不发回root。各slice仍可流水，图中纵向顺序只表示单块依赖。</p>
+<p><img alt="归约链" src="visuals/27-reduce.svg" /></p>
+<p>Reduce root=0从root后继rank1发起。rank2、3边收边加本地贡献，root最后加X0并存输出；结果只要求root有效，不再广播给所有人。</p>
+<p>本版对应设备文件主要提供Ring特化。调度代码存在TreeUp/TreeDown的pattern名字，不能由枚举就推断这里有完整Tree Broadcast/Reduce设备实现。Tree图下面专门解释AllReduce路径。</p>
+<h2 id="11-tree-allreducecollnet">11. Tree AllReduce与CollNet：改变依赖结构</h2>
+<p><img alt="树归约广播" src="visuals/23-tree.svg" /></p>
+<p>这是一棵4rank树的单块依赖示例：0为根、2为根的孩子、1和3为2的孩子。叶先send，中间节点多收一发归约，根完成结果，再向下传播。实际邻居由该channel的tree.up/down给出，不能把图中rank连接当成所有机器固定拓扑。</p>
+<p><code>runTreeUpDown</code>先完整上行再下行。<code>runTreeSplit</code>让非根的两个线程组分别服务上行和下行，组号/屏障分开，所以前一块下行可与后一块上行重叠。根用融合收、归约、复制、多目标发送衔接两个方向。源码另有CUDA版本/架构条件决定使用哪条实现，不能把Split当作永远启用。</p>
+<p><img alt="CollNet阶段" src="visuals/24-collnet.svg" /></p>
+<p>CollNet多出head分工：每个head负责不同张量片段，机内先Scatter/Reduce，网络插件对相同分片做Iallreduce，再Broadcast/Gather让机内每GPU收齐。<code>loopSize=C×nHeads×chunkSize</code>反映head维度。GPU代码按Scatter/Reduce/Gather/Broadcast线程组分工，不是全部线程顺序执行四段。</p>
+<p>本版CollNet数据面仅Simple，要求插件/硬件和归约类型支持。不能用普通NET的Isend/Irecv图替代网络集合归约，也不能把普通IB QP总数直接当成交换机已支持硬件归约的证据。</p>
+<h2 id="12-sendrecvall-to-all">12. Send/Recv及上层All-to-All</h2>
+<p><img alt="P2P调度层次" src="visuals/25-p2p.svg" /></p>
+<p>ncclSend/Recv内部套Group，外层应用也可以Group组合多个peer。SaveP2p按peer保存缓冲与字节数，并标记缺失的索引1连接；GroupEnd先预建链，再按节点距离/节点内序号一致地排收发，避免双方以不匹配次序各自等待。</p>
+<p>第一层切块由getP2pChunkSize决定：每peer预算和总channel数量限制并行度，消息过大时可倍增所用channel，最后按step对齐。第二层在设备runSend/runRecv按chunkSize继续循环。零字节是同步语义，代码用do-while确保仍推进一次，不能与-1“无此方向任务”混同。</p>
+<p>self peer需要匹配的send/recv元素，由发送组把输入复制到接收组缓冲，接收组不再重复搬运。非self使用Simple原语，连接能力决定走GPU P2P、SHM还是NET。</p>
+<p>本版没有公开AllToAll/Gather/Scatter API；上层可以Group组织多peer Send/Recv来表达这些模式。其资源与调度取决于实际peer集合，不能把一个Ring邻居数拿来代表全互联模式。</p>
+<h2 id="13-proxy">13. Proxy与原语之间如何持续推进</h2>
+<p><img alt="发送代理" src="visuals/21-proxy-send.svg" /></p>
+<p>发送三道门：Proxy先提供槽位；GPU按原语生成有效数据并写sizes/tail或行flag；Proxy确认就绪才Isend。request非空后transmitted增加，Test完成后done增加并允许回收空间。Isend返回成功本身不允许GPU立刻覆盖NIC仍在读的缓冲。</p>
+<p><img alt="接收代理" src="visuals/22-proxy-recv.svg" /></p>
+<p>接收四道门：挂Irecv、网络Test完成、必要GDR可见性flush、GPU消费后head确认。网络完成后received前进，不代表GPU已经读取；flush完成后发布tail，GPU才能在等待满足后消费；消费再让done前进。下列三个“完成”不能互换：后端request完成、GPU可以读、GPU已读并释放。</p>
+<p>共享NET接收把同recvComm子项聚合交给Irecv，仍按maxRecvs上限组织；它是接口批量提交，不是verbs SRQ。GPU工作与Proxy工作必须对齐协议、连接和总步数，否则常见现象是一侧等tail、另一侧等sizes或CQ，表面上都在“忙”。</p>
+<h2 id="14">14. 对每个函数怎么读内部逻辑</h2>
+<p>源码的 <code>中文内部逻辑 F编号</code> 给出按函数体顺序的关键步骤；完整嵌套分支/循环在 <a href="function-logic.html">函数内部索引</a> 的对应页面。它们逐项区分条件、循环初始化/继续/增量、数据写入、调用、return/goto/break/continue，不把if和else画成都会执行。</p>
+<p>这些内部步骤是<strong>源码结构展开</strong>，配合上面人工拆解的协议语义来读。C++宏展开、模板特化、编译期条件与函数指针仍需结合具体配置；静态图不是CUDA指令时序，也不构成多线程无竞态的自动证明。解析器不能可靠拆分的片段会保留原文并标记，不能冒充已经验证的控制流。</p></main><script type="application/json" id="frames">{"allreduce": [{"title": "初始：先发本地贡献", "current": {"0": {"chunk": 3, "sources": [0]}, "1": {"chunk": 0, "sources": [1]}, "2": {"chunk": 1, "sources": [2]}, "3": {"chunk": 2, "sources": [3]}}, "outputs": [{}, {}, {}, {}], "arrows": [], "description": "每rank有全部输入块；这里只高亮本轮首发的块。"}, {"title": "ReduceScatter 逻辑传输轮 1", "current": {"1": {"chunk": 3, "sources": [0, 1]}, "2": {"chunk": 0, "sources": [1, 2]}, "3": {"chunk": 1, "sources": [2, 3]}, "0": {"chunk": 2, "sources": [0, 3]}}, "outputs": [{}, {}, {}, {}], "arrows": [{"from": 0, "to": 1, "chunk": 3, "sources": [0], "action": "接收后加入本地贡献"}, {"from": 1, "to": 2, "chunk": 0, "sources": [1], "action": "接收后加入本地贡献"}, {"from": 2, "to": 3, "chunk": 1, "sources": [2], "action": "接收后加入本地贡献"}, {"from": 3, "to": 0, "chunk": 2, "sources": [3], "action": "接收后加入本地贡献"}], "description": "部分结果沿环前进，接收者加入自己的同一块输入。"}, {"title": "ReduceScatter 逻辑传输轮 2", "current": {"2": {"chunk": 3, "sources": [0, 1, 2]}, "3": {"chunk": 0, "sources": [1, 2, 3]}, "0": {"chunk": 1, "sources": [0, 2, 3]}, "1": {"chunk": 2, "sources": [0, 1, 3]}}, "outputs": [{}, {}, {}, {}], "arrows": [{"from": 1, "to": 2, "chunk": 3, "sources": [0, 1], "action": "接收后加入本地贡献"}, {"from": 2, "to": 3, "chunk": 0, "sources": [1, 2], "action": "接收后加入本地贡献"}, {"from": 3, "to": 0, "chunk": 1, "sources": [2, 3], "action": "接收后加入本地贡献"}, {"from": 0, "to": 1, "chunk": 2, "sources": [0, 3], "action": "接收后加入本地贡献"}], "description": "部分结果沿环前进，接收者加入自己的同一块输入。"}, {"title": "ReduceScatter 逻辑传输轮 3", "current": {"3": {"chunk": 3, "sources": [0, 1, 2, 3]}, "0": {"chunk": 0, "sources": [0, 1, 2, 3]}, "1": {"chunk": 1, "sources": [0, 1, 2, 3]}, "2": {"chunk": 2, "sources": [0, 1, 2, 3]}}, "outputs": [{"0": [0, 1, 2, 3]}, {"1": [0, 1, 2, 3]}, {"2": [0, 1, 2, 3]}, {"3": [0, 1, 2, 3]}], "arrows": [{"from": 2, "to": 3, "chunk": 3, "sources": [0, 1, 2], "action": "接收后加入本地贡献"}, {"from": 3, "to": 0, "chunk": 0, "sources": [1, 2, 3], "action": "接收后加入本地贡献"}, {"from": 0, "to": 1, "chunk": 1, "sources": [0, 2, 3], "action": "接收后加入本地贡献"}, {"from": 1, "to": 2, "chunk": 2, "sources": [0, 1, 3], "action": "接收后加入本地贡献"}], "description": "部分结果沿环前进，接收者加入自己的同一块输入。"}, {"title": "AllGather 逻辑传输轮 1", "current": {"0": {"chunk": 3, "sources": [0, 1, 2, 3]}, "1": {"chunk": 0, "sources": [0, 1, 2, 3]}, "2": {"chunk": 1, "sources": [0, 1, 2, 3]}, "3": {"chunk": 2, "sources": [0, 1, 2, 3]}}, "outputs": [{"0": [0, 1, 2, 3], "3": [0, 1, 2, 3]}, {"1": [0, 1, 2, 3], "0": [0, 1, 2, 3]}, {"2": [0, 1, 2, 3], "1": [0, 1, 2, 3]}, {"3": [0, 1, 2, 3], "2": [0, 1, 2, 3]}], "arrows": [{"from": 3, "to": 0, "chunk": 3, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 0, "to": 1, "chunk": 0, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 1, "to": 2, "chunk": 1, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 2, "to": 3, "chunk": 2, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}], "description": "已经完整的结果向下游传播，不再加本地输入。"}, {"title": "AllGather 逻辑传输轮 2", "current": {"1": {"chunk": 3, "sources": [0, 1, 2, 3]}, "2": {"chunk": 0, "sources": [0, 1, 2, 3]}, "3": {"chunk": 1, "sources": [0, 1, 2, 3]}, "0": {"chunk": 2, "sources": [0, 1, 2, 3]}}, "outputs": [{"0": [0, 1, 2, 3], "3": [0, 1, 2, 3], "2": [0, 1, 2, 3]}, {"1": [0, 1, 2, 3], "0": [0, 1, 2, 3], "3": [0, 1, 2, 3]}, {"2": [0, 1, 2, 3], "1": [0, 1, 2, 3], "0": [0, 1, 2, 3]}, {"3": [0, 1, 2, 3], "2": [0, 1, 2, 3], "1": [0, 1, 2, 3]}], "arrows": [{"from": 0, "to": 1, "chunk": 3, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 1, "to": 2, "chunk": 0, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 2, "to": 3, "chunk": 1, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 3, "to": 0, "chunk": 2, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}], "description": "已经完整的结果向下游传播，不再加本地输入。"}, {"title": "AllGather 逻辑传输轮 3", "current": {"2": {"chunk": 3, "sources": [0, 1, 2, 3]}, "3": {"chunk": 0, "sources": [0, 1, 2, 3]}, "0": {"chunk": 1, "sources": [0, 1, 2, 3]}, "1": {"chunk": 2, "sources": [0, 1, 2, 3]}}, "outputs": [{"0": [0, 1, 2, 3], "3": [0, 1, 2, 3], "2": [0, 1, 2, 3], "1": [0, 1, 2, 3]}, {"1": [0, 1, 2, 3], "0": [0, 1, 2, 3], "3": [0, 1, 2, 3], "2": [0, 1, 2, 3]}, {"2": [0, 1, 2, 3], "1": [0, 1, 2, 3], "0": [0, 1, 2, 3], "3": [0, 1, 2, 3]}, {"3": [0, 1, 2, 3], "2": [0, 1, 2, 3], "1": [0, 1, 2, 3], "0": [0, 1, 2, 3]}], "arrows": [{"from": 1, "to": 2, "chunk": 3, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 2, "to": 3, "chunk": 0, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 3, "to": 0, "chunk": 1, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}, {"from": 0, "to": 1, "chunk": 2, "sources": [0, 1, 2, 3], "action": "完整结果复制，不再次归约"}], "description": "已经完整的结果向下游传播，不再加本地输入。"}], "allgather": [{"title": "初始：每rank先保留自己的贡献", "current": {"0": {"chunk": 0, "sources": [0]}, "1": {"chunk": 1, "sources": [1]}, "2": {"chunk": 2, "sources": [2]}, "3": {"chunk": 3, "sources": [3]}}, "outputs": [{"0": [0]}, {"1": [1]}, {"2": [2]}, {"3": [3]}], "arrows": [], "description": "块号就是贡献者的用户rank，输出按这个顺序排列。"}, {"title": "AllGather 逻辑传输轮 1", "current": {"1": {"chunk": 0, "sources": [0]}, "2": {"chunk": 1, "sources": [1]}, "3": {"chunk": 2, "sources": [2]}, "0": {"chunk": 3, "sources": [3]}}, "outputs": [{"0": [0], "3": [3]}, {"1": [1], "0": [0]}, {"2": [2], "1": [1]}, {"3": [3], "2": [2]}], "arrows": [{"from": 0, "to": 1, "chunk": 0, "sources": [0], "action": "保存并继续转发"}, {"from": 1, "to": 2, "chunk": 1, "sources": [1], "action": "保存并继续转发"}, {"from": 2, "to": 3, "chunk": 2, "sources": [2], "action": "保存并继续转发"}, {"from": 3, "to": 0, "chunk": 3, "sources": [3], "action": "保存并继续转发"}], "description": "只复制来源贡献，不执行加法。"}, {"title": "AllGather 逻辑传输轮 2", "current": {"2": {"chunk": 0, "sources": [0]}, "3": {"chunk": 1, "sources": [1]}, "0": {"chunk": 2, "sources": [2]}, "1": {"chunk": 3, "sources": [3]}}, "outputs": [{"0": [0], "3": [3], "2": [2]}, {"1": [1], "0": [0], "3": [3]}, {"2": [2], "1": [1], "0": [0]}, {"3": [3], "2": [2], "1": [1]}], "arrows": [{"from": 1, "to": 2, "chunk": 0, "sources": [0], "action": "保存并继续转发"}, {"from": 2, "to": 3, "chunk": 1, "sources": [1], "action": "保存并继续转发"}, {"from": 3, "to": 0, "chunk": 2, "sources": [2], "action": "保存并继续转发"}, {"from": 0, "to": 1, "chunk": 3, "sources": [3], "action": "保存并继续转发"}], "description": "只复制来源贡献，不执行加法。"}, {"title": "AllGather 逻辑传输轮 3", "current": {"3": {"chunk": 0, "sources": [0]}, "0": {"chunk": 1, "sources": [1]}, "1": {"chunk": 2, "sources": [2]}, "2": {"chunk": 3, "sources": [3]}}, "outputs": [{"0": [0], "3": [3], "2": [2], "1": [1]}, {"1": [1], "0": [0], "3": [3], "2": [2]}, {"2": [2], "1": [1], "0": [0], "3": [3]}, {"3": [3], "2": [2], "1": [1], "0": [0]}], "arrows": [{"from": 2, "to": 3, "chunk": 0, "sources": [0], "action": "保存并继续转发"}, {"from": 3, "to": 0, "chunk": 1, "sources": [1], "action": "保存并继续转发"}, {"from": 0, "to": 1, "chunk": 2, "sources": [2], "action": "保存并继续转发"}, {"from": 1, "to": 2, "chunk": 3, "sources": [3], "action": "保存并继续转发"}], "description": "只复制来源贡献，不执行加法。"}], "reducescatter": [{"title": "初始：先发本地贡献", "current": {"0": {"chunk": 3, "sources": [0]}, "1": {"chunk": 0, "sources": [1]}, "2": {"chunk": 1, "sources": [2]}, "3": {"chunk": 2, "sources": [3]}}, "outputs": [{}, {}, {}, {}], "arrows": [], "description": "每rank有全部输入块；这里只高亮本轮首发的块。"}, {"title": "ReduceScatter 逻辑传输轮 1", "current": {"1": {"chunk": 3, "sources": [0, 1]}, "2": {"chunk": 0, "sources": [1, 2]}, "3": {"chunk": 1, "sources": [2, 3]}, "0": {"chunk": 2, "sources": [0, 3]}}, "outputs": [{}, {}, {}, {}], "arrows": [{"from": 0, "to": 1, "chunk": 3, "sources": [0], "action": "接收后加入本地贡献"}, {"from": 1, "to": 2, "chunk": 0, "sources": [1], "action": "接收后加入本地贡献"}, {"from": 2, "to": 3, "chunk": 1, "sources": [2], "action": "接收后加入本地贡献"}, {"from": 3, "to": 0, "chunk": 2, "sources": [3], "action": "接收后加入本地贡献"}], "description": "部分结果沿环前进，接收者加入自己的同一块输入。"}, {"title": "ReduceScatter 逻辑传输轮 2", "current": {"2": {"chunk": 3, "sources": [0, 1, 2]}, "3": {"chunk": 0, "sources": [1, 2, 3]}, "0": {"chunk": 1, "sources": [0, 2, 3]}, "1": {"chunk": 2, "sources": [0, 1, 3]}}, "outputs": [{}, {}, {}, {}], "arrows": [{"from": 1, "to": 2, "chunk": 3, "sources": [0, 1], "action": "接收后加入本地贡献"}, {"from": 2, "to": 3, "chunk": 0, "sources": [1, 2], "action": "接收后加入本地贡献"}, {"from": 3, "to": 0, "chunk": 1, "sources": [2, 3], "action": "接收后加入本地贡献"}, {"from": 0, "to": 1, "chunk": 2, "sources": [0, 3], "action": "接收后加入本地贡献"}], "description": "部分结果沿环前进，接收者加入自己的同一块输入。"}, {"title": "ReduceScatter 逻辑传输轮 3", "current": {"3": {"chunk": 3, "sources": [0, 1, 2, 3]}, "0": {"chunk": 0, "sources": [0, 1, 2, 3]}, "1": {"chunk": 1, "sources": [0, 1, 2, 3]}, "2": {"chunk": 2, "sources": [0, 1, 2, 3]}}, "outputs": [{"0": [0, 1, 2, 3]}, {"1": [0, 1, 2, 3]}, {"2": [0, 1, 2, 3]}, {"3": [0, 1, 2, 3]}], "arrows": [{"from": 2, "to": 3, "chunk": 3, "sources": [0, 1, 2], "action": "接收后加入本地贡献"}, {"from": 3, "to": 0, "chunk": 0, "sources": [1, 2, 3], "action": "接收后加入本地贡献"}, {"from": 0, "to": 1, "chunk": 1, "sources": [0, 2, 3], "action": "接收后加入本地贡献"}, {"from": 1, "to": 2, "chunk": 2, "sources": [0, 1, 3], "action": "接收后加入本地贡献"}], "description": "部分结果沿环前进，接收者加入自己的同一块输入。"}]}</script><script>
+const frames=JSON.parse(document.getElementById('frames').textContent);let round=0;
+const byId=id=>document.getElementById(id);function render(){const k=byId('collective').value,fs=frames[k],f=fs[round];byId('frame').src='visuals/'+k+'-step-'+round+'.svg';byId('frame').alt=k+' '+f.title;byId('counter').textContent=(round+1)+' / '+fs.length;byId('desc').textContent=f.title+'。'+f.description;byId('prev').disabled=round===0;byId('next').disabled=round===fs.length-1;const table=document.createElement('table');for(let r=0;r<4;r++){const tr=document.createElement('tr');for(const val of ['rank '+r,Object.entries(f.outputs[r]).map(([c,s])=>'C'+c+' ← '+s.map(x=>'X'+x).join('+')).join('；')||'尚无最终块']){const td=document.createElement('td');td.textContent=val;tr.append(td)}table.append(tr)}byId('ownership').replaceChildren(table)}
+byId('collective').onchange=()=>{round=0;render()};byId('prev').onclick=()=>{round--;render()};byId('next').onclick=()=>{round++;render()};
+const ps=['send','recv','copySend','recvCopySend','recvReduceSend','recvReduceCopy','recvReduceCopySend'];ps.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p;byId('primitive').append(o)});function primitive(){const i=+byId('primitive').value;byId('primitiveImage').src='visuals/'+String(i+5).padStart(2,'0')+'-'+ps[i]+'.svg';byId('primitiveImage').alt=ps[i]+'原语数据流'}byId('primitive').onchange=primitive;primitive();render();
+</script></body></html>

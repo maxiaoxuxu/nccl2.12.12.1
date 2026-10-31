@@ -669,6 +669,11 @@ namespace detail {
  * @return True if `T` contains a member `T::name` of type `const char*` or
  * `const wchar_t*`.
  */
+/* 中文内部逻辑 F0809：has_name_member
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (std::is_same<char const*, typename std::decay<decltype(T::name)>::type>::value || std::is_same<wchar_t const*, typename std::decay<decltype(T::name)>::type>::value);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0809
+ */
 /* 中文逐项-函数 F0809：has_name_member
  * 用途与位置：通过模板替换检测命名域类型是否具有要求的静态name成员，编译期拒绝不满足接口的类型。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -794,6 +799,13 @@ class domain {
    * name the `domain` object.
    * @return Reference to the `domain` corresponding to the type `DomainName`.
    */
+/* 中文内部逻辑 F0810：get
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 源码语法片段：static_assert(detail::has_name_member<DomainName>(), "Type used to identify a domain must contain a name member of" "type const char* or const wchar_t*");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 2. 准备局部状态：static domain const d{DomainName::name};；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 函数返回：return d;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0810
+ */
 /* 中文逐项-函数 F0810：get
  * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -849,6 +861,10 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文内部逻辑 F0811：domain
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0811
+ */
 /* 中文逐项-函数 F0811：domain
  * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
  * 参数 name（char const* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -865,6 +881,10 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文内部逻辑 F0812：domain
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0812
+ */
 /* 中文逐项-函数 F0812：domain
  * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
  * 参数 name（wchar_t const* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -881,6 +901,10 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文内部逻辑 F0813：domain
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0813
+ */
 /* 中文逐项-函数 F0813：domain
  * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
  * 参数 <未命名参数>（std::string const& name）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -897,6 +921,10 @@ class domain {
    *
    * @param name A unique name identifying the domain
    */
+/* 中文内部逻辑 F0814：domain
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0814
+ */
 /* 中文逐项-函数 F0814：domain
  * 用途与位置：构造NVTX性能标记域，按传入文本创建/引用工具可识别的域句柄，与NCCL communicator不同。
  * 参数 <未命名参数>（std::wstring const& name）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -951,6 +979,12 @@ class domain {
  * @return Reference to the `domain` corresponding to the global NVTX domain.
  *
  */
+/* 中文内部逻辑 F0815：domain::get<domain::global>
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：static domain const d{};；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 函数返回：return d;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0815
+ */
 /* 中文逐项-函数 F0815：domain::get<domain::global>
  * 用途与位置：全局域特化，返回默认NVTX域表示，避免为默认作用域创建重复命名域。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -992,6 +1026,10 @@ struct rgb {
    * @param green_ Value of the green channel
    * @param blue_ Value of the blue channel
    */
+/* 中文内部逻辑 F0816：rgb
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0816
+ */
 /* 中文逐项-函数 F0816：rgb
  * 用途与位置：构造颜色分量描述，RGB未显式给alpha的部分按对应包装约定处理，不影响张量数据。
  * 参数 red_（component_type red_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1041,6 +1079,10 @@ struct argb final : rgb {
    * @param blue_  Value of the blue channel
    *
    */
+/* 中文内部逻辑 F0817：argb
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0817
+ */
 /* 中文逐项-函数 F0817：argb
  * 用途与位置：构造颜色分量描述，RGB未显式给alpha的部分按对应包装约定处理，不影响张量数据。
  * 参数 alpha_（component_type alpha_）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1099,6 +1141,10 @@ class color {
    *
    * @param hex_code The hex code used to construct the `color`
    */
+/* 中文内部逻辑 F0818：color
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0818
+ */
 /* 中文逐项-函数 F0818：color
  * 用途与位置：构造NVTX颜色属性，保存颜色种类和打包值以供事件属性使用。
  * 参数 hex_code（value_type hex_code）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1113,6 +1159,10 @@ class color {
    *
    * @param argb The alpha, red, green, blue components of the desired `color`
    */
+/* 中文内部逻辑 F0819：color
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0819
+ */
 /* 中文逐项-函数 F0819：color
  * 用途与位置：构造NVTX颜色属性，保存颜色种类和打包值以供事件属性使用。
  * 参数 argb（argb argb）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1132,6 +1182,10 @@ class color {
    *
    * @param rgb The red, green, blue components of the desired `color`
    */
+/* 中文内部逻辑 F0820：color
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0820
+ */
 /* 中文逐项-函数 F0820：color
  * 用途与位置：构造NVTX颜色属性，保存颜色种类和打包值以供事件属性使用。
  * 参数 rgb（rgb rgb）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1147,6 +1201,11 @@ class color {
    * @brief Returns the `color`s argb hex code
    *
    */
+/* 中文内部逻辑 F0821：get_value
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return _value;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0821
+ */
 /* 中文逐项-函数 F0821：get_value
  * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1160,6 +1219,11 @@ class color {
    * @brief Return the NVTX color type of the color.
    *
    */
+/* 中文内部逻辑 F0822：get_type
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return _type;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0822
+ */
 /* 中文逐项-函数 F0822：get_type
  * 用途与位置：返回NVTX消息/颜色/载荷的类型标签，使消费者选择正确union视图。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1182,6 +1246,11 @@ class color {
    * most to least significant byte order.
    *
    */
+/* 中文内部逻辑 F0823：from_bytes_msb_to_lsb
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return uint32_t{byte3} << 24 | uint32_t{byte2} << 16 | uint32_t{byte1} << 8 | uint32_t{byte0};；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0823
+ */
 /* 中文逐项-函数 F0823：from_bytes_msb_to_lsb
  * 用途与位置：按从高到低字节顺序打包颜色分量，形成NVTX事件颜色值。
  * 参数 byte3（uint8_t byte3）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1250,6 +1319,10 @@ class category {
    *
    * @param[in] id The `category`'s identifying value
    */
+/* 中文内部逻辑 F0824：category
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0824
+ */
 /* 中文逐项-函数 F0824：category
  * 用途与位置：保存NVTX事件类别整数标识，供性能工具分组显示。
  * 参数 id（id_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -1262,6 +1335,11 @@ class category {
    * @brief Returns the id of the category.
    *
    */
+/* 中文内部逻辑 F0825：get_id
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return id_;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0825
+ */
 /* 中文逐项-函数 F0825：get_id
  * 用途与位置：读取当前NVTX类别或范围标识，不等于NCCL rank/channel编号。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1374,6 +1452,13 @@ class named_category final : public category {
    * @tparam C Type containing a member `C::name` that resolves  to either a
    * `char const*` or `wchar_t const*` and `C::id`.
    */
+/* 中文内部逻辑 F0826：get
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 源码语法片段：static_assert(detail::has_name_member<C>(), "Type used to name a category must contain a name member.");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 2. 准备局部状态：static named_category<D> const category{C::id, C::name};；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 函数返回：return category;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0826
+ */
 /* 中文逐项-函数 F0826：get
  * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1403,6 +1488,15 @@ class named_category final : public category {
    * @param[in] id The category id to name
    * @param[in] name The name to associated with `id`
    */
+/* 中文内部逻辑 F0827：named_category
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 调用 / 计算 / 写入：nvtxDomainNameCategoryA(domain::get<D>(), get_id(), name);；为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：(void)id;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     5. 调用 / 计算 / 写入：(void)name;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0827
+ */
 /* 中文逐项-函数 F0827：named_category
  * 用途与位置：在指定NVTX域中为类别id注册可读名字，后续事件可引用该类别。
  * 参数 id（id_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -1430,6 +1524,15 @@ class named_category final : public category {
    * @param[in] id The category id to name
    * @param[in] name The name to associated with `id`
    */
+/* 中文内部逻辑 F0828：named_category
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 调用 / 计算 / 写入：nvtxDomainNameCategoryW(domain::get<D>(), get_id(), name);；为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：(void)id;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     5. 调用 / 计算 / 写入：(void)name;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0828
+ */
 /* 中文逐项-函数 F0828：named_category
  * 用途与位置：在指定NVTX域中为类别id注册可读名字，后续事件可引用该类别。
  * 参数 id（id_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -1534,6 +1637,12 @@ class registered_string {
    * registered string's contents.
    * @return Reference to a `registered_string` associated with the type `M`.
    */
+/* 中文内部逻辑 F0829：get
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：static registered_string<D> const registered_string{M::message};；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 函数返回：return registered_string;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0829
+ */
 /* 中文逐项-函数 F0829：get
  * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1563,6 +1672,10 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0830：registered_string
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0830
+ */
 /* 中文逐项-函数 F0830：registered_string
  * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
  * 参数 msg（char const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1585,6 +1698,10 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0831：registered_string
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0831
+ */
 /* 中文逐项-函数 F0831：registered_string
  * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
  * 参数 <未命名参数>（std::string const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1604,6 +1721,10 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0832：registered_string
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0832
+ */
 /* 中文逐项-函数 F0832：registered_string
  * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
  * 参数 msg（wchar_t const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1626,6 +1747,10 @@ class registered_string {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0833：registered_string
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0833
+ */
 /* 中文逐项-函数 F0833：registered_string
  * 用途与位置：在NVTX域注册可复用消息字符串，减少频繁标记时重复文本处理。
  * 参数 <未命名参数>（std::wstring const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1638,6 +1763,11 @@ class registered_string {
    * @brief Returns the registered string's handle
    *
    */
+/* 中文内部逻辑 F0834：get_handle
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return handle_;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0834
+ */
 /* 中文逐项-函数 F0834：get_handle
  * 用途与位置：读取包装保存的不透明NVTX注册字符串/域等句柄，必须交给对应NVTX API使用。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1699,6 +1829,11 @@ class registered_string {
  * nvtx3::thread_range range3{"message 3"};
  * \endcode
  */
+/* 中文内部逻辑 F0835：get_value
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return value_;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0835
+ */
 /* 中文逐项-函数 F0835：get_value
  * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1719,6 +1854,11 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0836：message
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.ascii = msg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0836
+ */
 /* 中文逐项-函数 F0836：message
  * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
  * 参数 msg（char const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1735,6 +1875,10 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0837：message
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0837
+ */
 /* 中文逐项-函数 F0837：message
  * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
  * 参数 <未命名参数>（std::string const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1758,6 +1902,11 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0838：message
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.unicode = msg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0838
+ */
 /* 中文逐项-函数 F0838：message
  * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
  * 参数 msg（wchar_t const* msg）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1774,6 +1923,10 @@ class message {
    *
    * @param msg The contents of the message
    */
+/* 中文内部逻辑 F0839：message
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0839
+ */
 /* 中文逐项-函数 F0839：message
  * 用途与位置：把ASCII、Unicode或注册字符串统一包装成带type标签的NVTX消息。
  * 参数 <未命名参数>（std::wstring const& msg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1821,6 +1974,11 @@ class message {
    * @brief Return the type information about the value the union holds.
    *
    */
+/* 中文内部逻辑 F0840：nvtxMessageType_t get_type
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return type_;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0840
+ */
 /* 中文逐项-函数 F0840：nvtxMessageType_t get_type
  * 用途与位置：返回NVTX消息/颜色/载荷的类型标签，使消费者选择正确union视图。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -1876,7 +2034,12 @@ class payload {
 /* 中文逐项-变量 V3039：explicit
  * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
  */
-  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0841：payload
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文内部逻辑 F0841：payload
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.llValue = value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0841
+ */
+/* 中文逐项-函数 F0841：payload
  * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
  * 参数 value（int64_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1895,7 +2058,12 @@ class payload {
 /* 中文逐项-变量 V3040：explicit
  * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
  */
-  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0842：payload
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文内部逻辑 F0842：payload
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.iValue = value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0842
+ */
+/* 中文逐项-函数 F0842：payload
  * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
  * 参数 value（int32_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1914,7 +2082,12 @@ class payload {
 /* 中文逐项-变量 V3041：explicit
  * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
  */
-  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0843：payload
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文内部逻辑 F0843：payload
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.ullValue = value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0843
+ */
+/* 中文逐项-函数 F0843：payload
  * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
  * 参数 value（uint64_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1933,7 +2106,12 @@ class payload {
 /* 中文逐项-变量 V3042：explicit
  * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
  */
-  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0844：payload
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文内部逻辑 F0844：payload
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.uiValue = value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0844
+ */
+/* 中文逐项-函数 F0844：payload
  * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
  * 参数 value（uint32_t value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1953,7 +2131,12 @@ class payload {
 /* 中文逐项-变量 V3043：explicit
  * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
  */
-  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0845：payload
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文内部逻辑 F0845：payload
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.fValue = value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0845
+ */
+/* 中文逐项-函数 F0845：payload
  * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
  * 参数 value（float value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1973,7 +2156,12 @@ class payload {
 /* 中文逐项-变量 V3044：explicit
  * explicit（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX显式范围包装相关声明的解析项，真正语义以紧邻C++声明为准，不把关键字当运行态数据。
  */
-  NVTX3_RELAXED_CONSTEXPR explicit /* 中文逐项-函数 F0846：payload
+  NVTX3_RELAXED_CONSTEXPR explicit /* 中文内部逻辑 F0846：payload
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：value_.dValue = value;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0846
+ */
+/* 中文逐项-函数 F0846：payload
  * 用途与位置：把某种标量保存成带类型标签的NVTX事件载荷，仅用于性能标记附加信息。
  * 参数 value（double value）：XML节点属性键值数组、有效条数与单个键/值，字段容量有固定上限。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1988,6 +2176,11 @@ class payload {
    * @brief Return the union holding the value of the payload
    *
    */
+/* 中文内部逻辑 F0847：get_value
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return value_;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0847
+ */
 /* 中文逐项-函数 F0847：get_value
  * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2004,7 +2197,12 @@ class payload {
 /* 中文逐项-变量 V3045：nvtxPayloadType_t
  * nvtxPayloadType_t（NVTX3_RELAXED_CONSTEXPR；成员 payload）：NVTX载荷类型标签的声明/解析项，具体使用仍由payloadType和union对应。
  */
-  NVTX3_RELAXED_CONSTEXPR nvtxPayloadType_t /* 中文逐项-函数 F0848：get_type
+  NVTX3_RELAXED_CONSTEXPR nvtxPayloadType_t /* 中文内部逻辑 F0848：get_type
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return type_;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0848
+ */
+/* 中文逐项-函数 F0848：get_type
  * 用途与位置：返回NVTX消息/颜色/载荷的类型标签，使消费者选择正确union视图。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -2096,6 +2294,10 @@ class event_attributes {
    * @brief Default constructor creates an `event_attributes` with no
    * category, color, payload, nor message.
    */
+/* 中文内部逻辑 F0849：event_attributes
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0849
+ */
 /* 中文逐项-函数 F0849：event_attributes
  * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2125,6 +2327,11 @@ class event_attributes {
    * forwards the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文内部逻辑 F0850：event_attributes
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：attributes_.category = c.get_id();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0850
+ */
 /* 中文逐项-函数 F0850：event_attributes
  * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2145,6 +2352,12 @@ class event_attributes {
    * the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文内部逻辑 F0851：event_attributes
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：attributes_.color = c.get_value();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：attributes_.colorType = c.get_type();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0851
+ */
 /* 中文逐项-函数 F0851：event_attributes
  * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2166,6 +2379,12 @@ class event_attributes {
    * the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文内部逻辑 F0852：event_attributes
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：attributes_.payload = p.get_value();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：attributes_.payloadType = p.get_type();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0852
+ */
 /* 中文逐项-函数 F0852：event_attributes
  * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2187,6 +2406,12 @@ class event_attributes {
    * the remaining variadic parameter pack to the next constructor.
    *
    */
+/* 中文内部逻辑 F0853：event_attributes
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：attributes_.message = m.get_value();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：attributes_.messageType = m.get_type();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0853
+ */
 /* 中文逐项-函数 F0853：event_attributes
  * 用途与位置：将颜色、类别、消息、载荷等参数组合成版本化NVTX事件属性结构，默认字段按库契约初始化。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2211,6 +2436,11 @@ class event_attributes {
    * @brief Get raw pointer to underlying NVTX attributes object.
    *
    */
+/* 中文内部逻辑 F0854：get
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return &attributes_;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0854
+ */
 /* 中文逐项-函数 F0854：get
  * 用途与位置：NVTX包装的construct-on-first-use入口，按DomainName/类别/字符串模板创建并复用对应的静态注册对象。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2295,6 +2525,14 @@ class domain_thread_range {
    * @param[in] attr `event_attributes` that describes the desired attributes
    * of the range.
    */
+/* 中文内部逻辑 F0855：domain_thread_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 调用 / 计算 / 写入：nvtxDomainRangePushEx(domain::get<D>(), attr.get());；在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：(void)attr;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0855
+ */
 /* 中文逐项-函数 F0855：domain_thread_range
  * 用途与位置：RAII范围对象：构造时在当前线程push一个NVTX范围，析构时配对pop。
  * 参数 <未命名参数>（event_attributes const& attr）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -2337,6 +2575,10 @@ class domain_thread_range {
    * forward.
    *
    */
+/* 中文内部逻辑 F0856：domain_thread_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0856
+ */
 /* 中文逐项-函数 F0856：domain_thread_range
  * 用途与位置：RAII范围对象：构造时在当前线程push一个NVTX范围，析构时配对pop。
  * 参数 <未命名参数>（First const& first）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -2357,6 +2599,10 @@ class domain_thread_range {
    * message, color, payload, nor category.
    *
    */
+/* 中文内部逻辑 F0857：domain_thread_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0857
+ */
 /* 中文逐项-函数 F0857：domain_thread_range
  * 用途与位置：RAII范围对象：构造时在当前线程push一个NVTX范围，析构时配对pop。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2381,6 +2627,12 @@ class domain_thread_range {
   /**
    * @brief Destroy the domain_thread_range, ending the NVTX range event.
    */
+/* 中文内部逻辑 F0858：~domain_thread_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 调用 / 计算 / 写入：nvtxDomainRangePop(domain::get<D>());；从当前线程NVTX范围栈pop结束最近区间。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0858
+ */
 /* 中文逐项-函数 F0858：~domain_thread_range
  * 用途与位置：结束当前线程RAII对象管理的NVTX范围，保证离开C++作用域时标记配对。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2417,6 +2669,10 @@ struct range_handle {
    * @brief Construct a `range_handle` from the given id.
    *
    */
+/* 中文内部逻辑 F0859：range_handle
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0859
+ */
 /* 中文逐项-函数 F0859：range_handle
  * 用途与位置：保存跨线程/进程范围start返回的NVTX id及域，以便之后显式结束。
  * 参数 id（value_type id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -2430,6 +2686,11 @@ struct range_handle {
    *
    * @return value_type The handle's value
    */
+/* 中文内部逻辑 F0860：get_value
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return _range_id;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0860
+ */
 /* 中文逐项-函数 F0860：get_value
  * 用途与位置：返回NVTX包装内部保存的颜色/消息/载荷union值，不复制或传输GPU张量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2470,6 +2731,15 @@ struct range_handle {
  * @param[in] attr `event_attributes` that describes the desired attributes
  * of the range.
  * @return Unique handle to be passed to `end_range` to end the range.
+ */
+/* 中文内部逻辑 F0861：start_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return range_handle{nvtxDomainRangeStartEx(domain::get<D>(), attr.get())};；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：(void)attr;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     5. 函数返回：return range_handle{};；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0861
  */
 /* 中文逐项-函数 F0861：start_range
  * 用途与位置：开始可显式结束的NVTX范围并返回句柄，标记被测时间区间而不执行通信。
@@ -2518,6 +2788,15 @@ range_handle start_range(event_attributes const& attr) noexcept
  * `event_attributes`.
  * @return Unique handle to be passed to `end_range` to end the range.
  */
+/* 中文内部逻辑 F0862：start_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return start_range(event_attributes{first, args...});；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：(void)first;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     5. 函数返回：return range_handle{};；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0862
+ */
 /* 中文逐项-函数 F0862：start_range
  * 用途与位置：开始可显式结束的NVTX范围并返回句柄，标记被测时间区间而不执行通信。
  * 参数 <未命名参数>（First const& first）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -2550,6 +2829,14 @@ range_handle start_range(First const& first, Args const&... args) noexcept
  * handle `r` already indicates the domain to which the range belongs.
  *
  * @param r Handle to a range started by a prior call to `start_range`.
+ */
+/* 中文内部逻辑 F0863：end_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 调用 / 计算 / 写入：nvtxRangeEnd(r.get_value());；按id结束显式NVTX时间范围。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：(void)r;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0863
  */
 /* 中文逐项-函数 F0863：end_range
  * 用途与位置：根据保存的域和范围id结束NVTX范围，与start_range配对。
@@ -2597,6 +2884,10 @@ class domain_process_range {
    *
    * @param attr
    */
+/* 中文内部逻辑 F0864：domain_process_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0864
+ */
 /* 中文逐项-函数 F0864：domain_process_range
  * 用途与位置：RAII包装显式NVTX范围，构造start、析构end；范围不要求只依赖线程push/pop栈。
  * 参数 <未命名参数>（event_attributes const& attr）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -2614,6 +2905,10 @@ class domain_process_range {
    * @param first
    * @param args
    */
+/* 中文内部逻辑 F0865：domain_process_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0865
+ */
 /* 中文逐项-函数 F0865：domain_process_range
  * 用途与位置：RAII包装显式NVTX范围，构造start、析构end；范围不要求只依赖线程push/pop栈。
  * 参数 <未命名参数>（First const& first）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -2633,6 +2928,10 @@ class domain_process_range {
    * @brief Construct a new domain process range object
    *
    */
+/* 中文内部逻辑 F0866：domain_process_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0866
+ */
 /* 中文逐项-函数 F0866：domain_process_range
  * 用途与位置：RAII包装显式NVTX范围，构造start、析构end；范围不要求只依赖线程push/pop栈。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2645,6 +2944,13 @@ class domain_process_range {
    * @brief Destroy the `domain_process_range` ending the range.
    *
    */
+/* 中文内部逻辑 F0867：~domain_process_range
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(handle_)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：end_range(*handle_);；根据保存的域和范围id结束NVTX范围，与start_range配对。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0867
+ */
 /* 中文逐项-函数 F0867：~domain_process_range
  * 用途与位置：以保存的NVTX域和id结束该RAII范围，不等待NCCL GPU通信完成。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -2716,6 +3022,14 @@ using process_range = domain_process_range<>;
  * indicate that the global NVTX domain should be used.
  * @param[in] attr `event_attributes` that describes the desired attributes
  * of the mark.
+ */
+/* 中文内部逻辑 F0868：mark
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 调用 / 计算 / 写入：nvtxDomainMarkEx(domain::get<D>(), attr.get());；向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：(void)(attr);；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3_hpp.md#f0868
  */
 /* 中文逐项-函数 F0868：mark
  * 用途与位置：提交一个瞬时时间点NVTX事件，不建立持续区间、不做张量传输。

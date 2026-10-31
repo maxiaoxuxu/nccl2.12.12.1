@@ -17,7 +17,29 @@ template<typename T, typename RedOp>
  * 对 self 的匹配通信可转为本地复制；对其他 peer 通过连接能力选择直接访问或缓冲区路径。
  */
 struct RunWork<ncclFuncSendRecv, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0374：runSend
+  __device__ __forceinline__ /* 中文内部逻辑 F0374：runSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(args->peer == ncclShmem.comm.rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 准备局部状态：struct ncclWorkElemP2p* recvArgs = args-1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     4. 条件判断：(args->buff != recvArgs->buff)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       5. 真分支：；仅条件为真执行以下子项。
+ *         6. 调用 / 计算 / 写入：ReduceOrCopyMulti<COLL_UNROLL, RedOp, T, 1, 1, 1, 1, 0>(tid, nthreads, nullptr, false, 1, (const T**)&args->buff, 1, (T**)&recvArgs->buff, args->count);；统一选择 128-bit 对齐主路径与逐类型尾部路径，融合多源归约及多目标复制。
+ *   7. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     8. 源码语法片段：using Proto = ProtoSimple<1, 1>;；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ *     9. 准备局部状态：ssize_t const count = args->count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     10. 准备局部状态：int const chunkSize = args->chunkSize/sizeof(T);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     11. 准备局部状态：int const peer = args->peer;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     12. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<0, 1>, 1, Proto, 1> prims (tid, nthreads, nullptr, &peer, args->buff, nullptr, 0, group);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     13. 准备局部状态：ssize_t offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     14. 先执行一次的循环：初始 ；继续条件 (offset < count)；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *       15. 准备局部状态：int nelem = min(chunkSize, count-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *       16. 调用 / 计算 / 写入：prims.directSend(offset, offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       17. 调用 / 计算 / 写入：offset += nelem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__sendrecv_h.md#f0374
+ */
+/* 中文逐项-函数 F0374：runSend
  * 用途与位置：执行分给当前 P2P 线程组的发送任务；self peer 走本地复制，其他 peer 用 Simple 原语分块。
  * 参数 tid（const int tid）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
  * 参数 nthreads（const int nthreads）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
@@ -84,7 +106,24 @@ struct RunWork<ncclFuncSendRecv, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
     }
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0375：runRecv
+  __device__ __forceinline__ /* 中文内部逻辑 F0375：runRecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(args->peer != ncclShmem.comm.rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 源码语法片段：using Proto = ProtoSimple<1, 1>;；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ *     4. 准备局部状态：ssize_t const count = args->count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 准备局部状态：int const chunkSize = args->chunkSize/sizeof(T);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 准备局部状态：int const peer = args->peer;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<1, 0>, 1, Proto, 1> prims (tid, nthreads, &peer, nullptr, nullptr, args->buff, 0, group);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     8. 准备局部状态：ssize_t offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     9. 先执行一次的循环：初始 ；继续条件 (offset < count)；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *       10. 准备局部状态：int nelem = min(chunkSize, count-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *       11. 调用 / 计算 / 写入：prims.directRecv(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       12. 调用 / 计算 / 写入：offset += nelem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__sendrecv_h.md#f0375
+ */
+/* 中文逐项-函数 F0375：runRecv
  * 用途与位置：执行 P2P 接收线程组任务；self peer 的数据由配对发送组复制，其他 peer 用 Simple 接收。
  * 参数 tid（const int tid）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
  * 参数 nthreads（const int nthreads）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
@@ -136,7 +175,32 @@ struct RunWork<ncclFuncSendRecv, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
     }
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0376：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0376：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclWorkElemP2p* args = work->p2pElems;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int ngroups = args->ngroups;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：int tid = threadIdx.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int wid = tid / WARP_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 编译期分支/指令：#define NWARPS (NCCL_MAX_NTHREADS/WARP_SIZE)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ * 6. 准备局部状态：int group = ngroups-1- (NWARPS-1-wid) * ngroups / NWARPS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：args += group;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 条件判断：(args->header.type == ncclWorkTypeUnused)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   9. 真分支：；仅条件为真执行以下子项。
+ *     10. 函数返回：return;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 调用 / 计算 / 写入：tid -= args->warpStart * WARP_SIZE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 准备局部状态：int nthreads = args->nWarps * WARP_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 13. 调用 / 计算 / 写入：group |= 1<<16;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 条件判断：(tid >= nthreads || args->peer == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 函数返回：return;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 17. 条件判断：((group%2) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   18. 真分支：；仅条件为真执行以下子项。
+ *     19. 调用 / 计算 / 写入：runRecv(tid, nthreads, group, args);；执行 P2P 接收线程组任务；self peer 的数据由配对发送组复制，其他 peer 用 Simple 接收。
+ *   20. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     21. 调用 / 计算 / 写入：runSend(tid, nthreads, group, args);；执行分给当前 P2P 线程组的发送任务；self peer 走本地复制，其他 peer 用 Simple 原语分块。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__sendrecv_h.md#f0376
+ */
+/* 中文逐项-函数 F0376：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWork<ncclFuncSendRecv, T, RedOp,
  * NCCL_ALGO_RING, NCCL_PROTO_SIMPLE>。
  * 参数 work（ncclWork *work）：一条任务描述或 channel 的描述符 FIFO，存元数据而非整个用户张量。

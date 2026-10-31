@@ -30,6 +30,18 @@ struct ncclP2Pinfo {
 
 typedef ncclRecyclableList<struct ncclP2Pinfo> ncclP2Plist;
 
+/* 中文内部逻辑 F0869：ncclSaveP2pInfo
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(p2p == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：p2p = new ncclP2Plist();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 准备局部状态：struct ncclP2Pinfo* next;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(p2p->getNewElem(&next));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 6. 调用 / 计算 / 写入：next->buff = buff;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：next->nbytes = nBytes;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__p2p_h.md#f0869
+ */
 /* 中文逐项-函数 F0869：ncclSaveP2pInfo
  * 用途与位置：按 peer 的可复用列表保存缓冲指针和字节数，供最外层 GroupEnd 统一分块和配对调度。
  * 参数 <未命名参数>（ncclP2Plist* &p2p）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。

@@ -48,6 +48,27 @@
     ret func(args)
 #endif // end PROFAPI
 
+/* 中文内部逻辑 F0628：ncclTypeSize
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 多路分派：(type)；按case匹配进入；没有break/return/goto时可能贯穿下一个case。
+ *   2. case / default：ncclInt8；从匹配项进入，随后依源码直到break等跳转。
+ *   3. case / default：ncclUint8；从匹配项进入，随后依源码直到break等跳转。
+ *     4. 函数返回：return 1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   5. case / default：ncclFloat16；从匹配项进入，随后依源码直到break等跳转。
+ *   6. 编译期分支/指令：#if defined(__CUDA_BF16_TYPES_EXIST__)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   7. 函数返回：return 2;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   8. case / default：ncclInt32；从匹配项进入，随后依源码直到break等跳转。
+ *   9. case / default：ncclUint32；从匹配项进入，随后依源码直到break等跳转。
+ *   10. case / default：ncclFloat32；从匹配项进入，随后依源码直到break等跳转。
+ *     11. 函数返回：return 4;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   12. case / default：ncclInt64；从匹配项进入，随后依源码直到break等跳转。
+ *   13. case / default：ncclUint64；从匹配项进入，随后依源码直到break等跳转。
+ *   14. case / default：ncclFloat64；从匹配项进入，随后依源码直到break等跳转。
+ *     15. 函数返回：return 8;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   16. case / default：default；从匹配项进入，随后依源码直到break等跳转。
+ *     17. 函数返回：return -1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__core_h.md#f0628
+ */
 /* 中文逐项-函数 F0628：ncclTypeSize
  * 用途与位置：把 NCCL 数据类型枚举映射到每元素字节数，用于尺寸换算；未知类型返回 -1。
  * 参数 type（ncclDataType_t type）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。

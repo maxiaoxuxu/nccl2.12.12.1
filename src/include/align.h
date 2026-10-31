@@ -41,6 +41,11 @@
   #endif
 #endif
 
+/* 中文内部逻辑 F0600：divUp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x+y-1)/y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__align_h.md#f0600
+ */
 /* 中文逐项-函数 F0600：divUp
  * 用途与位置：计算整数向上取整的商，避免尾数不整除时少覆盖最后一块。
  * 参数 x（X x）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -54,6 +59,11 @@ __host__ __device__ constexpr Z divUp(X x, Y y) {
   return (x+y-1)/y;
 }
 
+/* 中文内部逻辑 F0601：roundUp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x+y-1) - (x+y-1)%y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__align_h.md#f0601
+ */
 /* 中文逐项-函数 F0601：roundUp
  * 用途与位置：把尺寸/偏移向上对齐到指定粒度，满足向量访存、页或协议槽位契约。
  * 参数 x（X x）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -68,6 +78,11 @@ __host__ __device__ constexpr Z roundUp(X x, Y y) {
 }
 
 // assumes second argument is a power of 2
+/* 中文内部逻辑 F0602：alignUp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x+a-1) & Z(-a);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__align_h.md#f0602
+ */
 /* 中文逐项-函数 F0602：alignUp
  * 用途与位置：把尺寸/偏移向上对齐到指定粒度，满足向量访存、页或协议槽位契约。
  * 参数 x（X x）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。

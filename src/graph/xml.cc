@@ -23,6 +23,15 @@
 /* XML File Parser */
 /*******************/
 
+/* 中文内部逻辑 F0532：xmlGetChar
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(fread(c, 1, 1, file) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("XML Parse : Unexpected EOF");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0532
+ */
 /* 中文逐项-函数 F0532：xmlGetChar
  * 用途与位置：从 XML 输入流读取字符并检测结束状态，作为轻量解析器的基础读操作。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -40,6 +49,34 @@ ncclResult_t xmlGetChar(FILE* file, char* c) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0533：xmlGetValue
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetChar(file, &c));；失败时可能提前return，成功才继续；从 XML 输入流读取字符并检测结束状态，作为轻量解析器的基础读操作。
+ * 3. 条件判断：(c != '"' && c != '\'')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 编译期分支/指令：#if INT_OK；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *       6. 准备局部状态：int o = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       7. 先执行一次的循环：初始 ；继续条件 (c >= '0' && c <= '9')；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *         8. 调用 / 计算 / 写入：value[o++] = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         9. 调用 / 计算 / 写入：NCCLCHECK(xmlGetChar(file, &c));；失败时可能提前return，成功才继续；从 XML 输入流读取字符并检测结束状态，作为轻量解析器的基础读操作。
+ *       10. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       11. 调用 / 计算 / 写入：value[o] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       12. 调用 / 计算 / 写入：*last = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *       14. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         15. 调用 / 计算 / 写入：WARN("XML Parse : Expected (double) quote.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         16. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 17. 准备局部状态：int o = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 18. 先执行一次的循环：初始 ；继续条件 (c != '"')；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *   19. 调用 / 计算 / 写入：NCCLCHECK(xmlGetChar(file, &c));；失败时可能提前return，成功才继续；从 XML 输入流读取字符并检测结束状态，作为轻量解析器的基础读操作。
+ *   20. 调用 / 计算 / 写入：value[o++] = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 22. 调用 / 计算 / 写入：value[o-1] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 23. 调用 / 计算 / 写入：NCCLCHECK(xmlGetChar(file, last));；失败时可能提前return，成功才继续；从 XML 输入流读取字符并检测结束状态，作为轻量解析器的基础读操作。
+ * 24. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0533
+ */
 /* 中文逐项-函数 F0533：xmlGetValue
  * 用途与位置：解析 XML 的引号属性值或对应值片段，限制目标容量避免读取越界。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -90,6 +127,34 @@ ncclResult_t xmlGetValue(FILE* file, char* value, char* last) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0534：xmlGetToken
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：char* ptr = name;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：int o = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 先执行一次的循环：初始 ；继续条件 (c != ' ' && c != '>' && c != '/' && c != '\n' && c != '\r')；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *   5. 调用 / 计算 / 写入：NCCLCHECK(xmlGetChar(file, &c));；失败时可能提前return，成功才继续；从 XML 输入流读取字符并检测结束状态，作为轻量解析器的基础读操作。
+ *   6. 条件判断：(c == '=')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     7. 真分支：；仅条件为真执行以下子项。
+ *       8. 调用 / 计算 / 写入：ptr[o] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       9. 条件判断：(value == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         10. 真分支：；仅条件为真执行以下子项。
+ *           11. 调用 / 计算 / 写入：WARN("XML Parse : Unexpected value with name %s", ptr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           12. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *       13. 函数返回：return xmlGetValue(file, value, last);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   14. 调用 / 计算 / 写入：ptr[o] = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   15. 条件判断：(o == MAX_STR_LEN-1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     16. 真分支：；仅条件为真执行以下子项。
+ *       17. 调用 / 计算 / 写入：ptr[o] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       18. 调用 / 计算 / 写入：WARN("Error : name %s too long (max %d)", ptr, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       19. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   20. 调用 / 计算 / 写入：o++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 22. 调用 / 计算 / 写入：ptr[o-1] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 23. 调用 / 计算 / 写入：*last = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 24. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0534
+ */
 /* 中文逐项-函数 F0534：xmlGetToken
  * 用途与位置：扫描 XML 分隔符之间的 token，供节点名/属性名解析使用。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -146,6 +211,24 @@ ncclResult_t xmlGetToken(FILE* file, char* name, char* value, char* last) {
  * 原始宏名 SHIFT_APPEND；完整替换体紧邻下方，续行反斜线属于宏定义的一部分。注释放在宏定义外，未改替换体。
  */
 #define SHIFT_APPEND(s, c) do { s[0]=s[1]; s[1]=s[2]; s[2]=c; } while(0)
+/* 中文内部逻辑 F0535：xmlSkipComment
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char end[4] = "...";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 int i=0;；继续条件 i<strlen(start)；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 调用 / 计算 / 写入：SHIFT_APPEND(end, start[i]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 5. 调用 / 计算 / 写入：SHIFT_APPEND(end, next);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 循环：初始 ；继续条件 (strcmp(end, "-->") != 0)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 准备局部状态：int c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   8. 条件判断：(fread(&c, 1, 1, file) != 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     9. 真分支：；仅条件为真执行以下子项。
+ *       10. 调用 / 计算 / 写入：WARN("XML Parse error : unterminated comment");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       11. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   12. 调用 / 计算 / 写入：SHIFT_APPEND(end, c);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0535
+ */
 /* 中文逐项-函数 F0535：xmlSkipComment
  * 用途与位置：跳过 XML 注释直到终止符，不把注释内容误识别成拓扑节点。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -189,6 +272,56 @@ ncclResult_t xmlSkipComment(FILE* file, char* start, char next) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0536：xmlGetNode
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：node->type = NODE_TYPE_NONE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 准备局部状态：char c = ' ';；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 循环：初始 ；继续条件 (c == ' ' || c == '\n' || c == '\r')；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 条件判断：(fread(&c, 1, 1, file) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 条件判断：(c != '<')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   9. 真分支：；仅条件为真执行以下子项。
+ *     10. 调用 / 计算 / 写入：WARN("XML Parse error : expecting '<', got '%c'", c);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     11. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 12. 调用 / 计算 / 写入：NCCLCHECK(xmlGetToken(file, node->name, NULL, &c));；失败时可能提前return，成功才继续；扫描 XML 分隔符之间的 token，供节点名/属性名解析使用。
+ * 13. 条件判断：(strncmp(node->name, "!--", 3) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 调用 / 计算 / 写入：NCCLCHECK(xmlSkipComment(file, node->name+3, c));；失败时可能提前return，成功才继续；跳过 XML 注释直到终止符，不把注释内容误识别成拓扑节点。
+ *     16. 函数返回：return xmlGetNode(file, node);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 17. 条件判断：(node->name[0] == '\0' && c == '/')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   18. 真分支：；仅条件为真执行以下子项。
+ *     19. 调用 / 计算 / 写入：node->type = NODE_TYPE_CLOSE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     20. 调用 / 计算 / 写入：NCCLCHECK(xmlGetToken(file, node->name, NULL, &c));；失败时可能提前return，成功才继续；扫描 XML 分隔符之间的 token，供节点名/属性名解析使用。
+ *     21. 条件判断：(c != '>')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       22. 真分支：；仅条件为真执行以下子项。
+ *         23. 调用 / 计算 / 写入：WARN("XML Parse error : unexpected trailing %c in closing tag %s", c, node->name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         24. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     25. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 26. 调用 / 计算 / 写入：node->type = NODE_TYPE_OPEN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 27. 准备局部状态：int a = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 28. 循环：初始 ；继续条件 (c == ' ')；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   29. 调用 / 计算 / 写入：NCCLCHECK(xmlGetToken(file, node->attrs[a].key, node->attrs[a].value, &c));；失败时可能提前return，成功才继续；扫描 XML 分隔符之间的 token，供节点名/属性名解析使用。
+ *   30. 条件判断：(a == MAX_ATTR_COUNT)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     31. 真分支：；仅条件为真执行以下子项。
+ *       32. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "XML Parse : Ignoring extra attributes (max %d)", MAX_ATTR_COUNT);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     33. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       34. 调用 / 计算 / 写入：a++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 35. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 36. 调用 / 计算 / 写入：node->nAttrs = a;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 37. 条件判断：(c == '/')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   38. 真分支：；仅条件为真执行以下子项。
+ *     39. 调用 / 计算 / 写入：node->type = NODE_TYPE_SINGLE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     40. 准备局部状态：char str[MAX_STR_LEN];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     41. 调用 / 计算 / 写入：NCCLCHECK(xmlGetToken(file, str, NULL, &c));；失败时可能提前return，成功才继续；扫描 XML 分隔符之间的 token，供节点名/属性名解析使用。
+ * 42. 条件判断：(c != '>')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   43. 真分支：；仅条件为真执行以下子项。
+ *     44. 调用 / 计算 / 写入：WARN("XML Parse : expected >, got '%c'", c);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     45. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 46. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0536
+ */
 /* 中文逐项-函数 F0536：xmlGetNode
  * 用途与位置：读取一个 XML 标签的名字、开闭类型和属性，填入节点表示。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -283,6 +416,57 @@ struct xmlHandler {
   xmlHandlerFunc_t func;
 };
 
+/* 中文内部逻辑 F0537：xmlLoadSub
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(head && head->type == NODE_TYPE_SINGLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 循环：初始 ；继续条件 (1)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   5. 条件判断：(xml->maxIndex == MAX_NODES)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     6. 真分支：；仅条件为真执行以下子项。
+ *       7. 调用 / 计算 / 写入：WARN("Error : XML parser is limited to 1024 nodes");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       8. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   9. 准备局部状态：struct ncclXmlNode* node = xml->nodes+xml->maxIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   10. 调用 / 计算 / 写入：memset(node, 0, sizeof(struct ncclXmlNode));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   11. 调用 / 计算 / 写入：NCCLCHECK(xmlGetNode(file, node));；失败时可能提前return，成功才继续；读取一个 XML 标签的名字、开闭类型和属性，填入节点表示。
+ *   12. 条件判断：(node->type == NODE_TYPE_NONE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     13. 真分支：；仅条件为真执行以下子项。
+ *       14. 条件判断：(head)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         15. 真分支：；仅条件为真执行以下子项。
+ *           16. 调用 / 计算 / 写入：WARN("XML Parse : unterminated %s", head->name);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           17. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *         18. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   20. 条件判断：(head && node->type == NODE_TYPE_CLOSE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     21. 真分支：；仅条件为真执行以下子项。
+ *       22. 条件判断：(strcmp(node->name, head->name) != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         23. 真分支：；仅条件为真执行以下子项。
+ *           24. 调用 / 计算 / 写入：WARN("XML Mismatch : %s / %s", head->name, node->name);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           25. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *       26. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   27. 准备局部状态：int found = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   28. 循环：初始 int h=0;；继续条件 h<nHandlers；每轮更新 h++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     29. 条件判断：(strcmp(node->name, handlers[h].name) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       30. 真分支：；仅条件为真执行以下子项。
+ *         31. 条件判断：(head)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           32. 真分支：；仅条件为真执行以下子项。
+ *             33. 调用 / 计算 / 写入：head->subs[head->nSubs++] = node;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         34. 调用 / 计算 / 写入：node->parent = head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         35. 调用 / 计算 / 写入：node->nSubs = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         36. 调用 / 计算 / 写入：xml->maxIndex++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         37. 调用 / 计算 / 写入：NCCLCHECK(handlers[h].func(file, xml, node));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *         38. 调用 / 计算 / 写入：found = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         39. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   40. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   41. 条件判断：(!found)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     42. 真分支：；仅条件为真执行以下子项。
+ *       43. 条件判断：(nHandlers)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         44. 真分支：；仅条件为真执行以下子项。
+ *           45. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Ignoring element %s", node->name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       46. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, node, NULL, 0));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 47. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0537
+ */
 /* 中文逐项-函数 F0537：xmlLoadSub
  * 用途与位置：递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -357,6 +541,30 @@ ncclResult_t xmlLoadSub(FILE* file, struct ncclXml* xml, struct ncclXmlNode* hea
 /* XML Writer */
 /**************/
 
+/* 中文内部逻辑 F0538：ncclTopoDumpXmlRec
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int i=0;；继续条件 i<indent；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 调用 / 计算 / 写入：fprintf(file, " ");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 3. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 4. 调用 / 计算 / 写入：fprintf(file, "<%s", node->name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 循环：初始 int a=0;；继续条件 a<node->nAttrs；每轮更新 a++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   6. 调用 / 计算 / 写入：fprintf(file, " %s=\"%s\"", node->attrs[a].key, node->attrs[a].value);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 条件判断：(node->nSubs == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   9. 真分支：；仅条件为真执行以下子项。
+ *     10. 调用 / 计算 / 写入：fprintf(file, "/>\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   11. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     12. 调用 / 计算 / 写入：fprintf(file, ">\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     13. 循环：初始 int s=0;；继续条件 s<node->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       14. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoDumpXmlRec(indent+2, file, node->subs[s]));；失败时可能提前return，成功才继续；递归把内存 XML 节点序列化并写出文件，供拓扑/搜索图调试和复用。
+ *     15. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     16. 循环：初始 int i=0;；继续条件 i<indent；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       17. 调用 / 计算 / 写入：fprintf(file, " ");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     19. 调用 / 计算 / 写入：fprintf(file, "</%s>\n", node->name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 20. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0538
+ */
 /* 中文逐项-函数 F0538：ncclTopoDumpXmlRec
  * 用途与位置：递归把内存 XML 节点序列化并写出文件，供拓扑/搜索图调试和复用。
  * 参数 indent（int indent）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -403,6 +611,18 @@ ncclResult_t ncclTopoDumpXmlRec(int indent, FILE* file, struct ncclXmlNode* node
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0539：ncclTopoDumpXmlToFile
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：FILE* file = fopen(xmlTopoFile, "w");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(file == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("Unable to open %s, not dumping topology.", xmlTopoFile);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoDumpXmlRec(0, file, xml->nodes));；失败时可能提前return，成功才继续；递归把内存 XML 节点序列化并写出文件，供拓扑/搜索图调试和复用。
+ * 7. 调用 / 计算 / 写入：fclose(file);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0539
+ */
 /* 中文逐项-函数 F0539：ncclTopoDumpXmlToFile
  * 用途与位置：递归把内存 XML 节点序列化并写出文件，供拓扑/搜索图调试和复用。
  * 参数 xmlTopoFile（const char* xmlTopoFile）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -431,6 +651,12 @@ ncclResult_t ncclTopoDumpXmlToFile(const char* xmlTopoFile, struct ncclXml* xml)
 /* Parser rules for our specific format */
 /****************************************/
 
+/* 中文内部逻辑 F0540：ncclTopoXmlLoadNvlink
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, NULL, 0));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0540
+ */
 /* 中文逐项-函数 F0540：ncclTopoXmlLoadNvlink
  * 用途与位置：按对应标签种类递归加载硬件 XML，消费子节点并校验该层允许的结构。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -445,6 +671,13 @@ ncclResult_t ncclTopoXmlLoadNvlink(FILE* file, struct ncclXml* xml, struct ncclX
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0541：ncclTopoXmlLoadGpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct xmlHandler handlers[] = { { "nvlink", ncclTopoXmlLoadNvlink } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, handlers, 1));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0541
+ */
 /* 中文逐项-函数 F0541：ncclTopoXmlLoadGpu
  * 用途与位置：按对应标签种类递归加载硬件 XML，消费子节点并校验该层允许的结构。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -464,6 +697,12 @@ ncclResult_t ncclTopoXmlLoadGpu(FILE* file, struct ncclXml* xml, struct ncclXmlN
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0542：ncclTopoXmlLoadNet
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, NULL, 0));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0542
+ */
 /* 中文逐项-函数 F0542：ncclTopoXmlLoadNet
  * 用途与位置：按对应标签种类递归加载硬件 XML，消费子节点并校验该层允许的结构。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -478,6 +717,13 @@ ncclResult_t ncclTopoXmlLoadNet(FILE* file, struct ncclXml* xml, struct ncclXmlN
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0543：ncclTopoXmlLoadNic
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct xmlHandler handlers[] = { { "net", ncclTopoXmlLoadNet } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, handlers, 1));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0543
+ */
 /* 中文逐项-函数 F0543：ncclTopoXmlLoadNic
  * 用途与位置：按对应标签种类递归加载硬件 XML，消费子节点并校验该层允许的结构。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -497,6 +743,13 @@ ncclResult_t ncclTopoXmlLoadNic(FILE* file, struct ncclXml* xml, struct ncclXmlN
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0544：ncclTopoXmlLoadPci
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct xmlHandler handlers[] = { { "pci", ncclTopoXmlLoadPci }, { "gpu", ncclTopoXmlLoadGpu }, { "nic", ncclTopoXmlLoadNic} };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, handlers, 3));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0544
+ */
 /* 中文逐项-函数 F0544：ncclTopoXmlLoadPci
  * 用途与位置：按对应标签种类递归加载硬件 XML，消费子节点并校验该层允许的结构。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -517,6 +770,13 @@ ncclResult_t ncclTopoXmlLoadPci(FILE* file, struct ncclXml* xml, struct ncclXmlN
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0545：ncclTopoXmlLoadCpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct xmlHandler handlers[] = { { "pci", ncclTopoXmlLoadPci }, { "nic", ncclTopoXmlLoadNic } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, handlers, 2));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0545
+ */
 /* 中文逐项-函数 F0545：ncclTopoXmlLoadCpu
  * 用途与位置：按对应标签种类递归加载硬件 XML，消费子节点并校验该层允许的结构。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -537,6 +797,26 @@ ncclResult_t ncclTopoXmlLoadCpu(FILE* file, struct ncclXml* xml, struct ncclXmlN
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0546：ncclTopoXmlLoadSystem
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int version;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(head, "version", &version));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 3. 条件判断：(version != NCCL_TOPO_XML_VERSION)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：WARN("XML Topology has wrong version %d, %d needed", version, NCCL_TOPO_XML_VERSION);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 函数返回：return ncclInvalidUsage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 准备局部状态：const char* name;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(head, "name", &name));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 9. 条件判断：(name != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Loading topology %s", name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   12. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     13. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Loading unnamed topology");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 准备局部状态：struct xmlHandler handlers[] = { { "cpu", ncclTopoXmlLoadCpu } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 15. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, handlers, 1));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0546
+ */
 /* 中文逐项-函数 F0546：ncclTopoXmlLoadSystem
  * 用途与位置：按对应标签种类递归加载硬件 XML，消费子节点并校验该层允许的结构。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -576,6 +856,23 @@ ncclResult_t ncclTopoXmlLoadSystem(FILE* file, struct ncclXml* xml, struct ncclX
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0547：ncclTopoGetXmlFromFile
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：FILE* file = fopen(xmlTopoFile, "r");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(file == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 条件判断：(warn)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       5. 真分支：；仅条件为真执行以下子项。
+ *         6. 调用 / 计算 / 写入：WARN("Could not open XML topology file %s : %s", xmlTopoFile, strerror(errno));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Loading topology file %s", xmlTopoFile);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 准备局部状态：struct xmlHandler handlers[] = { { "system", ncclTopoXmlLoadSystem } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 调用 / 计算 / 写入：xml->maxIndex = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, NULL, handlers, 1));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 12. 调用 / 计算 / 写入：fclose(file);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0547
+ */
 /* 中文逐项-函数 F0547：ncclTopoGetXmlFromFile
  * 用途与位置：打开拓扑文件并解析指定版本的系统 XML，按 warn 决定缺失文件的处理方式。
  * 参数 xmlTopoFile（const char* xmlTopoFile）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -625,6 +922,13 @@ ncclResult_t ncclTopoGetXmlFromFile(const char* xmlTopoFile, struct ncclXml* xml
  * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
  */
 #define BUSID_REDUCED_SIZE (sizeof("0000:00"))
+/* 中文内部逻辑 F0548：memcpylower
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int i=0;；继续条件 i<size；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 调用 / 计算 / 写入：dst[i] = tolower(src[i]);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0548
+ */
 /* 中文逐项-函数 F0548：memcpylower
  * 用途与位置：复制字符同时转为小写，规范 sysfs 路径/属性中的文本比较。
  * 参数 dst（char* dst）：输出数据地址，必须容纳当前 API 语义所需结果；AG 是多 rank 拼接，RS 只保留本段。
@@ -641,6 +945,19 @@ static void memcpylower(char* dst, const char* src, const size_t size) {
  * 所在for循环的继续条件：i<size；循环体与增量表达式决定每轮如何推进。
  */int i=0; i<size; i++) dst[i] = tolower(src[i]);
 }
+/* 中文内部逻辑 F0549：getPciPath
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char busPath[] = "/sys/class/pci_bus/0000:00/../../0000:00:00.0";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：memcpylower(busPath+sizeof("/sys/class/pci_bus/")-1, busId, BUSID_REDUCED_SIZE-1);；复制字符同时转为小写，规范 sysfs 路径/属性中的文本比较。
+ * 3. 调用 / 计算 / 写入：memcpylower(busPath+sizeof("/sys/class/pci_bus/0000:00/../../")-1, busId, BUSID_SIZE-1);；复制字符同时转为小写，规范 sysfs 路径/属性中的文本比较。
+ * 4. 调用 / 计算 / 写入：*path = realpath(busPath, NULL);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 条件判断：(*path == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：WARN("Could not find real path of %s", busPath);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     8. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0549
+ */
 /* 中文逐项-函数 F0549：getPciPath
  * 用途与位置：解析设备对应的系统 PCI 实际路径，供网卡/GPU 归属层级匹配。
  * 参数 busId（const char* busId）：PCI BDF 的整数标识，用于将 CUDA、NVML 与拓扑中的同一设备关联。
@@ -666,6 +983,28 @@ static ncclResult_t getPciPath(const char* busId, char** path) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0550：ncclTopoGetStrFromSys
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char filePath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：sprintf(filePath, "%s/%s", path, fileName);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 3. 准备局部状态：int offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：FILE* file;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：((file = fopen(filePath, "r")) != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 循环：初始 ；继续条件 (feof(file) == 0 && ferror(file) == 0 && offset < MAX_STR_LEN)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       8. 准备局部状态：int len = fread(strValue+offset, 1, MAX_STR_LEN-offset, file);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       9. 调用 / 计算 / 写入：offset += len;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     11. 调用 / 计算 / 写入：fclose(file);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 12. 条件判断：(offset == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 调用 / 计算 / 写入：strValue[0] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     15. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Topology detection : could not read %s, ignoring", filePath);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   16. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     17. 调用 / 计算 / 写入：strValue[offset-1] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0550
+ */
 /* 中文逐项-函数 F0550：ncclTopoGetStrFromSys
  * 用途与位置：从 sysfs 属性文件读取并整理文本值，失败时按本函数的返回约定报告。
  * 参数 path（const char* path）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -714,6 +1053,17 @@ ncclResult_t ncclTopoGetStrFromSys(const char* path, const char* fileName, char*
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0551：ncclTopoSetAttrFromSys
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char strValue[MAX_STR_LEN];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetStrFromSys(path, fileName, strValue));；失败时可能提前return，成功才继续；从 sysfs 属性文件读取并整理文本值，失败时按本函数的返回约定报告。
+ * 3. 条件判断：(strValue[0] != '\0')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(pciNode, attrName, strValue));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ * 6. 调用 / 计算 / 写入：TRACE(NCCL_GRAPH, "Read from sys %s/%s -> %s=%s", path, fileName, attrName, strValue);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0551
+ */
 /* 中文逐项-函数 F0551：ncclTopoSetAttrFromSys
  * 用途与位置：把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
  * 参数 pciNode（struct ncclXmlNode* pciNode）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -737,6 +1087,52 @@ ncclResult_t ncclTopoSetAttrFromSys(struct ncclXmlNode* pciNode, const char* pat
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0552：ncclTopoGetXmlFromCpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(cpuNode, "affinity", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 准备局部状态：const char* numaId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(cpuNode, "numaid", &numaId));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *     7. 条件判断：(numaId == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       8. 真分支：；仅条件为真执行以下子项。
+ *         9. 调用 / 计算 / 写入：WARN("GetXmlFromCpu : could not find CPU numa ID.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         10. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     11. 准备局部状态：char cpumaskPath[] = "/sys/devices/system/node/node0000";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     12. 调用 / 计算 / 写入：sprintf(cpumaskPath, "/sys/devices/system/node/node%s", numaId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     13. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoSetAttrFromSys(cpuNode, cpumaskPath, "cpumap", "affinity"));；失败时可能提前return，成功才继续；把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
+ * 14. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(cpuNode, "arch", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 15. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   16. 真分支：；仅条件为真执行以下子项。
+ *     17. 编译期分支/指令：#if defined(__PPC__)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *       18. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(cpuNode, "arch", "ppc64"));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *       19. 编译期分支/指令：#elif defined(__aarch64__)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         20. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(cpuNode, "arch", "arm64"));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *         21. 编译期分支/指令：#elif defined(__x86_64__)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *           22. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(cpuNode, "arch", "x86_64"));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ * 23. 编译期分支/指令：#if defined(__x86_64__)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   24. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(cpuNode, "vendor", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ *   25. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     26. 真分支：；仅条件为真执行以下子项。
+ *       27. 准备局部状态：union { struct { uint32_t ebx; uint32_t edx; uint32_t ecx; }; char vendor[12]; } cpuid0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       28. 调用 / 计算 / 写入：asm volatile("cpuid" : "=b" (cpuid0.ebx), "=c" (cpuid0.ecx), "=d" (cpuid0.edx) : "a" (0) : "memory");；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       29. 准备局部状态：char vendor[13];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       30. 调用 / 计算 / 写入：strncpy(vendor, cpuid0.vendor, 12);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       31. 调用 / 计算 / 写入：vendor[12] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       32. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(cpuNode, "vendor", vendor));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *   33. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(cpuNode, "familyid", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ *   34. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     35. 真分支：；仅条件为真执行以下子项。
+ *       36. 准备局部状态：union { struct { unsigned steppingId:4; unsigned modelId:4; unsigned familyId:4; unsigned processorType:2; unsigned resv0:2; unsigned extModelId:4; unsigned extFamilyId:8; unsigned resv1:4; }; uint32_ …（完整代码见函数体）；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       37. 调用 / 计算 / 写入：asm volatile("cpuid" : "=a" (cpuid1.val) : "a" (1) : "memory");；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       38. 准备局部状态：int familyId = cpuid1.familyId + (cpuid1.extFamilyId << 4);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       39. 准备局部状态：int modelId = cpuid1.modelId + (cpuid1.extModelId << 4);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       40. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(cpuNode, "familyid", familyId));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *       41. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(cpuNode, "modelid", modelId));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ * 42. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0552
+ */
 /* 中文逐项-函数 F0552：ncclTopoGetXmlFromCpu
  * 用途与位置：读取 CPU/NUMA 属性及亲和性，建立/补齐硬件 XML 的 CPU 层。
  * 参数 cpuNode（struct ncclXmlNode* cpuNode）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -911,6 +1307,16 @@ ncclResult_t ncclTopoGetXmlFromCpu(struct ncclXmlNode* cpuNode, struct ncclXml* 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0553：ncclTopoGetPciNode
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTagKv(xml, "pci", pciNode, "busid", busId));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ * 2. 条件判断：(*pciNode == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, NULL, "pci", pciNode));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(*pciNode, "busid", busId));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0553
+ */
 /* 中文逐项-函数 F0553：ncclTopoGetPciNode
  * 用途与位置：按 PCI 地址在 XML 中查找已有节点，避免同一设备被重复创建。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -933,6 +1339,11 @@ ncclResult_t ncclTopoGetPciNode(struct ncclXml* xml, const char* busId, struct n
 // Check whether a string is in BDF format or not.
 // BDF (Bus-Device-Function) is "BBBB:BB:DD.F" where B, D and F are hex digits.
 // There can be trailing chars.
+/* 中文内部逻辑 F0554：isHex
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0554
+ */
 /* 中文逐项-函数 F0554：isHex
  * 用途与位置：检查字符是否为十六进制数字，辅助验证 PCI BDF 路径格式。
  * 参数 c（char c）：本作用域通道/候选遍历位置，实际上界由下面循环条件限定。
@@ -941,6 +1352,17 @@ ncclResult_t ncclTopoGetPciNode(struct ncclXml* xml, const char* busId, struct n
  * 源码返回表达式：return ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));。CHECK类宏还可能提前返回/跳转。
  */
 int isHex(char c) { return ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')); }
+/* 中文内部逻辑 F0555：checkBDFFormat
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(bdf[4] != ':' || bdf[7] != ':' || bdf[10] != '.')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 条件判断：(isHex(bdf[0]) == 0 || isHex(bdf[1] == 0) || isHex(bdf[2] == 0) || isHex(bdf[3] == 0) || isHex(bdf[5] == 0) || isHex(bdf[6] == 0) || isHex(bdf[8] == 0) || isHex(bdf[9] == 0) || isHex(bdf[11] == 0))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 函数返回：return 1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0555
+ */
 /* 中文逐项-函数 F0555：checkBDFFormat
  * 用途与位置：验证 PCI domain:bus:device.function 文本格式，防止非设备目录被当作 PCI 节点。
  * 参数 bdf（char* bdf）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -959,6 +1381,139 @@ int checkBDFFormat(char* bdf) {
   return 1;
 }
 
+/* 中文内部逻辑 F0556：ncclTopoGetXmlFromSys
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const char* busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(pciNode, "busid", &busId));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 3. 准备局部状态：char* path = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：ncclDebugNoWarn = NCCL_GRAPH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：getPciPath(busId, &path);；解析设备对应的系统 PCI 实际路径，供网卡/GPU 归属层级匹配。
+ * 6. 调用 / 计算 / 写入：ncclDebugNoWarn = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoSetAttrFromSys(pciNode, path, "class", "class"));；失败时可能提前return，成功才继续；把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
+ * 10. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 调用 / 计算 / 写入：ncclDebugNoWarn = NCCL_GRAPH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(pciNode, "vendor", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 13. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       16. 真分支：；仅条件为真执行以下子项。
+ *         17. 调用 / 计算 / 写入：ncclTopoSetAttrFromSys(pciNode, path, "vendor", "vendor");；把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
+ * 18. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(pciNode, "device", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 19. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       22. 真分支：；仅条件为真执行以下子项。
+ *         23. 调用 / 计算 / 写入：ncclTopoSetAttrFromSys(pciNode, path, "device", "device");；把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
+ * 24. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(pciNode, "subsystem_vendor", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 25. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   26. 真分支：；仅条件为真执行以下子项。
+ *     27. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       28. 真分支：；仅条件为真执行以下子项。
+ *         29. 调用 / 计算 / 写入：ncclTopoSetAttrFromSys(pciNode, path, "subsystem_vendor", "subsystem_vendor");；把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
+ * 30. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(pciNode, "subsystem_device", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 31. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   32. 真分支：；仅条件为真执行以下子项。
+ *     33. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       34. 真分支：；仅条件为真执行以下子项。
+ *         35. 调用 / 计算 / 写入：ncclTopoSetAttrFromSys(pciNode, path, "subsystem_device", "subsystem_device");；把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
+ * 36. 调用 / 计算 / 写入：ncclDebugNoWarn = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 37. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(pciNode, "link_speed", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 38. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   39. 真分支：；仅条件为真执行以下子项。
+ *     40. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       41. 真分支：；仅条件为真执行以下子项。
+ *         42. 准备局部状态：char deviceSpeedStr[MAX_STR_LEN];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         43. 准备局部状态：float deviceSpeed;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         44. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetStrFromSys(path, "max_link_speed", deviceSpeedStr));；失败时可能提前return，成功才继续；从 sysfs 属性文件读取并整理文本值，失败时按本函数的返回约定报告。
+ *         45. 调用 / 计算 / 写入：sscanf(deviceSpeedStr, "%f GT/s", &deviceSpeed);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         46. 准备局部状态：char portSpeedStr[MAX_STR_LEN];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         47. 准备局部状态：float portSpeed;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         48. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetStrFromSys(path, "../max_link_speed", portSpeedStr));；失败时可能提前return，成功才继续；从 sysfs 属性文件读取并整理文本值，失败时按本函数的返回约定报告。
+ *         49. 调用 / 计算 / 写入：sscanf(portSpeedStr, "%f GT/s", &portSpeed);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         50. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(pciNode, "link_speed", portSpeed < deviceSpeed ? portSpeedStr : deviceSpeedStr));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *       51. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         52. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(pciNode, "link_speed", ""));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ * 53. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(pciNode, "link_width", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 54. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   55. 真分支：；仅条件为真执行以下子项。
+ *     56. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       57. 真分支：；仅条件为真执行以下子项。
+ *         58. 准备局部状态：char strValue[MAX_STR_LEN];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         59. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetStrFromSys(path, "max_link_width", strValue));；失败时可能提前return，成功才继续；从 sysfs 属性文件读取并整理文本值，失败时按本函数的返回约定报告。
+ *         60. 准备局部状态：int deviceWidth = strtol(strValue, NULL, 0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         61. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetStrFromSys(path, "../max_link_width", strValue));；失败时可能提前return，成功才继续；从 sysfs 属性文件读取并整理文本值，失败时按本函数的返回约定报告。
+ *         62. 准备局部状态：int portWidth = strtol(strValue, NULL, 0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         63. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(pciNode, "link_width", std::min(deviceWidth,portWidth)));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *       64. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         65. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(pciNode, "link_width", ""));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ * 66. 准备局部状态：struct ncclXmlNode* parent = pciNode->parent;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 67. 条件判断：(parent == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   68. 真分支：；仅条件为真执行以下子项。
+ *     69. 条件判断：(path)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       70. 真分支：；仅条件为真执行以下子项。
+ *         71. 准备局部状态：char numaIdStr[MAX_STR_LEN];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         72. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetStrFromSys(path, "numa_node", numaIdStr));；失败时可能提前return，成功才继续；从 sysfs 属性文件读取并整理文本值，失败时按本函数的返回约定报告。
+ *         73. 准备局部状态：int slashCount = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         74. 准备局部状态：int parentOffset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         75. 循环：初始 parentOffset = strlen(path)-1；继续条件 parentOffset>0；每轮更新 parentOffset--；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           76. 条件判断：(path[parentOffset] == '/')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             77. 真分支：；仅条件为真执行以下子项。
+ *               78. 调用 / 计算 / 写入：slashCount++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               79. 调用 / 计算 / 写入：path[parentOffset] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               80. 准备局部状态：int start = parentOffset - 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               81. 循环：初始 ；继续条件 (start>0 && path[start] != '/')；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                 82. 调用 / 计算 / 写入：start--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               83. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *               84. 条件判断：(checkBDFFormat(path+start+1) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 85. 真分支：；仅条件为真执行以下子项。
+ *                   86. 准备局部状态：struct ncclXmlNode* topNode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                   87. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTag(xml, "system", &topNode));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ *                   88. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSubKv(topNode, "cpu", &parent, "numaid", numaIdStr));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ *                   89. 条件判断：(parent == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                     90. 真分支：；仅条件为真执行以下子项。
+ *                       91. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, topNode, "cpu", &parent));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ *                       92. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(parent, "numaid", numaIdStr));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *                 93. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                   94. 条件判断：(slashCount == 2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                     95. 真分支：；仅条件为真执行以下子项。
+ *                       96. 循环：初始 int i = strlen(path)-1;；继续条件 i>0；每轮更新 i--；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                         97. 条件判断：(path[i] == '/')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                           98. 真分支：；仅条件为真执行以下子项。
+ *                             99. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTagKv(xml, "pci", &parent, "busid", path+i+1));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ *                             100. 条件判断：(parent == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                               101. 真分支：；仅条件为真执行以下子项。
+ *                                 102. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, NULL, "pci", &parent));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ *                                 103. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(parent, "busid", path+i+1));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *                             104. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *                       105. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *           106. 条件判断：(parent)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             107. 真分支：；仅条件为真执行以下子项。
+ *               108. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *         109. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       110. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         111. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTagKv(xml, "cpu", &parent, "numaid", "-1"));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ *         112. 条件判断：(parent == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           113. 真分支：；仅条件为真执行以下子项。
+ *             114. 准备局部状态：struct ncclXmlNode* topNode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             115. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTag(xml, "system", &topNode));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ *             116. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, topNode, "cpu", &parent));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ *             117. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(parent, "numaid", "-1"));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *             118. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromCpu(parent, xml));；失败时可能提前return，成功才继续；读取 CPU/NUMA 属性及亲和性，建立/补齐硬件 XML 的 CPU 层。
+ *     119. 调用 / 计算 / 写入：pciNode->parent = parent;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     120. 调用 / 计算 / 写入：parent->subs[parent->nSubs++] = pciNode;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 121. 条件判断：(strcmp(parent->name, "pci") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   122. 真分支：；仅条件为真执行以下子项。
+ *     123. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromSys(parent, xml));；失败时可能提前return，成功才继续；沿 sysfs 真实设备路径建立 PCI 父层级，并读取链路速度/宽度等属性。
+ *   124. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     125. 条件判断：(strcmp(parent->name, "cpu") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       126. 真分支：；仅条件为真执行以下子项。
+ *         127. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromCpu(parent, xml));；失败时可能提前return，成功才继续；读取 CPU/NUMA 属性及亲和性，建立/补齐硬件 XML 的 CPU 层。
+ * 128. 调用 / 计算 / 写入：free(path);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 129. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0556
+ */
 /* 中文逐项-函数 F0556：ncclTopoGetXmlFromSys
  * 用途与位置：沿 sysfs 真实设备路径建立 PCI 父层级，并读取链路速度/宽度等属性。
  * 参数 pciNode（struct ncclXmlNode* pciNode）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1168,6 +1723,115 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0557：ncclTopoGetXmlFromGpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclXmlNode* gpuNode = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSub(pciNode, "gpu", &gpuNode));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ * 3. 条件判断：(gpuNode == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, pciNode, "gpu", &gpuNode));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ * 6. 准备局部状态：int index = -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：int dev = -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(gpuNode, "dev", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 9. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 条件判断：(nvmlDev == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       12. 真分支：；仅条件为真执行以下子项。
+ *         13. 准备局部状态：const char* busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         14. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(pciNode, "busid", &busId));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *         15. 条件判断：(busId == NULL || cudaDeviceGetByPCIBusId(&dev, busId) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           16. 真分支：；仅条件为真执行以下子项。
+ *             17. 调用 / 计算 / 写入：dev = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       18. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         19. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlDeviceGetIndex(nvmlDev, (unsigned int*)&dev));；失败时可能提前return，成功才继续；由句柄查询 NVML 序号；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
+ *     20. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(gpuNode, "dev", dev));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ * 21. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(gpuNode, "dev", &dev));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 22. 条件判断：(dev == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   23. 真分支：；仅条件为真执行以下子项。
+ *     24. 调用 / 计算 / 写入：*gpuNodeRet = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     25. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 26. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(gpuNode, "sm", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 27. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   28. 真分支：；仅条件为真执行以下子项。
+ *     29. 准备局部状态：int cudaMajor, cudaMinor;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     30. 条件判断：(nvmlDev == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       31. 真分支：；仅条件为真执行以下子项。
+ *         32. 准备局部状态：cudaDeviceProp devProp;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         33. 调用 / 计算 / 写入：CUDACHECK(cudaGetDeviceProperties(&devProp, dev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *         34. 调用 / 计算 / 写入：cudaMajor = devProp.major;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         35. 调用 / 计算 / 写入：cudaMinor = devProp.minor;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       36. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         37. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlDeviceGetCudaComputeCapability(nvmlDev, &cudaMajor, &cudaMinor));；失败时可能提前return，成功才继续；查询 GPU 计算能力；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
+ *     38. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(gpuNode, "sm", cudaMajor*10+cudaMinor));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ * 39. 准备局部状态：int sm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 40. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(gpuNode, "sm", &sm));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 41. 准备局部状态：struct ncclXmlNode* nvlNode = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 42. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSub(gpuNode, "nvlink", &nvlNode));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ * 43. 条件判断：(nvlNode == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   44. 真分支：；仅条件为真执行以下子项。
+ *     45. 准备局部状态：int maxNvLinks = (sm < 60) ? 0 : (sm < 70) ? 4 : (sm < 80) ? 6 : 12;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     46. 条件判断：(maxNvLinks > 0 && nvmlDev == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       47. 真分支：；仅条件为真执行以下子项。
+ *         48. 调用 / 计算 / 写入：WARN("No NVML device handle. Skipping nvlink detection.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         49. 调用 / 计算 / 写入：maxNvLinks = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     50. 循环：初始 int l=0;；继续条件 l<maxNvLinks；每轮更新 ++l；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       51. 准备局部状态：unsigned canP2P;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       52. 条件判断：((ncclNvmlDeviceGetNvLinkCapability(nvmlDev, l, NVML_NVLINK_CAP_P2P_SUPPORTED, &canP2P) != ncclSuccess) || !canP2P)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         53. 真分支：；仅条件为真执行以下子项。
+ *           54. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       55. 准备局部状态：nvmlEnableState_t isActive;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       56. 条件判断：((ncclNvmlDeviceGetNvLinkState(nvmlDev, l, &isActive) != ncclSuccess) || (isActive != NVML_FEATURE_ENABLED))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         57. 真分支：；仅条件为真执行以下子项。
+ *           58. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       59. 准备局部状态：nvmlPciInfo_t remoteProc;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       60. 条件判断：(ncclNvmlDeviceGetNvLinkRemotePciInfo(nvmlDev, l, &remoteProc) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         61. 真分支：；仅条件为真执行以下子项。
+ *           62. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       63. 准备局部状态：char* p = remoteProc.busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       64. 准备局部状态：char lowerId[NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       65. 循环：初始 int c=0;；继续条件 c<NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         66. 调用 / 计算 / 写入：lowerId[c] = tolower(p[c]);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         67. 条件判断：(p[c] == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           68. 真分支：；仅条件为真执行以下子项。
+ *             69. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *       70. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       71. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSubKv(gpuNode, "nvlink", &nvlNode, "target", lowerId));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ *       72. 条件判断：(nvlNode == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         73. 真分支：；仅条件为真执行以下子项。
+ *           74. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, gpuNode, "nvlink", &nvlNode));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ *           75. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(nvlNode, "target", lowerId));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *           76. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(nvlNode, "count", 1));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *         77. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           78. 准备局部状态：int count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           79. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(nvlNode, "count", &count));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ *           80. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(nvlNode, "count", count+1));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *     81. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 82. 循环：初始 int s=0;；继续条件 s<gpuNode->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   83. 准备局部状态：struct ncclXmlNode* sub = gpuNode->subs[s];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   84. 条件判断：(strcmp(sub->name, "nvlink") != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     85. 真分支：；仅条件为真执行以下子项。
+ *       86. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   87. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   88. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(sub, "tclass", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ *   89. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     90. 真分支：；仅条件为真执行以下子项。
+ *       91. 准备局部状态：const char* busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       92. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(sub, "target", &busId));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *       93. 准备局部状态：char* path;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       94. 调用 / 计算 / 写入：ncclDebugNoWarn = NCCL_GRAPH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       95. 调用 / 计算 / 写入：getPciPath(busId, &path);；解析设备对应的系统 PCI 实际路径，供网卡/GPU 归属层级匹配。
+ *       96. 调用 / 计算 / 写入：ncclDebugNoWarn = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       97. 条件判断：(path == NULL || strcmp(busId, "fffffff:ffff:ff") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         98. 真分支：；仅条件为真执行以下子项。
+ *           99. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(sub, "tclass", "0x068000"));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ *         100. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           101. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoSetAttrFromSys(sub, path, "class", "tclass"));；失败时可能提前return，成功才继续；把 sysfs 文件读取的值填入指定 XML 属性，连接自动发现与统一 XML 表示。
+ *           102. 调用 / 计算 / 写入：free(path);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 103. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 104. 调用 / 计算 / 写入：*gpuNodeRet = gpuNode;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 105. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0557
+ */
 /* 中文逐项-函数 F0557：ncclTopoGetXmlFromGpu
  * 用途与位置：利用 CUDA/NVML 信息补齐 GPU 的 PCI、计算能力和 NVLink 属性。
  * 参数 pciNode（struct ncclXmlNode* pciNode）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1381,6 +2045,20 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0558：ncclTopoFillGpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclXmlNode* node;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetPciNode(xml, busId, &node));；失败时可能提前return，成功才继续；按 PCI 地址在 XML 中查找已有节点，避免同一设备被重复创建。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrIfUnset(node, "class", "0x03"));；失败时可能提前return，成功才继续；只给缺失属性设置默认值，避免自动发现结果覆盖用户明确配置。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromSys(node, xml));；失败时可能提前return，成功才继续；沿 sysfs 真实设备路径建立 PCI 父层级，并读取链路速度/宽度等属性。
+ * 5. 准备局部状态：nvmlDevice_t nvmlDev = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 条件判断：(ncclNvmlDeviceGetHandleByPciBusId(busId, &nvmlDev) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 调用 / 计算 / 写入：nvmlDev = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromGpu(node, nvmlDev, xml, gpuNode));；失败时可能提前return，成功才继续；利用 CUDA/NVML 信息补齐 GPU 的 PCI、计算能力和 NVLink 属性。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0558
+ */
 /* 中文逐项-函数 F0558：ncclTopoFillGpu
  * 用途与位置：在 XML 找到或添加指定 GPU，触发系统/NVML 自动发现补全其属性。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1412,6 +2090,24 @@ ncclResult_t ncclTopoFillGpu(struct ncclXml* xml, const char* busId, struct nccl
 
 // Returns the subsystem name of a path, i.e. the end of the path
 // where sysPath/subsystem points to.
+/* 中文内部逻辑 F0559：ncclTopoGetSubsystem
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char subSysPath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：sprintf(subSysPath, "%s/subsystem", sysPath);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 3. 准备局部状态：char* path = realpath(subSysPath, NULL);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 条件判断：(path == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 调用 / 计算 / 写入：subSys[0] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   7. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     8. 准备局部状态：int offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     9. 循环：初始 offset = strlen(path)；继续条件 offset > 0 && path[offset] != '/'；每轮更新 offset--；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       10. 调用 / 计算 / 写入：;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     12. 调用 / 计算 / 写入：strcpy(subSys, path+offset+1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     13. 调用 / 计算 / 写入：free(path);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0559
+ */
 /* 中文逐项-函数 F0559：ncclTopoGetSubsystem
  * 用途与位置：读取 PCI 子系统标识，辅助识别设备类别与硬件拓扑特殊处理。
  * 参数 sysPath（const char* sysPath）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1449,6 +2145,45 @@ ncclResult_t ncclTopoGetSubsystem(const char* sysPath, char* subSys) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0560：ncclTopoFillNet
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTagKv(xml, "net", netNode, "name", netName));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ * 2. 条件判断：(*netNode != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：const char* pciSysPath = pciPath;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 条件判断：(pciSysPath)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 准备局部状态：char subSystem[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     9. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetSubsystem(pciSysPath, subSystem));；失败时可能提前return，成功才继续；读取 PCI 子系统标识，辅助识别设备类别与硬件拓扑特殊处理。
+ *     10. 条件判断：(strcmp(subSystem, "pci") != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       11. 真分支：；仅条件为真执行以下子项。
+ *         12. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Topology detection: network path %s is not a PCI device (%s). Attaching to first CPU", pciSysPath, subSystem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         13. 调用 / 计算 / 写入：pciSysPath = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 准备局部状态：struct ncclXmlNode* parent = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 15. 条件判断：(pciSysPath)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   16. 真分支：；仅条件为真执行以下子项。
+ *     17. 准备局部状态：int offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     18. 循环：初始 offset=strlen(pciSysPath)-1；继续条件 pciSysPath[offset] != '/'；每轮更新 offset--；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       19. 调用 / 计算 / 写入：;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     20. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     21. 准备局部状态：char busId[NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     22. 调用 / 计算 / 写入：strcpy(busId, pciSysPath+offset+1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     23. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetPciNode(xml, busId, &parent));；失败时可能提前return，成功才继续；按 PCI 地址在 XML 中查找已有节点，避免同一设备被重复创建。
+ *     24. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrIfUnset(parent, "class", "0x02"));；失败时可能提前return，成功才继续；只给缺失属性设置默认值，避免自动发现结果覆盖用户明确配置。
+ *     25. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromSys(parent, xml));；失败时可能提前return，成功才继续；沿 sysfs 真实设备路径建立 PCI 父层级，并读取链路速度/宽度等属性。
+ *   26. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     27. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTag(xml, "cpu", &parent));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ * 28. 准备局部状态：struct ncclXmlNode* nicNode = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 29. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSub(parent, "nic", &nicNode));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ * 30. 条件判断：(nicNode == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   31. 真分支：；仅条件为真执行以下子项。
+ *     32. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, parent, "nic", &nicNode));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ * 33. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, nicNode, "net", netNode));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ * 34. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttr(*netNode, "name", netName));；失败时可能提前return，成功才继续；在节点中更新已有属性或新增一项键值，维护属性计数和固定容量边界。
+ * 35. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0560
+ */
 /* 中文逐项-函数 F0560：ncclTopoFillNet
  * 用途与位置：将后端提供的网络设备属性补入 XML，关联其 PCI/NIC 层次与 GDR/CollNet 能力。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1526,6 +2261,26 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0561：ncclTopoTrimXmlRec
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const char* str;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(node, "keep", &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 3. 条件判断：(str && strcmp(str, "1") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(xmlUnsetAttr(node, "keep"));；失败时可能提前return，成功才继续；删除指定属性并整理数组，防止遗留键值参与之后的匹配/导出。
+ *   6. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     7. 准备局部状态：struct ncclXmlNode* subs[MAX_SUBS];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     8. 准备局部状态：int nSubs = node->nSubs;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     9. 调用 / 计算 / 写入：memcpy(subs, node->subs, node->nSubs*sizeof(struct ncclXmlNode*));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 循环：初始 int s=0;；继续条件 s<nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       11. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoTrimXmlRec(subs[s]));；失败时可能提前return，成功才继续；裁剪与当前通信设备无关的 XML 子树，保留当前运行所需硬件路径。
+ *     12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     13. 条件判断：(node->nSubs == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       14. 真分支：；仅条件为真执行以下子项。
+ *         15. 调用 / 计算 / 写入：NCCLCHECK(xmlRemoveNode(node));；失败时可能提前return，成功才继续；从父节点子项表摘除目标节点并整理关系，裁剪不需要的拓扑分支。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0561
+ */
 /* 中文逐项-函数 F0561：ncclTopoTrimXmlRec
  * 用途与位置：裁剪与当前通信设备无关的 XML 子树，保留当前运行所需硬件路径。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -1567,6 +2322,12 @@ ncclResult_t ncclTopoTrimXmlRec(struct ncclXmlNode* node) {
   }
   return ncclSuccess;
 }
+/* 中文内部逻辑 F0562：ncclTopoTrimXml
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoTrimXmlRec(xml->nodes));；失败时可能提前return，成功才继续；裁剪与当前通信设备无关的 XML 子树，保留当前运行所需硬件路径。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0562
+ */
 /* 中文逐项-函数 F0562：ncclTopoTrimXml
  * 用途与位置：裁剪与当前通信设备无关的 XML 子树，保留当前运行所需硬件路径。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1583,6 +2344,12 @@ ncclResult_t ncclTopoTrimXml(struct ncclXml* xml) {
 /* Parser rules for the user-defined graph search */
 /**************************************************/
 
+/* 中文内部逻辑 F0563：ncclTopoXmlGraphLoadGpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, NULL, 0));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0563
+ */
 /* 中文逐项-函数 F0563：ncclTopoXmlGraphLoadGpu
  * 用途与位置：解析对应层级的通信图 XML 标签，与硬件系统 XML 加载路径分开。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -1597,6 +2364,12 @@ ncclResult_t ncclTopoXmlGraphLoadGpu(FILE* file, struct ncclXml* xml, struct ncc
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0564：ncclTopoXmlGraphLoadNet
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, NULL, 0));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0564
+ */
 /* 中文逐项-函数 F0564：ncclTopoXmlGraphLoadNet
  * 用途与位置：解析对应层级的通信图 XML 标签，与硬件系统 XML 加载路径分开。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -1611,6 +2384,13 @@ ncclResult_t ncclTopoXmlGraphLoadNet(FILE* file, struct ncclXml* xml, struct ncc
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0565：ncclTopoXmlGraphLoadChannel
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct xmlHandler handlers[] = { { "net", ncclTopoXmlGraphLoadNet }, { "gpu", ncclTopoXmlGraphLoadGpu } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, handlers, 2));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0565
+ */
 /* 中文逐项-函数 F0565：ncclTopoXmlGraphLoadChannel
  * 用途与位置：解析对应层级的通信图 XML 标签，与硬件系统 XML 加载路径分开。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -1631,6 +2411,13 @@ ncclResult_t ncclTopoXmlGraphLoadChannel(FILE* file, struct ncclXml* xml, struct
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0566：ncclTopoXmlGraphLoadGraph
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct xmlHandler handlers[] = { { "channel", ncclTopoXmlGraphLoadChannel } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, head, handlers, 1));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0566
+ */
 /* 中文逐项-函数 F0566：ncclTopoXmlGraphLoadGraph
  * 用途与位置：解析对应层级的通信图 XML 标签，与硬件系统 XML 加载路径分开。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -1650,6 +2437,26 @@ ncclResult_t ncclTopoXmlGraphLoadGraph(FILE* file, struct ncclXml* xml, struct n
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0567：ncclTopoXmlGraphLoadGraphs
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int version;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(head, "version", &version));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 3. 条件判断：(version != NCCL_GRAPH_XML_VERSION)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：WARN("XML Graph has wrong version %d, %d needed", version, NCCL_GRAPH_XML_VERSION);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 函数返回：return ncclInvalidUsage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 准备局部状态：const char* name;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(head, "name", &name));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 9. 条件判断：(name != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Loading graphs for topology %s", name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   12. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     13. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Loading graphs");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 准备局部状态：struct xmlHandler handlers[] = { { "graph", ncclTopoXmlGraphLoadGraph } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 15. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xmlGraph, head, handlers, 1));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0567
+ */
 /* 中文逐项-函数 F0567：ncclTopoXmlGraphLoadGraphs
  * 用途与位置：解析对应层级的通信图 XML 标签，与硬件系统 XML 加载路径分开。
  * 参数 file（FILE* file）：源文件/行号或文本行缓冲，按类型判断是日志定位信息还是输入文本。
@@ -1689,6 +2496,20 @@ ncclResult_t ncclTopoXmlGraphLoadGraphs(FILE* file, struct ncclXml* xmlGraph, st
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0568：ncclTopoGetXmlGraphFromFile
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：FILE* file = fopen(xmlGraphFile, "r");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(file == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("Could not open XML graph file %s : %s", xmlGraphFile, strerror(errno));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 准备局部状态：struct xmlHandler handlers[] = { { "graphs", ncclTopoXmlGraphLoadGraphs } };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：xml->maxIndex = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(xmlLoadSub(file, xml, NULL, handlers, 1));；失败时可能提前return，成功才继续；递归读取节点子树并检查父子闭合关系，限制节点/子项容量。
+ * 9. 调用 / 计算 / 写入：fclose(file);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__xml_cc.md#f0568
+ */
 /* 中文逐项-函数 F0568：ncclTopoGetXmlGraphFromFile
  * 用途与位置：打开并解析通信图 XML 文件，校验图版本以恢复预先保存的搜索结果。
  * 参数 xmlGraphFile（const char* xmlGraphFile）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。

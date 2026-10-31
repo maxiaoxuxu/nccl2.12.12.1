@@ -267,6 +267,89 @@ const char * (*ibv_internal_event_type_str)(enum ibv_event_type event);
  * NCCL net_ib 是 verbs 的使用者，通常不直接编码某个厂商的寄存器格式。
  * 添加自研 RDMA 设备时，应区分 rdma-core provider 接入与 NCCL 网络插件接入这两个接口层。
  */
+/* 中文内部逻辑 F0924：wrap_ibv_symbols
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ibvState == ibvInitialized)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 条件判断：(ibvState == ibvError)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 条件判断：(__sync_bool_compare_and_swap(&ibvState, ibvUninitialized, ibvInitializing) == false)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 循环：初始 ；继续条件 (ibvState == ibvInitializing)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       10. 调用 / 计算 / 写入：pthread_yield();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     12. 函数返回：return (ibvState == ibvInitialized) ? ncclSuccess : ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 准备局部状态：static void* ibvhandle = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 准备局部状态：void* tmp;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 15. 准备局部状态：void** cast;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 16. 调用 / 计算 / 写入：ibvhandle=dlopen("libibverbs.so", RTLD_NOW);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 条件判断：(!ibvhandle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   18. 真分支：；仅条件为真执行以下子项。
+ *     19. 调用 / 计算 / 写入：ibvhandle=dlopen("libibverbs.so.1", RTLD_NOW);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     20. 条件判断：(!ibvhandle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       21. 真分支：；仅条件为真执行以下子项。
+ *         22. 调用 / 计算 / 写入：INFO(NCCL_INIT, "Failed to open libibverbs.so[.1]");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         23. 控制转移：goto teardown;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 24. 编译期分支/指令：#define LOAD_SYM(handle, symbol, funcptr) do { \；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ * 25. 编译期分支/指令：#define LOAD_SYM_VERSION(handle, symbol, funcptr, version) do { \；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ * 26. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_get_device_list", ibv_internal_get_device_list);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 27. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_free_device_list", ibv_internal_free_device_list);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 28. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_get_device_name", ibv_internal_get_device_name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 29. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_open_device", ibv_internal_open_device);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 30. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_close_device", ibv_internal_close_device);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 31. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_get_async_event", ibv_internal_get_async_event);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 32. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_ack_async_event", ibv_internal_ack_async_event);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 33. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_query_device", ibv_internal_query_device);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 34. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_query_port", ibv_internal_query_port);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 35. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_query_gid", ibv_internal_query_gid);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 36. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_query_qp", ibv_internal_query_qp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 37. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_alloc_pd", ibv_internal_alloc_pd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 38. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_dealloc_pd", ibv_internal_dealloc_pd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 39. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_reg_mr", ibv_internal_reg_mr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 40. 调用 / 计算 / 写入：LOAD_SYM_VERSION(ibvhandle, "ibv_reg_mr_iova2", ibv_internal_reg_mr_iova2, "IBVERBS_1.8");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 41. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_dereg_mr", ibv_internal_dereg_mr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 42. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_create_cq", ibv_internal_create_cq);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 43. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_destroy_cq", ibv_internal_destroy_cq);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 44. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_create_qp", ibv_internal_create_qp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 45. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_modify_qp", ibv_internal_modify_qp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 46. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_destroy_qp", ibv_internal_destroy_qp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 47. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_fork_init", ibv_internal_fork_init);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 48. 调用 / 计算 / 写入：LOAD_SYM(ibvhandle, "ibv_event_type_str", ibv_internal_event_type_str);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 49. 调用 / 计算 / 写入：ibvState = ibvInitialized;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 50. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 51. 跳转标签：teardown；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   52. 调用 / 计算 / 写入：ibv_internal_get_device_list = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 53. 调用 / 计算 / 写入：ibv_internal_free_device_list = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 54. 调用 / 计算 / 写入：ibv_internal_get_device_name = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 55. 调用 / 计算 / 写入：ibv_internal_open_device = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 56. 调用 / 计算 / 写入：ibv_internal_close_device = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 57. 调用 / 计算 / 写入：ibv_internal_get_async_event = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 58. 调用 / 计算 / 写入：ibv_internal_ack_async_event = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 59. 调用 / 计算 / 写入：ibv_internal_query_device = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 60. 调用 / 计算 / 写入：ibv_internal_query_port = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 61. 调用 / 计算 / 写入：ibv_internal_query_gid = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 62. 调用 / 计算 / 写入：ibv_internal_query_qp = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 63. 调用 / 计算 / 写入：ibv_internal_alloc_pd = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 64. 调用 / 计算 / 写入：ibv_internal_dealloc_pd = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 65. 调用 / 计算 / 写入：ibv_internal_reg_mr = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 66. 调用 / 计算 / 写入：ibv_internal_reg_mr_iova2 = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 67. 调用 / 计算 / 写入：ibv_internal_dereg_mr = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 68. 调用 / 计算 / 写入：ibv_internal_create_cq = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 69. 调用 / 计算 / 写入：ibv_internal_destroy_cq = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 70. 调用 / 计算 / 写入：ibv_internal_create_qp = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 71. 调用 / 计算 / 写入：ibv_internal_modify_qp = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 72. 调用 / 计算 / 写入：ibv_internal_destroy_qp = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 73. 调用 / 计算 / 写入：ibv_internal_fork_init = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 74. 调用 / 计算 / 写入：ibv_internal_event_type_str = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 75. 条件判断：(ibvhandle != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   76. 真分支：；仅条件为真执行以下子项。
+ *     77. 调用 / 计算 / 写入：dlclose(ibvhandle);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 78. 调用 / 计算 / 写入：ibvState = ibvError;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 79. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0924
+ */
 /* 中文逐项-函数 F0924：wrap_ibv_symbols
  * 用途与位置：动态装载并解析 libibverbs 符号表；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -472,6 +555,11 @@ teardown:
   call; \
   return ncclSuccess;
 
+/* 中文内部逻辑 F0925：wrap_ibv_fork_init
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK(ibv_internal_fork_init, ibv_internal_fork_init(), -1, "ibv_fork_init");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0925
+ */
 /* 中文逐项-函数 F0925：wrap_ibv_fork_init
  * 用途与位置：初始化 verbs 注册页的 fork 处理；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -482,6 +570,15 @@ ncclResult_t wrap_ibv_fork_init() {
   IBV_INT_CHECK(ibv_internal_fork_init, ibv_internal_fork_init(), -1, "ibv_fork_init");
 }
 
+/* 中文内部逻辑 F0926：wrap_ibv_get_device_list
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*ret = ibv_internal_get_device_list(num_devices);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 条件判断：(*ret == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：*num_devices = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0926
+ */
 /* 中文逐项-函数 F0926：wrap_ibv_get_device_list
  * 用途与位置：获取可用 RDMA 设备列表；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（struct ibv_device ***ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -497,6 +594,11 @@ ncclResult_t wrap_ibv_get_device_list(struct ibv_device ***ret, int *num_devices
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0927：wrap_ibv_free_device_list
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_PASSTHRU(ibv_internal_free_device_list, ibv_internal_free_device_list(list));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0927
+ */
 /* 中文逐项-函数 F0927：wrap_ibv_free_device_list
  * 用途与位置：归还设备枚举列表；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 list（struct ibv_device **list）：节点或链路指针列表，count给出有效条目数，遍历不得越过当前有效范围。
@@ -507,6 +609,15 @@ ncclResult_t wrap_ibv_free_device_list(struct ibv_device **list) {
   IBV_PASSTHRU(ibv_internal_free_device_list, ibv_internal_free_device_list(list));
 }
 
+/* 中文内部逻辑 F0928：wrap_ibv_get_device_name
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ibv_internal_get_device_name == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 调用 / 计算 / 写入：exit(-1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 函数返回：return ibv_internal_get_device_name(device);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0928
+ */
 /* 中文逐项-函数 F0928：wrap_ibv_get_device_name
  * 用途与位置：读取设备名字；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 device（struct ibv_device *device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
@@ -523,6 +634,11 @@ const char *wrap_ibv_get_device_name(struct ibv_device *device) {
   return ibv_internal_get_device_name(device);
 }
 
+/* 中文内部逻辑 F0929：wrap_ibv_open_device
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_PTR_CHECK(ibv_internal_open_device, ibv_internal_open_device(device), *ret, NULL, "ibv_open_device");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0929
+ */
 /* 中文逐项-函数 F0929：wrap_ibv_open_device
  * 用途与位置：打开设备得到 verbs context；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（struct ibv_context **ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -534,6 +650,11 @@ ncclResult_t wrap_ibv_open_device(struct ibv_context **ret, struct ibv_device *d
   IBV_PTR_CHECK(ibv_internal_open_device, ibv_internal_open_device(device), *ret, NULL, "ibv_open_device");
 }
 
+/* 中文内部逻辑 F0930：wrap_ibv_close_device
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK(ibv_internal_close_device, ibv_internal_close_device(context), -1, "ibv_close_device");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0930
+ */
 /* 中文逐项-函数 F0930：wrap_ibv_close_device
  * 用途与位置：关闭设备上下文；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 context（struct ibv_context *context）：verbs/CUDA/回调的运行上下文句柄，具体对象由声明类型决定，不是用户张量指针。
@@ -544,6 +665,11 @@ ncclResult_t wrap_ibv_close_device(struct ibv_context *context) { /*returns 0 on
   IBV_INT_CHECK(ibv_internal_close_device, ibv_internal_close_device(context), -1, "ibv_close_device");
 }
 
+/* 中文内部逻辑 F0931：wrap_ibv_get_async_event
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK(ibv_internal_get_async_event, ibv_internal_get_async_event(context, event), -1, "ibv_get_async_event");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0931
+ */
 /* 中文逐项-函数 F0931：wrap_ibv_get_async_event
  * 用途与位置：等待读取设备异步事件；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 context（struct ibv_context *context）：verbs/CUDA/回调的运行上下文句柄，具体对象由声明类型决定，不是用户张量指针。
@@ -555,6 +681,11 @@ ncclResult_t wrap_ibv_get_async_event(struct ibv_context *context, struct ibv_as
   IBV_INT_CHECK(ibv_internal_get_async_event, ibv_internal_get_async_event(context, event), -1, "ibv_get_async_event");
 }
 
+/* 中文内部逻辑 F0932：wrap_ibv_ack_async_event
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_PASSTHRU(ibv_internal_ack_async_event, ibv_internal_ack_async_event(event));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0932
+ */
 /* 中文逐项-函数 F0932：wrap_ibv_ack_async_event
  * 用途与位置：确认并释放已处理异步事件；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 event（struct ibv_async_event *event）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -565,6 +696,11 @@ ncclResult_t wrap_ibv_ack_async_event(struct ibv_async_event *event) {
   IBV_PASSTHRU(ibv_internal_ack_async_event, ibv_internal_ack_async_event(event));
 }
 
+/* 中文内部逻辑 F0933：wrap_ibv_query_device
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_device, ibv_internal_query_device(context, device_attr), 0, "ibv_query_device");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0933
+ */
 /* 中文逐项-函数 F0933：wrap_ibv_query_device
  * 用途与位置：读取设备能力限制；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 context（struct ibv_context *context）：verbs/CUDA/回调的运行上下文句柄，具体对象由声明类型决定，不是用户张量指针。
@@ -576,6 +712,11 @@ ncclResult_t wrap_ibv_query_device(struct ibv_context *context, struct ibv_devic
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_device, ibv_internal_query_device(context, device_attr), 0, "ibv_query_device");
 }
 
+/* 中文内部逻辑 F0934：wrap_ibv_query_port
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_port, ibv_internal_query_port(context, port_num, port_attr), 0, "ibv_query_port");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0934
+ */
 /* 中文逐项-函数 F0934：wrap_ibv_query_port
  * 用途与位置：读取端口状态/地址与速率能力；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 context（struct ibv_context *context）：verbs/CUDA/回调的运行上下文句柄，具体对象由声明类型决定，不是用户张量指针。
@@ -588,6 +729,11 @@ ncclResult_t wrap_ibv_query_port(struct ibv_context *context, uint8_t port_num, 
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_port, ibv_internal_query_port(context, port_num, port_attr), 0, "ibv_query_port");
 }
 
+/* 中文内部逻辑 F0935：wrap_ibv_query_gid
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_gid, ibv_internal_query_gid(context, port_num, index, gid), 0, "ibv_query_gid");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0935
+ */
 /* 中文逐项-函数 F0935：wrap_ibv_query_gid
  * 用途与位置：读取指定端口/GID索引的地址；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 context（struct ibv_context *context）：verbs/CUDA/回调的运行上下文句柄，具体对象由声明类型决定，不是用户张量指针。
@@ -601,6 +747,11 @@ ncclResult_t wrap_ibv_query_gid(struct ibv_context *context, uint8_t port_num, i
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_gid, ibv_internal_query_gid(context, port_num, index, gid), 0, "ibv_query_gid");
 }
 
+/* 中文内部逻辑 F0936：wrap_ibv_query_qp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_qp, ibv_internal_query_qp(qp, attr, attr_mask, init_attr), 0, "ibv_query_qp");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0936
+ */
 /* 中文逐项-函数 F0936：wrap_ibv_query_qp
  * 用途与位置：查询 QP 当前状态和属性；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 qp（struct ibv_qp *qp）：单个或多个 verbs 队列对，承载实际数据/控制请求，区别于 NCCL 逻辑channel。
@@ -614,6 +765,11 @@ ncclResult_t wrap_ibv_query_qp(struct ibv_qp *qp, struct ibv_qp_attr *attr, int 
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_query_qp, ibv_internal_query_qp(qp, attr, attr_mask, init_attr), 0, "ibv_query_qp");
 }
 
+/* 中文内部逻辑 F0937：wrap_ibv_alloc_pd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_PTR_CHECK(ibv_internal_alloc_pd, ibv_internal_alloc_pd(context), *ret, NULL, "ibv_alloc_pd");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0937
+ */
 /* 中文逐项-函数 F0937：wrap_ibv_alloc_pd
  * 用途与位置：分配保护域，隔离允许访问的 QP/MR 集合；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（struct ibv_pd **ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -625,6 +781,11 @@ ncclResult_t wrap_ibv_alloc_pd(struct ibv_pd **ret, struct ibv_context *context)
   IBV_PTR_CHECK(ibv_internal_alloc_pd, ibv_internal_alloc_pd(context), *ret, NULL, "ibv_alloc_pd");
 }
 
+/* 中文内部逻辑 F0938：wrap_ibv_dealloc_pd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_dealloc_pd, ibv_internal_dealloc_pd(pd), 0, "ibv_dealloc_pd");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0938
+ */
 /* 中文逐项-函数 F0938：wrap_ibv_dealloc_pd
  * 用途与位置：释放保护域；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 pd（struct ibv_pd *pd）：RDMA 保护域，关联允许互相访问的 QP、MR 等对象，不能假设不同PD的key可互用。
@@ -635,6 +796,11 @@ ncclResult_t wrap_ibv_dealloc_pd(struct ibv_pd *pd) { /*returns 0 on success, or
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_dealloc_pd, ibv_internal_dealloc_pd(pd), 0, "ibv_dealloc_pd");
 }
 
+/* 中文内部逻辑 F0939：wrap_ibv_reg_mr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_PTR_CHECK(ibv_internal_reg_mr, ibv_internal_reg_mr(pd, addr, length, access), *ret, NULL, "ibv_reg_mr");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0939
+ */
 /* 中文逐项-函数 F0939：wrap_ibv_reg_mr
  * 用途与位置：把指定虚拟地址范围注册到 PD 并取得 lkey/rkey；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（struct ibv_mr **ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -649,6 +815,15 @@ ncclResult_t wrap_ibv_reg_mr(struct ibv_mr **ret, struct ibv_pd *pd, void *addr,
   IBV_PTR_CHECK(ibv_internal_reg_mr, ibv_internal_reg_mr(pd, addr, length, access), *ret, NULL, "ibv_reg_mr");
 }
 
+/* 中文内部逻辑 F0940：wrap_direct_ibv_reg_mr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ibv_internal_reg_mr == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 函数返回：return ibv_internal_reg_mr(pd, addr, length, access);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0940
+ */
 /* 中文逐项-函数 F0940：wrap_direct_ibv_reg_mr
  * 用途与位置：直接调用选定 verbs 注册入口并返回 MR 指针，供需要原生指针/错误约定的能力探测使用。
  * 参数 pd（struct ibv_pd *pd）：RDMA 保护域，关联允许互相访问的 QP、MR 等对象，不能假设不同PD的key可互用。
@@ -668,6 +843,17 @@ struct ibv_mr * wrap_direct_ibv_reg_mr(struct ibv_pd *pd, void *addr, size_t len
   return ibv_internal_reg_mr(pd, addr, length, access);
 }
 
+/* 中文内部逻辑 F0941：wrap_ibv_reg_mr_iova2
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ibv_internal_reg_mr_iova2 == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 条件判断：(ret == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 调用 / 计算 / 写入：IBV_PTR_CHECK(ibv_internal_reg_mr_iova2, ibv_internal_reg_mr_iova2(pd, addr, length, iova, access), *ret, NULL, "ibv_reg_mr_iova2");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0941
+ */
 /* 中文逐项-函数 F0941：wrap_ibv_reg_mr_iova2
  * 用途与位置：注册内存并指定 HCA 使用的 IOVA 地址及访问权限；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（struct ibv_mr **ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -689,6 +875,11 @@ ncclResult_t wrap_ibv_reg_mr_iova2(struct ibv_mr **ret, struct ibv_pd *pd, void 
   IBV_PTR_CHECK(ibv_internal_reg_mr_iova2, ibv_internal_reg_mr_iova2(pd, addr, length, iova, access), *ret, NULL, "ibv_reg_mr_iova2");
 }
 
+/* 中文内部逻辑 F0942：wrap_ibv_dereg_mr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_dereg_mr, ibv_internal_dereg_mr(mr), 0, "ibv_dereg_mr");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0942
+ */
 /* 中文逐项-函数 F0942：wrap_ibv_dereg_mr
  * 用途与位置：注销一个真实 MR；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 mr（struct ibv_mr *mr）：真实 verbs 内存注册对象，包含本地/远端访问key，可能由注册缓存共享。
@@ -699,6 +890,11 @@ ncclResult_t wrap_ibv_dereg_mr(struct ibv_mr *mr) { /*returns 0 on success, or t
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_dereg_mr, ibv_internal_dereg_mr(mr), 0, "ibv_dereg_mr");
 }
 
+/* 中文内部逻辑 F0943：wrap_ibv_create_cq
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_PTR_CHECK(ibv_internal_create_cq, ibv_internal_create_cq(context, cqe, cq_context, channel, comp_vector), *ret, NULL, "ibv_create_cq");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0943
+ */
 /* 中文逐项-函数 F0943：wrap_ibv_create_cq
  * 用途与位置：创建完成队列；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（struct ibv_cq **ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -714,6 +910,11 @@ ncclResult_t wrap_ibv_create_cq(struct ibv_cq **ret, struct ibv_context *context
   IBV_PTR_CHECK(ibv_internal_create_cq, ibv_internal_create_cq(context, cqe, cq_context, channel, comp_vector), *ret, NULL, "ibv_create_cq");
 }
 
+/* 中文内部逻辑 F0944：wrap_ibv_destroy_cq
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_destroy_cq, ibv_internal_destroy_cq(cq), 0, "ibv_destroy_cq");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0944
+ */
 /* 中文逐项-函数 F0944：wrap_ibv_destroy_cq
  * 用途与位置：销毁完成队列；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 cq（struct ibv_cq *cq）：完成队列或 QP 绑定的发送/接收 CQ，保存硬件工作完成项。
@@ -724,6 +925,11 @@ ncclResult_t wrap_ibv_destroy_cq(struct ibv_cq *cq) {
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_destroy_cq, ibv_internal_destroy_cq(cq), 0, "ibv_destroy_cq");
 }
 
+/* 中文内部逻辑 F0945：wrap_ibv_destroy_qp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_destroy_qp, ibv_internal_destroy_qp(qp), 0, "ibv_destroy_qp");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0945
+ */
 /* 中文逐项-函数 F0945：wrap_ibv_destroy_qp
  * 用途与位置：销毁队列对；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 qp（struct ibv_qp *qp）：单个或多个 verbs 队列对，承载实际数据/控制请求，区别于 NCCL 逻辑channel。
@@ -734,6 +940,11 @@ ncclResult_t wrap_ibv_destroy_qp(struct ibv_qp *qp) {
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_destroy_qp, ibv_internal_destroy_qp(qp), 0, "ibv_destroy_qp");
 }
 
+/* 中文内部逻辑 F0946：wrap_ibv_create_qp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_PTR_CHECK(ibv_internal_create_qp, ibv_internal_create_qp(pd, qp_init_attr), *ret, NULL, "ibv_create_qp");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0946
+ */
 /* 中文逐项-函数 F0946：wrap_ibv_create_qp
  * 用途与位置：创建指定类型和队列容量的 QP；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（struct ibv_qp **ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -746,6 +957,11 @@ ncclResult_t wrap_ibv_create_qp(struct ibv_qp **ret, struct ibv_pd *pd, struct i
   IBV_PTR_CHECK(ibv_internal_create_qp, ibv_internal_create_qp(pd, qp_init_attr), *ret, NULL, "ibv_create_qp");
 }
 
+/* 中文内部逻辑 F0947：wrap_ibv_modify_qp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：IBV_INT_CHECK_RET_ERRNO(ibv_internal_modify_qp, ibv_internal_modify_qp(qp, attr, attr_mask), 0, "ibv_modify_qp");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0947
+ */
 /* 中文逐项-函数 F0947：wrap_ibv_modify_qp
  * 用途与位置：按属性掩码修改 QP 状态/路由/权限；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 qp（struct ibv_qp *qp）：单个或多个 verbs 队列对，承载实际数据/控制请求，区别于 NCCL 逻辑channel。
@@ -758,6 +974,12 @@ ncclResult_t wrap_ibv_modify_qp(struct ibv_qp *qp, struct ibv_qp_attr *attr, int
   IBV_INT_CHECK_RET_ERRNO(ibv_internal_modify_qp, ibv_internal_modify_qp(qp, attr, attr_mask), 0, "ibv_modify_qp");
 }
 
+/* 中文内部逻辑 F0948：wrap_ibv_event_type_str
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*ret = (char *) ibv_internal_event_type_str(event);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__ibvwrap_cc.md#f0948
+ */
 /* 中文逐项-函数 F0948：wrap_ibv_event_type_str
  * 用途与位置：把设备事件枚举转换成诊断字符串；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。
  * 参数 ret（char **ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。

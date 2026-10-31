@@ -548,6 +548,18 @@ ncclResult_t ncclTopoGetXmlFromGraphs(int ngraphs, struct ncclTopoGraph** graphs
  */
 ncclResult_t ncclTopoGetCompCap(struct ncclTopoSystem* system, int* ccMin, int* ccMax);
 
+/* 中文内部逻辑 F0523：ncclTopoIdToIndex
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*index = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 循环：初始 int i=0;；继续条件 i<system->nodes[type].count；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(system->nodes[type].nodes[i].id == id)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：*index = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_h.md#f0523
+ */
 /* 中文逐项-函数 F0523：ncclTopoIdToIndex
  * 用途与位置：把硬件 id 或通信 rank 查找为给定节点类型数组下标，查不到时返回错误。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -574,6 +586,18 @@ static ncclResult_t ncclTopoIdToIndex(struct ncclTopoSystem* system, int type, i
   return ncclInternalError;
 }
 
+/* 中文内部逻辑 F0524：ncclTopoRankToIndex
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*index = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 循环：初始 int i=0;；继续条件 i<system->nodes[GPU].count；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(system->nodes[GPU].nodes[i].gpu.rank == rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：*index = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_h.md#f0524
+ */
 /* 中文逐项-函数 F0524：ncclTopoRankToIndex
  * 用途与位置：把硬件 id 或通信 rank 查找为给定节点类型数组下标，查不到时返回错误。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -600,6 +624,11 @@ static ncclResult_t ncclTopoRankToIndex(struct ncclTopoSystem* system, int rank,
 }
 
 // Returns NVLink speed in GB/s
+/* 中文内部逻辑 F0525：ncclTopoNVLinkSpeed
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return cudaCompCap == 86 ? SM86_NVLINK_WIDTH : cudaCompCap >= 80 ? SM80_NVLINK_WIDTH : cudaCompCap >= 70 ? SM70_NVLINK_WIDTH : cudaCompCap >= 60 ? SM60_NVLINK_WIDTH : SM80_NVLINK_WIDTH;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_h.md#f0525
+ */
 /* 中文逐项-函数 F0525：ncclTopoNVLinkSpeed
  * 用途与位置：按 GPU 计算能力选择该代 NVLink 单链估计速率，供路径通道预算使用。
  * 参数 cudaCompCap（int cudaCompCap）：GPU计算能力整数编码，影响NVLink速率、协议支持和编译特化选择。

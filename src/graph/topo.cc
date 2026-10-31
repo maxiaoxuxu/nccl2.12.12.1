@@ -51,6 +51,23 @@ const char* topoPathTypeStr[] = { "LOC", "NVL", "NVB", "PIX", "PXB", "PXN", "PHB
 /******************************************************************/
 
 // Get an int64 from a PCI path. For example, sys/class/pci0000:00/0000:00:02.0/0000:02:00.0/ will return 0x000002000.
+/* 中文内部逻辑 F0493：pciPathToInt64
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char* str = path+offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(*str == '/')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：str--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 循环：初始 ；继续条件 (*str != '/')；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   6. 调用 / 计算 / 写入：str--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 调用 / 计算 / 写入：str++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 准备局部状态：int64_t numid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 调用 / 计算 / 写入：NCCLCHECK(busIdToInt64(str, &numid));；失败时可能提前return，成功才继续；在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
+ * 11. 调用 / 计算 / 写入：numid -= numid & 0xf;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 调用 / 计算 / 写入：*id = numid;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0493
+ */
 /* 中文逐项-函数 F0493：pciPathToInt64
  * 用途与位置：把 PCI 路径中的 BDF 片段解析成便于匹配和排序的整数标识。
  * 参数 path（char* path）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -85,6 +102,24 @@ ncclResult_t pciPathToInt64(char* path, int offset, int minOffset, int64_t* id) 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0494：findLocalCpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*cpu = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 条件判断：(node->type == CPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：*cpu = node;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 循环：初始 int l=0;；继续条件 l<node->nlinks；每轮更新 l++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 条件判断：(node->links[l].type == LINK_PCI)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     8. 真分支：；仅条件为真执行以下子项。
+ *       9. 调用 / 计算 / 写入：NCCLCHECK(findLocalCpu(node->links[l].remNode, cpu));；失败时可能提前return，成功才继续；沿硬件连接查找设备所在 CPU 节点，用于补建 CPU/PCI 关系。
+ *   10. 条件判断：(*cpu != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     11. 真分支：；仅条件为真执行以下子项。
+ *       12. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0494
+ */
 /* 中文逐项-函数 F0494：findLocalCpu
  * 用途与位置：沿硬件连接查找设备所在 CPU 节点，用于补建 CPU/PCI 关系。
  * 参数 node（struct ncclTopoNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -122,6 +157,26 @@ int interCpuWidth = 0;
  */
 int cpuPciWidth = 0;
 
+/* 中文内部逻辑 F0495：ncclTopoGetInterCpuWidth
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*width = LOC_WIDTH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 条件判断：(cpu->cpu.arch == NCCL_TOPO_CPU_ARCH_POWER)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：*width = P9_WIDTH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 条件判断：(cpu->cpu.arch == NCCL_TOPO_CPU_ARCH_ARM)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 调用 / 计算 / 写入：*width = ARM_WIDTH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 10. 条件判断：(cpu->cpu.arch == NCCL_TOPO_CPU_ARCH_X86 && cpu->cpu.vendor == NCCL_TOPO_CPU_VENDOR_INTEL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：*width = cpu->cpu.model == NCCL_TOPO_CPU_TYPE_SKL ? SKL_QPI_WIDTH : QPI_WIDTH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 条件判断：(cpu->cpu.arch == NCCL_TOPO_CPU_ARCH_X86 && cpu->cpu.vendor == NCCL_TOPO_CPU_VENDOR_ZHAOXIN)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 调用 / 计算 / 写入：*width = cpu->cpu.model == NCCL_TOPO_CPU_TYPE_YONGFENG ? YONGFENG_ZPI_WIDTH : ZPI_WIDTH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0495
+ */
 /* 中文逐项-函数 F0495：ncclTopoGetInterCpuWidth
  * 用途与位置：依据 CPU 架构/型号估计 CPU 之间的互联带宽，补全硬件图中 SYS 边容量。
  * 参数 cpu（struct ncclTopoNode* cpu）：硬件节点union中对应GPU、网络、CPU或PCI的专有属性；先看node.type再读取。
@@ -179,6 +234,17 @@ enum ncclNvLinkDeviceType {
   ncclNvLinkDeviceBridge, // IBM/Power NVLink bridge (Device 04ea)
 };
 
+/* 中文内部逻辑 F0496：ncclTopoGetNode
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int i=0;；继续条件 i<system->nodes[type].count；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 条件判断：(system->nodes[type].nodes[i].id == id)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     3. 真分支：；仅条件为真执行以下子项。
+ *       4. 调用 / 计算 / 写入：*node = system->nodes[type].nodes+i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0496
+ */
 /* 中文逐项-函数 F0496：ncclTopoGetNode
  * 用途与位置：在系统指定类型节点表中按 id 查找对象，返回已有节点地址。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -204,6 +270,42 @@ ncclResult_t ncclTopoGetNode(struct ncclTopoSystem* system, struct ncclTopoNode*
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0497：ncclTopoCreateNode
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(system->nodes[type].count == NCCL_TOPO_MAX_NODES)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("Error : tried to create too many nodes of type %d", type);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：struct ncclTopoNode* n = system->nodes[type].nodes+system->nodes[type].count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：system->nodes[type].count++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：n->type = type;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：n->id = id;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 条件判断：(type == GPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：n->nlinks=1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     12. 调用 / 计算 / 写入：n->links[0].type = LINK_LOC;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 调用 / 计算 / 写入：n->links[0].remNode = n;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     14. 调用 / 计算 / 写入：n->links[0].width = LOC_WIDTH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     15. 调用 / 计算 / 写入：n->gpu.dev = NCCL_TOPO_UNDEF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     16. 调用 / 计算 / 写入：n->gpu.rank = NCCL_TOPO_UNDEF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 调用 / 计算 / 写入：n->gpu.cudaCompCap = NCCL_TOPO_UNDEF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   18. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     19. 条件判断：(type == CPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       20. 真分支：；仅条件为真执行以下子项。
+ *         21. 调用 / 计算 / 写入：n->cpu.arch = NCCL_TOPO_UNDEF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         22. 调用 / 计算 / 写入：n->cpu.vendor = NCCL_TOPO_UNDEF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         23. 调用 / 计算 / 写入：n->cpu.model = NCCL_TOPO_UNDEF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       24. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         25. 条件判断：(type == NET)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           26. 真分支：；仅条件为真执行以下子项。
+ *             27. 调用 / 计算 / 写入：n->net.asic = 0ULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             28. 调用 / 计算 / 写入：n->net.port = NCCL_TOPO_UNDEF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             29. 调用 / 计算 / 写入：n->net.width = 0.0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             30. 调用 / 计算 / 写入：n->net.latency = 0.0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 调用 / 计算 / 写入：*node = n;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 32. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0497
+ */
 /* 中文逐项-函数 F0497：ncclTopoCreateNode
  * 用途与位置：在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -251,6 +353,32 @@ ncclResult_t ncclTopoCreateNode(struct ncclTopoSystem* system, struct ncclTopoNo
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0498：ncclTopoRemoveNode
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclTopoNode* delNode = system->nodes[type].nodes+index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 int t=0;；继续条件 t<NCCL_TOPO_NODE_TYPES；每轮更新 t++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 调用 / 计算 / 写入：free(delNode->paths[t]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   4. 循环：初始 int n=0;；继续条件 n<system->nodes[t].count；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     5. 准备局部状态：struct ncclTopoNode* node = system->nodes[t].nodes+n;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 条件判断：(node == delNode)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *     9. 循环：初始 int l=0;；继续条件 l<node->nlinks；每轮更新 l++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       10. 循环：初始 ；继续条件 (l<node->nlinks && node->links[l].remNode == delNode)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         11. 调用 / 计算 / 写入：memmove(node->links+l, node->links+l+1, (node->nlinks-l-1)*sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         12. 调用 / 计算 / 写入：node->nlinks--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       14. 条件判断：(l<node->nlinks && node->links[l].remNode->type == type && node->links[l].remNode >= delNode)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         15. 真分支：；仅条件为真执行以下子项。
+ *           16. 调用 / 计算 / 写入：node->links[l].remNode--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 19. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 20. 调用 / 计算 / 写入：memmove(delNode, delNode+1, (system->nodes[type].count-index-1)*sizeof(struct ncclTopoNode));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 21. 调用 / 计算 / 写入：system->nodes[type].count--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 22. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0498
+ */
 /* 中文逐项-函数 F0498：ncclTopoRemoveNode
  * 用途与位置：删除硬件节点并修正指向它的连接及数组位置，避免后续搜索引用被裁掉对象。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -304,6 +432,33 @@ ncclResult_t ncclTopoRemoveNode(struct ncclTopoSystem* system, int type, int ind
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0499：ncclTopoConnectNodes
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclTopoLink* link;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 link = node->links；继续条件 link->remNode；每轮更新 link++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(link->remNode == remNode && link->type == type)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ * 6. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 7. 条件判断：(link->remNode == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：node->nlinks++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 调用 / 计算 / 写入：link->type = type;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 调用 / 计算 / 写入：link->remNode = remNode;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 调用 / 计算 / 写入：link->width += width;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 准备局部状态：struct ncclTopoLink linkSave;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 调用 / 计算 / 写入：memcpy(&linkSave, link, sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 15. 循环：初始 ；继续条件 (link != node->links)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   16. 条件判断：((link-1)->width >= linkSave.width)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     17. 真分支：；仅条件为真执行以下子项。
+ *       18. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   19. 调用 / 计算 / 写入：memcpy(link, link-1, sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   20. 调用 / 计算 / 写入：link--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 22. 调用 / 计算 / 写入：memcpy(link, &linkSave, sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 23. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0499
+ */
 /* 中文逐项-函数 F0499：ncclTopoConnectNodes
  * 用途与位置：给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
  * 参数 node（struct ncclTopoNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -351,6 +506,53 @@ ncclResult_t ncclTopoConnectNodes(struct ncclTopoNode* node, struct ncclTopoNode
 // even though they're supposed to sustain full BW across all ports.
 // Flatten the switch as this extra level can break the search and make
 // NCCL take wrong topology decisions.
+/* 中文内部逻辑 F0500：ncclTopoFlattenBcmSwitches
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int s=0;；继续条件 s<system->nodes[PCI].count；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 准备局部状态：struct ncclTopoNode* pciSwitch = system->nodes[PCI].nodes+s;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 准备局部状态：uint64_t device = pciSwitch->pci.device;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   4. 条件判断：((device & 0xfffffffffffff000) == 0x1000c0101000a000)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 准备局部状态：int64_t* subSwIds;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       7. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&subSwIds, pciSwitch->nlinks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *       8. 准备局部状态：int subs = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       9. 循环：初始 int l=0;；继续条件 l<pciSwitch->nlinks；每轮更新 l++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         10. 准备局部状态：struct ncclTopoNode* sub = pciSwitch->links[l].remNode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         11. 条件判断：(sub->type != PCI || sub->pci.device != device)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           12. 真分支：；仅条件为真执行以下子项。
+ *             13. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *         14. 调用 / 计算 / 写入：subSwIds[subs++] = sub->id;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         15. 调用 / 计算 / 写入：memmove(pciSwitch->links+l, pciSwitch->links+l+1, (pciSwitch->nlinks-l-1)*(sizeof(struct ncclTopoLink)));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         16. 调用 / 计算 / 写入：pciSwitch->nlinks--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         17. 调用 / 计算 / 写入：l--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       19. 循环：初始 int s=0;；继续条件 s<subs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         20. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         21. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoIdToIndex(system, PCI, subSwIds[s], &index));；失败时可能提前return，成功才继续；把硬件 id 或通信 rank 查找为给定节点类型数组下标，查不到时返回错误。
+ *         22. 准备局部状态：struct ncclTopoNode* sub = system->nodes[PCI].nodes+index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         23. 循环：初始 int l=0;；继续条件 l<sub->nlinks；每轮更新 l++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           24. 准备局部状态：struct ncclTopoNode* remNode = sub->links[l].remNode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           25. 条件判断：(remNode == pciSwitch)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             26. 真分支：；仅条件为真执行以下子项。
+ *               27. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *           28. 调用 / 计算 / 写入：memcpy(pciSwitch->links+pciSwitch->nlinks, sub->links+l, sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           29. 调用 / 计算 / 写入：pciSwitch->nlinks++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           30. 循环：初始 int rl=0;；继续条件 rl<remNode->nlinks；每轮更新 rl++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *             31. 条件判断：(remNode->links[rl].remNode == sub)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               32. 真分支：；仅条件为真执行以下子项。
+ *                 33. 调用 / 计算 / 写入：remNode->links[rl].remNode = pciSwitch;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                 34. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *           35. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *         36. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *         37. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoRemoveNode(system, PCI, index));；失败时可能提前return，成功才继续；删除硬件节点并修正指向它的连接及数组位置，避免后续搜索引用被裁掉对象。
+ *       38. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       39. 调用 / 计算 / 写入：pciSwitch->pci.device = 0x1000c01010000000;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       40. 调用 / 计算 / 写入：free(subSwIds);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       41. 调用 / 计算 / 写入：s = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 42. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 43. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0500
+ */
 /* 中文逐项-函数 F0500：ncclTopoFlattenBcmSwitches
  * 用途与位置：识别可合并表示的 Broadcom PCI 交换结构，简化建图而不额外发起硬件传输。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -467,6 +669,21 @@ ncclResult_t ncclTopoFlattenBcmSwitches(struct ncclTopoSystem* system) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0501：ncclTopoConnectCpus
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int n=0;；继续条件 n<system->nodes[CPU].count；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 循环：初始 int p=0;；继续条件 p<system->nodes[CPU].count；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     3. 条件判断：(n == p)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       4. 真分支：；仅条件为真执行以下子项。
+ *         5. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *     6. 准备局部状态：float width;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetInterCpuWidth(system->nodes[CPU].nodes+n, &width));；失败时可能提前return，成功才继续；依据 CPU 架构/型号估计 CPU 之间的互联带宽，补全硬件图中 SYS 边容量。
+ *     8. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(system->nodes[CPU].nodes+n, system->nodes[CPU].nodes+p, LINK_SYS, width));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ *   9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 10. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0501
+ */
 /* 中文逐项-函数 F0501：ncclTopoConnectCpus
  * 用途与位置：根据 CPU 类型补建 CPU 之间的互连边，使跨 NUMA 路径可被统一搜索。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -501,6 +718,48 @@ ncclResult_t ncclTopoConnectCpus(struct ncclTopoSystem* system) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0502：ncclTopoPrintRec
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(node->type == GPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：sprintf(line+offset, "%s/%lX (%d)", topoNodeTypeStr[node->type], node->id, node->gpu.rank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 条件判断：(node->type == CPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       6. 真分支：；仅条件为真执行以下子项。
+ *         7. 调用 / 计算 / 写入：sprintf(line+offset, "%s/%lX (%d/%d/%d)", topoNodeTypeStr[node->type], node->id, node->cpu.arch, node->cpu.vendor, node->cpu.model);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       8. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         9. 条件判断：(node->type == PCI)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           10. 真分支：；仅条件为真执行以下子项。
+ *             11. 调用 / 计算 / 写入：sprintf(line+offset, "%s/%lX (%lx)", topoNodeTypeStr[node->type], node->id, node->pci.device);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           12. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             13. 调用 / 计算 / 写入：sprintf(line+offset, "%s/%lX", topoNodeTypeStr[node->type], node->id);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "%s", line);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 15. 循环：初始 int i=0;；继续条件 i<offset；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   16. 调用 / 计算 / 写入：line[i] = ' ';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 18. 循环：初始 int l=0;；继续条件 l<node->nlinks；每轮更新 l++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   19. 准备局部状态：struct ncclTopoLink* link = node->links+l;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   20. 条件判断：(link->type == LINK_LOC)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     21. 真分支：；仅条件为真执行以下子项。
+ *       22. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   23. 条件判断：(link->type != LINK_PCI || link->remNode != prevNode)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     24. 真分支：；仅条件为真执行以下子项。
+ *       25. 调用 / 计算 / 写入：sprintf(line+offset, "+ %s[%2.1f] - ", topoLinkTypeStr[link->type], link->width);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       26. 准备局部状态：int nextOffset = strlen(line);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       27. 条件判断：(link->type == LINK_PCI)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         28. 真分支：；仅条件为真执行以下子项。
+ *           29. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPrintRec(link->remNode, node, line, nextOffset));；失败时可能提前return，成功才继续；递归打印硬件节点、类型和直接链路，验证发现到的硬件树。
+ *         30. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           31. 条件判断：(link->remNode->type == NET)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             32. 真分支：；仅条件为真执行以下子项。
+ *               33. 调用 / 计算 / 写入：sprintf(line+nextOffset, "%s/%lX (%lx/%d/%f)", topoNodeTypeStr[link->remNode->type], link->remNode->id, link->remNode->net.asic, link->remNode->net.port, link->remNode->net.width);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             34. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *               35. 调用 / 计算 / 写入：sprintf(line+nextOffset, "%s/%lX", topoNodeTypeStr[link->remNode->type], link->remNode->id);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           36. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "%s", line);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 37. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 38. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0502
+ */
 /* 中文逐项-函数 F0502：ncclTopoPrintRec
  * 用途与位置：递归打印硬件节点、类型和直接链路，验证发现到的硬件树。
  * 参数 node（struct ncclTopoNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -562,6 +821,18 @@ static ncclResult_t ncclTopoPrintRec(struct ncclTopoNode* node, struct ncclTopoN
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0503：ncclTopoPrint
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "=== System : maxWidth %2.1f totalWidth %2.1f ===", s->maxWidth, s->totalWidth);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 准备局部状态：char line[1024];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 循环：初始 int n=0;；继续条件 n<s->nodes[CPU].count；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPrintRec(s->nodes[CPU].nodes+n, NULL, line, 0));；失败时可能提前return，成功才继续；递归打印硬件节点、类型和直接链路，验证发现到的硬件树。
+ * 5. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 6. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "==========================================");；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPrintPaths(s));；失败时可能提前return，成功才继续；打印缓存路径的跳数、带宽和类别，检查拓扑发现与策略改写后的可达性。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0503
+ */
 /* 中文逐项-函数 F0503：ncclTopoPrint
  * 用途与位置：递归打印硬件节点、类型和直接链路，验证发现到的硬件树。
  * 参数 s（struct ncclTopoSystem* s）：当前遍历或处理对象的局部引用/值，类型和下面初始化来源确定其具体身份。
@@ -588,6 +859,30 @@ ncclResult_t ncclTopoPrint(struct ncclTopoSystem* s) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0504：ncclTopoSort
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(upNode)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 准备局部状态：int l=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     4. 循环：初始 ；继续条件 (node->links[l].remNode != upNode)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       5. 调用 / 计算 / 写入：l++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     7. 准备局部状态：struct ncclTopoLink upLink;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     8. 调用 / 计算 / 写入：memcpy(&upLink, node->links+l, sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     9. 循环：初始 ；继续条件 (node->links[l+1].remNode)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       10. 调用 / 计算 / 写入：memcpy(node->links+l, node->links+l+1, sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       11. 调用 / 计算 / 写入：l++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     13. 调用 / 计算 / 写入：memcpy(node->links+l, &upLink, sizeof(struct ncclTopoLink));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 循环：初始 int l=0;；继续条件 l<node->nlinks；每轮更新 l++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   15. 准备局部状态：struct ncclTopoLink* link = node->links+l;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   16. 条件判断：(link->type == LINK_PCI && link->remNode != upNode)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     17. 真分支：；仅条件为真执行以下子项。
+ *       18. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoSort(link->remNode, node));；失败时可能提前return，成功才继续；对节点/邻接链组织顺序做规范化，方便拓扑遍历和搜索使用一致输入。
+ * 19. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 20. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0504
+ */
 /* 中文逐项-函数 F0504：ncclTopoSort
  * 用途与位置：对节点/邻接链组织顺序做规范化，方便拓扑遍历和搜索使用一致输入。
  * 参数 node（struct ncclTopoNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -640,6 +935,14 @@ static ncclResult_t ncclTopoSort(struct ncclTopoNode* node, struct ncclTopoNode*
 // 2. PCI down
 // 3. PCI up
 // 4. SYS (already the case)
+/* 中文内部逻辑 F0505：ncclTopoSortSystem
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int n=0;；继续条件 n<system->nodes[CPU].count；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoSort(system->nodes[CPU].nodes+n, NULL));；失败时可能提前return，成功才继续；对节点/邻接链组织顺序做规范化，方便拓扑遍历和搜索使用一致输入。
+ * 3. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0505
+ */
 /* 中文逐项-函数 F0505：ncclTopoSortSystem
  * 用途与位置：对节点/邻接链组织顺序做规范化，方便拓扑遍历和搜索使用一致输入。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -657,6 +960,39 @@ ncclResult_t ncclTopoSortSystem(struct ncclTopoSystem* system) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0506：ncclTopoAddNet
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int dev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlNet, "dev", &dev));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 3. 准备局部状态：struct ncclTopoNode* net;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCreateNode(system, &net, NET, dev));；失败时可能提前return，成功才继续；在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
+ * 5. 准备局部状态：const char* str;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(xmlNet, "guid", &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 7. 条件判断：(str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：sscanf(str, "0x%lx", &net->net.asic);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   10. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     11. 调用 / 计算 / 写入：net->net.asic = dev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 调用 / 计算 / 写入：ncclDebugNoWarn = NCCL_GRAPH;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 准备局部状态：int mbps;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIntDefault(xmlNet, "speed", &mbps, 0));；失败时可能提前return，成功才继续；读取可选整数属性，缺失时写调用者指定的默认值。
+ * 15. 条件判断：(mbps <= 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   16. 真分支：；仅条件为真执行以下子项。
+ *     17. 调用 / 计算 / 写入：mbps = 10000;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 调用 / 计算 / 写入：net->net.width = mbps / 8000.0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 条件判断：(xmlGetAttrFloat(xmlNet, "latency", &net->net.latency) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 调用 / 计算 / 写入：net->net.latency = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 22. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIntDefault(xmlNet, "port", &net->net.port, 0));；失败时可能提前return，成功才继续；读取可选整数属性，缺失时写调用者指定的默认值。
+ * 23. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIntDefault(xmlNet, "gdr", &net->net.gdrSupport, 0));；失败时可能提前return，成功才继续；读取可选整数属性，缺失时写调用者指定的默认值。
+ * 24. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIntDefault(xmlNet, "maxconn", &net->net.maxChannels, MAXCHANNELS));；失败时可能提前return，成功才继续；读取可选整数属性，缺失时写调用者指定的默认值。
+ * 25. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIntDefault(xmlNet, "coll", &net->net.collSupport, 0));；失败时可能提前return，成功才继续；读取可选整数属性，缺失时写调用者指定的默认值。
+ * 26. 调用 / 计算 / 写入：ncclDebugNoWarn = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 27. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(nic, net, LINK_NET, net->net.width));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ * 28. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(net, nic, LINK_NET, net->net.width));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ * 29. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0506
+ */
 /* 中文逐项-函数 F0506：ncclTopoAddNet
  * 用途与位置：从 XML 的网络/网卡属性建立 NIC/NET 硬件节点，并接到对应 PCI/CPU 层级。
  * 参数 xmlNet（struct ncclXmlNode* xmlNet）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -711,6 +1047,23 @@ ncclResult_t ncclTopoAddNet(struct ncclXmlNode* xmlNet, struct ncclTopoSystem* s
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0507：ncclTopoAddNic
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int s=0;；继续条件 s<xmlNic->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 准备局部状态：struct ncclXmlNode* xmlNet = xmlNic->subs[s];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(strcmp(xmlNet->name, "net") != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   6. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   7. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(xmlNet, "dev", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ *   8. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     9. 真分支：；仅条件为真执行以下子项。
+ *       10. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   11. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddNet(xmlNet, system, nic));；失败时可能提前return，成功才继续；从 XML 的网络/网卡属性建立 NIC/NET 硬件节点，并接到对应 PCI/CPU 层级。
+ * 12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0507
+ */
 /* 中文逐项-函数 F0507：ncclTopoAddNic
  * 用途与位置：从 XML 的网络/网卡属性建立 NIC/NET 硬件节点，并接到对应 PCI/CPU 层级。
  * 参数 xmlNic（struct ncclXmlNode* xmlNic）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -745,6 +1098,15 @@ ncclResult_t ncclTopoAddNic(struct ncclXmlNode* xmlNic, struct ncclTopoSystem* s
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0508：ncclTopoAddGpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlGpu, "sm", &gpu->gpu.cudaCompCap));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlGpu, "rank", &gpu->gpu.rank));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlGpu, "dev", &gpu->gpu.dev));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlGpu, "gdr", &gpu->gpu.gdrSupport));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0508
+ */
 /* 中文逐项-函数 F0508：ncclTopoAddGpu
  * 用途与位置：从 XML 的 GPU 属性建立设备节点、通信 rank 及能力信息，并关联父级硬件。
  * 参数 xmlGpu（struct ncclXmlNode* xmlGpu）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -779,6 +1141,79 @@ struct kvDict kvDictPciGen[] = {
   { "2.5 GT/s", 15 }, { "5 GT/s", 30 }, { "8 GT/s", 60 }, { "16 GT/s", 120 }, { "32 GT/s", 240 }, /* Kernel 5.6 and earlier */
   { "2.5 GT/s PCIe", 15 }, { "5.0 GT/s PCIe", 30 }, { "8.0 GT/s PCIe", 60 }, { "16.0 GT/s PCIe", 120 }, { "32.0 GT/s PCIe", 240 }, { "64.0 GT/s PCIe", 480 },
   { NULL, 60 /* Default fallback */ } }; // x100 Mbps per lane
+/* 中文内部逻辑 F0509：ncclTopoAddPci
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const char* str;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int type;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(xmlPci, "class", &str));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(kvConvertToInt(str, &type, kvDictPciClass));；失败时可能提前return，成功才继续；在名称/数值字典中双向转换枚举属性，使 XML 可读名称对应内部路径/模式常量。
+ * 5. 准备局部状态：int64_t busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(xmlPci, "busid", &str));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(busIdToInt64(str, &busId));；失败时可能提前return，成功才继续；在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
+ * 8. 准备局部状态：struct ncclTopoNode* node = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：struct ncclXmlNode* xmlGpu = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSub(xmlPci, "gpu", &xmlGpu));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ * 11. 条件判断：(xmlGpu != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   12. 真分支：；仅条件为真执行以下子项。
+ *     13. 调用 / 计算 / 写入：type = GPU;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     14. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     15. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(xmlGpu, "rank", &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ *     16. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       17. 真分支：；仅条件为真执行以下子项。
+ *         18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     19. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCreateNode(system, &node, type, busId));；失败时可能提前return，成功才继续；在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
+ *     20. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddGpu(xmlGpu, system, node));；失败时可能提前return，成功才继续；从 XML 的 GPU 属性建立设备节点、通信 rank 及能力信息，并关联父级硬件。
+ * 21. 准备局部状态：struct ncclXmlNode* xmlNic = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 22. 调用 / 计算 / 写入：NCCLCHECK(xmlGetSub(xmlPci, "nic", &xmlNic));；失败时可能提前return，成功才继续；仅在当前节点直接子项中按标签及属性匹配目标，整数版本负责文本格式转换。
+ * 23. 条件判断：(xmlNic != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   24. 真分支：；仅条件为真执行以下子项。
+ *     25. 调用 / 计算 / 写入：type = NIC;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     26. 调用 / 计算 / 写入：busId &= 0xfffffffffffffff0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     27. 准备局部状态：struct ncclTopoNode* nicNode = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     28. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetNode(system, &nicNode, type, busId));；失败时可能提前return，成功才继续；在系统指定类型节点表中按 id 查找对象，返回已有节点地址。
+ *     29. 条件判断：(nicNode == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       30. 真分支：；仅条件为真执行以下子项。
+ *         31. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCreateNode(system, &nicNode, type, busId));；失败时可能提前return，成功才继续；在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
+ *         32. 调用 / 计算 / 写入：node = nicNode;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     33. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddNic(xmlNic, system, nicNode));；失败时可能提前return，成功才继续；从 XML 的网络/网卡属性建立 NIC/NET 硬件节点，并接到对应 PCI/CPU 层级。
+ *   34. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     35. 条件判断：(type == PCI)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       36. 真分支：；仅条件为真执行以下子项。
+ *         37. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCreateNode(system, &node, type, busId));；失败时可能提前return，成功才继续；在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
+ *         38. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(xmlPci, "vendor", &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *         39. 条件判断：(str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           40. 真分支：；仅条件为真执行以下子项。
+ *             41. 调用 / 计算 / 写入：node->pci.device += strtol(str, NULL, 0) << 48;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         42. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(xmlPci, "device", &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *         43. 条件判断：(str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           44. 真分支：；仅条件为真执行以下子项。
+ *             45. 调用 / 计算 / 写入：node->pci.device += strtol(str, NULL, 0) << 32;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         46. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(xmlPci, "subsystem_vendor", &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *         47. 条件判断：(str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           48. 真分支：；仅条件为真执行以下子项。
+ *             49. 调用 / 计算 / 写入：node->pci.device += strtol(str, NULL, 0) << 16;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         50. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(xmlPci, "subsystem_device", &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *         51. 条件判断：(str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           52. 真分支：；仅条件为真执行以下子项。
+ *             53. 调用 / 计算 / 写入：node->pci.device += strtol(str, NULL, 0);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         54. 循环：初始 int s=0;；继续条件 s<xmlPci->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           55. 准备局部状态：struct ncclXmlNode* xmlSubPci = xmlPci->subs[s];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           56. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddPci(xmlSubPci, system, node));；失败时可能提前return，成功才继续；递归建立 PCI 桥/交换节点与其子设备，使用链路代际和宽度推导带宽。
+ *         57. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 58. 条件判断：(node)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   59. 真分支：；仅条件为真执行以下子项。
+ *     60. 准备局部状态：int width, speed;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     61. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlPci, "link_width", &width));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ *     62. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(xmlPci, "link_speed", &str));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ *     63. 条件判断：(width == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       64. 真分支：；仅条件为真执行以下子项。
+ *         65. 调用 / 计算 / 写入：width = 16;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     66. 调用 / 计算 / 写入：NCCLCHECK(kvConvertToInt(str, &speed, kvDictPciGen));；失败时可能提前return，成功才继续；在名称/数值字典中双向转换枚举属性，使 XML 可读名称对应内部路径/模式常量。
+ *     67. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(node, parent, LINK_PCI, width*speed/80.0));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ *     68. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(parent, node, LINK_PCI, width*speed/80.0));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ * 69. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0509
+ */
 /* 中文逐项-函数 F0509：ncclTopoAddPci
  * 用途与位置：递归建立 PCI 桥/交换节点与其子设备，使用链路代际和宽度推导带宽。
  * 参数 xmlPci（struct ncclXmlNode* xmlPci）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -916,6 +1351,57 @@ struct kvDict kvDictCpuArch[] = { { "x86_64", NCCL_TOPO_CPU_ARCH_X86 }, { "arm64
  */
 struct kvDict kvDictCpuVendor[] = { { "GenuineIntel", NCCL_TOPO_CPU_VENDOR_INTEL }, { "AuthenticAMD", NCCL_TOPO_CPU_VENDOR_AMD }, { "CentaurHauls", NCCL_TOPO_CPU_VENDOR_ZHAOXIN }, { "  Shanghai  ", NCCL_TOPO_CPU_VENDOR_ZHAOXIN }, { NULL, 0 } };
 
+/* 中文内部逻辑 F0510：ncclTopoAddCpu
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int numaId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlCpu, "numaid", &numaId));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ * 3. 准备局部状态：struct ncclTopoNode* cpu;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCreateNode(system, &cpu, CPU, numaId));；失败时可能提前return，成功才继续；在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
+ * 5. 准备局部状态：const char* str;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(xmlCpu, "affinity", &str));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ * 7. 条件判断：(str != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：NCCLCHECK(ncclStrToCpuset(str, &cpu->cpu.affinity));；失败时可能提前return，成功才继续；把系统/配置的十六进制 CPU 位图解析成 cpu_set_t，支持线程亲和性设置。
+ * 10. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(xmlCpu, "arch", &str));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ * 11. 调用 / 计算 / 写入：NCCLCHECK(kvConvertToInt(str, &cpu->cpu.arch, kvDictCpuArch));；失败时可能提前return，成功才继续；在名称/数值字典中双向转换枚举属性，使 XML 可读名称对应内部路径/模式常量。
+ * 12. 条件判断：(cpu->cpu.arch == NCCL_TOPO_CPU_ARCH_X86)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(xmlCpu, "vendor", &str));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ *     15. 调用 / 计算 / 写入：NCCLCHECK(kvConvertToInt(str, &cpu->cpu.vendor, kvDictCpuVendor));；失败时可能提前return，成功才继续；在名称/数值字典中双向转换枚举属性，使 XML 可读名称对应内部路径/模式常量。
+ *     16. 条件判断：(cpu->cpu.vendor == NCCL_TOPO_CPU_VENDOR_INTEL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       17. 真分支：；仅条件为真执行以下子项。
+ *         18. 准备局部状态：int familyId, modelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         19. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlCpu, "familyid", &familyId));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ *         20. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlCpu, "modelid", &modelId));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ *         21. 调用 / 计算 / 写入：cpu->cpu.model = (familyId == 6 && modelId >= 0x55) ? NCCL_TOPO_CPU_TYPE_SKL : NCCL_TOPO_CPU_INTEL_BDW;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       22. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         23. 条件判断：(cpu->cpu.vendor == NCCL_TOPO_CPU_VENDOR_ZHAOXIN)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           24. 真分支：；仅条件为真执行以下子项。
+ *             25. 准备局部状态：int familyId, modelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             26. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlCpu, "familyid", &familyId));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ *             27. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(xmlCpu, "modelid", &modelId));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ *             28. 条件判断：(familyId == 7 && modelId == 0x5B)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               29. 真分支：；仅条件为真执行以下子项。
+ *                 30. 调用 / 计算 / 写入：cpu->cpu.model = NCCL_TOPO_CPU_TYPE_YONGFENG;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 循环：初始 int s=0;；继续条件 s<xmlCpu->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   32. 准备局部状态：struct ncclXmlNode* node = xmlCpu->subs[s];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   33. 条件判断：(strcmp(node->name, "pci") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     34. 真分支：；仅条件为真执行以下子项。
+ *       35. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddPci(node, system, cpu));；失败时可能提前return，成功才继续；递归建立 PCI 桥/交换节点与其子设备，使用链路代际和宽度推导带宽。
+ *   36. 条件判断：(strcmp(node->name, "nic") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     37. 真分支：；仅条件为真执行以下子项。
+ *       38. 准备局部状态：struct ncclTopoNode* nic = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       39. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetNode(system, &nic, NIC, 0));；失败时可能提前return，成功才继续；在系统指定类型节点表中按 id 查找对象，返回已有节点地址。
+ *       40. 条件判断：(nic == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         41. 真分支：；仅条件为真执行以下子项。
+ *           42. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCreateNode(system, &nic, NIC, 0));；失败时可能提前return，成功才继续；在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
+ *           43. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(cpu, nic, LINK_PCI, LOC_WIDTH));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ *           44. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(nic, cpu, LINK_PCI, LOC_WIDTH));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ *       45. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddNic(node, system, nic));；失败时可能提前return，成功才继续；从 XML 的网络/网卡属性建立 NIC/NET 硬件节点，并接到对应 PCI/CPU 层级。
+ * 46. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 47. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0510
+ */
 /* 中文逐项-函数 F0510：ncclTopoAddCpu
  * 用途与位置：建立 CPU/NUMA 节点并递归导入其 PCI、GPU、NIC 子树。
  * 参数 xmlCpu（struct ncclXmlNode* xmlCpu）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1007,6 +1493,58 @@ ncclResult_t ncclTopoAddCpu(struct ncclXmlNode* xmlCpu, struct ncclTopoSystem* s
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0511：ncclTopoAddNvLinks
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(strcmp(node->name, "nvlink") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 准备局部状态：struct ncclTopoNode* gpu = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     4. 准备局部状态：int64_t pBusId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(busIdToInt64(parentBusId, &pBusId));；失败时可能提前return，成功才继续；在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
+ *     6. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetNode(system, &gpu, GPU, pBusId));；失败时可能提前return，成功才继续；在系统指定类型节点表中按 id 查找对象，返回已有节点地址。
+ *     7. 条件判断：(gpu == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       8. 真分支：；仅条件为真执行以下子项。
+ *         9. 调用 / 计算 / 写入：WARN("Add NVLink error : could not find GPU %lx", pBusId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         10. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     11. 准备局部状态：int count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     12. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrInt(node, "count", &count));；失败时可能提前return，成功才继续；读取必需属性字符串并转成整数/浮点，供硬件宽度、rank、版本等数值属性使用。
+ *     13. 准备局部状态：const char* targetClass;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     14. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(node, "tclass", &targetClass));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ *     15. 准备局部状态：int targetType;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     16. 调用 / 计算 / 写入：NCCLCHECK(kvConvertToInt(targetClass, &targetType, kvDictPciClass));；失败时可能提前return，成功才继续；在名称/数值字典中双向转换枚举属性，使 XML 可读名称对应内部路径/模式常量。
+ *     17. 准备局部状态：struct ncclTopoNode* remote = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     18. 条件判断：(targetType == GPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       19. 真分支：；仅条件为真执行以下子项。
+ *         20. 准备局部状态：const char* target;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         21. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrStr(node, "target", &target));；失败时可能提前return，成功才继续；读取必需字符串属性，缺失时报错，适用于不能省略的拓扑字段。
+ *         22. 准备局部状态：int64_t busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         23. 调用 / 计算 / 写入：NCCLCHECK(busIdToInt64(target, &busId));；失败时可能提前return，成功才继续；在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
+ *         24. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetNode(system, &remote, GPU, busId));；失败时可能提前return，成功才继续；在系统指定类型节点表中按 id 查找对象，返回已有节点地址。
+ *       25. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         26. 条件判断：(targetType == CPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           27. 真分支：；仅条件为真执行以下子项。
+ *             28. 调用 / 计算 / 写入：NCCLCHECK(findLocalCpu(gpu, &remote));；失败时可能提前return，成功才继续；沿硬件连接查找设备所在 CPU 节点，用于补建 CPU/PCI 关系。
+ *           29. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             30. 条件判断：(system->nodes[NVS].count == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               31. 真分支：；仅条件为真执行以下子项。
+ *                 32. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCreateNode(system, &remote, NVS, 0));；失败时可能提前return，成功才继续；在固定节点表中新建指定类型/id 的硬件节点，初始化属性后交给调用者继续填充。
+ *               33. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                 34. 调用 / 计算 / 写入：remote = system->nodes[NVS].nodes;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     35. 条件判断：(remote)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       36. 真分支：；仅条件为真执行以下子项。
+ *         37. 准备局部状态：float nvlSpeed = ncclTopoNVLinkSpeed(gpu->gpu.cudaCompCap);；按 GPU 计算能力选择该代 NVLink 单链估计速率，供路径通道预算使用。
+ *         38. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(gpu, remote, LINK_NVL, count*nvlSpeed));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ *         39. 条件判断：(remote->type != GPU)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           40. 真分支：；仅条件为真执行以下子项。
+ *             41. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectNodes(remote, gpu, LINK_NVL, count*nvlSpeed));；失败时可能提前return，成功才继续；给两个硬件节点增加或合并同类链路及宽度，表示自动发现的物理连接。
+ *   42. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     43. 准备局部状态：const char* busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     44. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttr(node, "busid", &busId));；失败时可能提前return，成功才继续；读取可选字符串属性，缺失时返回空指针而不自动填默认值。
+ *     45. 循环：初始 int s=0;；继续条件 s<node->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       46. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddNvLinks(node->subs[s], system, busId ? busId : parentBusId));；失败时可能提前return，成功才继续；根据 XML/NVML 的 NVLink 远端信息补建 GPU/交换节点之间的高速链路。
+ *     47. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 48. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0511
+ */
 /* 中文逐项-函数 F0511：ncclTopoAddNvLinks
  * 用途与位置：根据 XML/NVML 的 NVLink 远端信息补建 GPU/交换节点之间的高速链路。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -1112,6 +1650,24 @@ ncclResult_t ncclTopoAddNvLinks(struct ncclXmlNode* node, struct ncclTopoSystem*
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0512：ncclTopoGetSystemFromXml
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(topoSystem, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 准备局部状态：struct ncclXmlNode* topNode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(xmlFindTag(xml, "system", &topNode));；失败时可能提前return，成功才继续；搜索满足标签名及可选键值匹配的 XML 节点，用于复用已有硬件对象。
+ * 4. 循环：初始 int s=0;；继续条件 s<topNode->nSubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   5. 准备局部状态：struct ncclXmlNode* node = topNode->subs[s];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   6. 条件判断：(strcmp(node->name, "cpu") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     7. 真分支：；仅条件为真执行以下子项。
+ *       8. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddCpu(node, *topoSystem));；失败时可能提前return，成功才继续；建立 CPU/NUMA 节点并递归导入其 PCI、GPU、NIC 子树。
+ * 9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 10. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoAddNvLinks(topNode, *topoSystem, NULL));；失败时可能提前return，成功才继续；根据 XML/NVML 的 NVLink 远端信息补建 GPU/交换节点之间的高速链路。
+ * 11. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoFlattenBcmSwitches(*topoSystem));；失败时可能提前return，成功才继续；识别可合并表示的 Broadcom PCI 交换结构，简化建图而不额外发起硬件传输。
+ * 12. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoConnectCpus(*topoSystem));；失败时可能提前return，成功才继续；根据 CPU 类型补建 CPU 之间的互连边，使跨 NUMA 路径可被统一搜索。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoSortSystem(*topoSystem));；失败时可能提前return，成功才继续；对节点/邻接链组织顺序做规范化，方便拓扑遍历和搜索使用一致输入。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0512
+ */
 /* 中文逐项-函数 F0512：ncclTopoGetSystemFromXml
  * 用途与位置：把硬件 XML 的层级属性转换成 ncclTopoSystem 节点和双向链路模型。
  * 参数 xml（struct ncclXml* xml）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -1158,6 +1714,18 @@ ncclResult_t ncclTopoGetSystemFromXml(struct ncclXml* xml, struct ncclTopoSystem
 NCCL_PARAM(TopoDumpFileRank, "TOPO_DUMP_FILE_RANK", 0);
 
 // Only set values if not already set
+/* 中文内部逻辑 F0513：xmlInitAttrInt
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：index = node->nAttrs++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：strncpy(node->attrs[index].key, attrName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：snprintf(node->attrs[index].value, MAX_STR_LEN, "%d", value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0513
+ */
 /* 中文逐项-函数 F0513：xmlInitAttrInt
  * 用途与位置：只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -1182,6 +1750,18 @@ static ncclResult_t xmlInitAttrInt(struct ncclXmlNode* node, const char* attrNam
   }
   return ncclSuccess;
 }
+/* 中文内部逻辑 F0514：xmlInitAttrUint64
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：index = node->nAttrs++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：strncpy(node->attrs[index].key, attrName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：snprintf(node->attrs[index].value, MAX_STR_LEN, "0x%lx", value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0514
+ */
 /* 中文逐项-函数 F0514：xmlInitAttrUint64
  * 用途与位置：只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -1206,6 +1786,18 @@ static ncclResult_t xmlInitAttrUint64(struct ncclXmlNode* node, const char* attr
   }
   return ncclSuccess;
 }
+/* 中文内部逻辑 F0515：xmlInitAttrFloat
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));；失败时可能提前return，成功才继续；按属性名在节点固定属性数组中找下标，缺失时写 -1 让上层决定默认值或错误。
+ * 3. 条件判断：(index == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：index = node->nAttrs++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：strncpy(node->attrs[index].key, attrName, MAX_STR_LEN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：snprintf(node->attrs[index].value, MAX_STR_LEN, "%f", value);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0515
+ */
 /* 中文逐项-函数 F0515：xmlInitAttrFloat
  * 用途与位置：只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
  * 参数 node（struct ncclXmlNode* node）：硬件节点或当前计算节点编号，具体由声明类型及赋值来源决定。
@@ -1235,6 +1827,82 @@ static ncclResult_t xmlInitAttrFloat(struct ncclXmlNode* node, const char* attrN
 /* 中文导读：
  * 从 XML/系统设备信息、GPU/NVML 和所选网络后端属性建立本机拓扑。
  * NET 节点带有端口速度、GDR/collective 能力等属性；后续搜索把这些属性作为模型输入。
+ */
+/* 中文内部逻辑 F0516：ncclTopoGetSystem
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclXml* xml;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&xml, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 准备局部状态：char* xmlTopoFile = getenv("NCCL_TOPO_FILE");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 条件判断：(xmlTopoFile)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 调用 / 计算 / 写入：INFO(NCCL_ENV, "NCCL_TOPO_FILE set by environment to %s", xmlTopoFile);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromFile(xmlTopoFile, xml, 1));；失败时可能提前return，成功才继续；打开拓扑文件并解析指定版本的系统 XML，按 warn 决定缺失文件的处理方式。
+ *   8. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     9. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetXmlFromFile("/var/run/nvidia-topologyd/virtualTopology.xml", xml, 0));；失败时可能提前return，成功才继续；打开拓扑文件并解析指定版本的系统 XML，按 warn 决定缺失文件的处理方式。
+ * 10. 条件判断：(xml->maxIndex == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 准备局部状态：struct ncclXmlNode* top;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     13. 调用 / 计算 / 写入：NCCLCHECK(xmlAddNode(xml, NULL, "system", &top));；失败时可能提前return，成功才继续；从 XML 固定节点池分配对象并关联父子关系，检查最大节点/子项限制。
+ *     14. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(top, "version", NCCL_TOPO_XML_VERSION));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ * 15. 循环：初始 int r=0;；继续条件 r<comm->nRanks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   16. 条件判断：(comm->peerInfo[r].hostHash == comm->peerInfo[comm->rank].hostHash)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     17. 真分支：；仅条件为真执行以下子项。
+ *       18. 准备局部状态：char busId[NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       19. 调用 / 计算 / 写入：NCCLCHECK(int64ToBusId(comm->peerInfo[r].busId, busId));；失败时可能提前return，成功才继续；在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
+ *       20. 准备局部状态：struct ncclXmlNode* node;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       21. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoFillGpu(xml, busId, &node));；失败时可能提前return，成功才继续；在 XML 找到或添加指定 GPU，触发系统/NVML 自动发现补全其属性。
+ *       22. 条件判断：(node == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         23. 真分支：；仅条件为真执行以下子项。
+ *           24. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       25. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(node, "keep", 1));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *       26. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(node, "rank", r));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *       27. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(node, "gdr", comm->peerInfo[r].gdrSupport));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ * 28. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 29. 准备局部状态：int netDevCount = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 30. 条件判断：(collNetSupport())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   31. 真分支：；仅条件为真执行以下子项。
+ *     32. 调用 / 计算 / 写入：NCCLCHECK(collNetDevices(&netDevCount));；失败时可能提前return，成功才继续；查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *     33. 循环：初始 int n=0;；继续条件 n<netDevCount；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       34. 准备局部状态：ncclNetProperties_t props;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       35. 调用 / 计算 / 写入：NCCLCHECK(collNetGetProperties(n, &props));；失败时可能提前return，成功才继续；读取设备拓扑/速度/指针/接收能力属性；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *       36. 准备局部状态：struct ncclXmlNode* netNode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       37. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoFillNet(xml, props.pciPath, props.name, &netNode));；失败时可能提前return，成功才继续；将后端提供的网络设备属性补入 XML，关联其 PCI/NIC 层次与 GDR/CollNet 能力。
+ *       38. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(netNode, "keep", 1));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *       39. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(netNode, "dev", n));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *       40. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "speed", props.speed));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *       41. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "port", props.port));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *       42. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrUint64(netNode, "guid", props.guid));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *       43. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "maxconn", props.maxComms));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *       44. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "gdr", props.ptrSupport & NCCL_PTR_CUDA ? 1 : 0));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *       45. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "coll", 1));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *     46. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 47. 条件判断：(netDevCount == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   48. 真分支：；仅条件为真执行以下子项。
+ *     49. 调用 / 计算 / 写入：NCCLCHECK(ncclNetDevices(&netDevCount));；失败时可能提前return，成功才继续；查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 50. 循环：初始 int n=0;；继续条件 n<netDevCount；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   51. 准备局部状态：ncclNetProperties_t props;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   52. 调用 / 计算 / 写入：NCCLCHECK(ncclNetGetProperties(n, &props));；失败时可能提前return，成功才继续；读取设备拓扑/速度/指针/接收能力属性；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *   53. 准备局部状态：struct ncclXmlNode* netNode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   54. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoFillNet(xml, props.pciPath, props.name, &netNode));；失败时可能提前return，成功才继续；将后端提供的网络设备属性补入 XML，关联其 PCI/NIC 层次与 GDR/CollNet 能力。
+ *   55. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(netNode, "keep", 1));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *   56. 调用 / 计算 / 写入：NCCLCHECK(xmlSetAttrInt(netNode, "dev", n));；失败时可能提前return，成功才继续；把数值格式化成字符串后写 XML 属性，统一与文本 XML 表示对接。
+ *   57. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "speed", props.speed));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *   58. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "port", props.port));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *   59. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrFloat(netNode, "latency", props.latency));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *   60. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrUint64(netNode, "guid", props.guid));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *   61. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "maxconn", props.maxComms));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ *   62. 调用 / 计算 / 写入：NCCLCHECK(xmlInitAttrInt(netNode, "gdr", props.ptrSupport & NCCL_PTR_CUDA ? 1 : 0));；失败时可能提前return，成功才继续；只在属性缺失时写入默认数值，保留用户拓扑文件明确提供的值。
+ * 63. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 64. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoTrimXml(xml));；失败时可能提前return，成功才继续；裁剪与当前通信设备无关的 XML 子树，保留当前运行所需硬件路径。
+ * 65. 调用 / 计算 / 写入：xmlTopoFile = getenv("NCCL_TOPO_DUMP_FILE");；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 66. 条件判断：(xmlTopoFile && comm->rank == ncclParamTopoDumpFileRank())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   67. 真分支：；仅条件为真执行以下子项。
+ *     68. 调用 / 计算 / 写入：INFO(NCCL_ENV, "NCCL_TOPO_DUMP_FILE set by environment to %s", xmlTopoFile);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     69. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoDumpXmlToFile(xmlTopoFile, xml));；失败时可能提前return，成功才继续；递归把内存 XML 节点序列化并写出文件，供拓扑/搜索图调试和复用。
+ * 70. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetSystemFromXml(xml, system));；失败时可能提前return，成功才继续；把硬件 XML 的层级属性转换成 ncclTopoSystem 节点和双向链路模型。
+ * 71. 调用 / 计算 / 写入：free(xml);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 72. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0516
  */
 /* 中文逐项-函数 F0516：ncclTopoGetSystem
  * 用途与位置：读入可选拓扑文件并补齐当前 rank 所见 GPU/NIC 的自动发现信息，再生成硬件图。
@@ -1381,6 +2049,37 @@ ncclResult_t ncclTopoGetSystem(struct ncclComm* comm, struct ncclTopoSystem** sy
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0517：ncclTopoGetLocalNet
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int g;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoRankToIndex(system, rank, &g));；失败时可能提前return，成功才继续；把硬件 id 或通信 rank 查找为给定节点类型数组下标，查不到时返回错误。
+ * 3. 准备局部状态：int minType = PATH_SYS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：float maxWidth = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：int count = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int* nets;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&nets, system->nodes[NET].count));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 8. 循环：初始 int n=0;；继续条件 n<system->nodes[NET].count；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   9. 准备局部状态：struct ncclTopoLinkList* path = system->nodes[NET].nodes[n].paths[GPU]+g;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   10. 条件判断：(path->width > maxWidth || (path->width == maxWidth && path->type < minType))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     11. 真分支：；仅条件为真执行以下子项。
+ *       12. 调用 / 计算 / 写入：maxWidth = path->width;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       13. 调用 / 计算 / 写入：minType = path->type;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       14. 调用 / 计算 / 写入：count = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   15. 条件判断：(path->width == maxWidth && path->type == minType)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     16. 真分支：；仅条件为真执行以下子项。
+ *       17. 调用 / 计算 / 写入：nets[count++] = system->nodes[NET].nodes[n].id;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 19. 条件判断：(count == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 调用 / 计算 / 写入：*id = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     22. 调用 / 计算 / 写入：free(nets);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     23. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 24. 准备局部状态：int rr = system->nodes[GPU].nodes[g].gpu.dev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 25. 调用 / 计算 / 写入：*id = nets[rr%count];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 26. 调用 / 计算 / 写入：free(nets);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 27. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0517
+ */
 /* 中文逐项-函数 F0517：ncclTopoGetLocalNet
  * 用途与位置：按 GPU 到 NIC 路径的距离/带宽等条件找出合适本地网络设备。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -1457,6 +2156,14 @@ ncclResult_t ncclTopoGetLocalNet(struct ncclTopoSystem* system, int rank, int* i
 /* External query functions */
 /****************************/
 
+/* 中文内部逻辑 F0518：ncclTopoCpuType
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*arch = system->nodes[CPU].nodes[0].cpu.arch;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：*vendor = system->nodes[CPU].nodes[0].cpu.vendor;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：*model = system->nodes[CPU].nodes[0].cpu.model;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0518
+ */
 /* 中文逐项-函数 F0518：ncclTopoCpuType
  * 用途与位置：从硬件图读取 CPU 架构、厂商和型号，供容量建模和策略选择。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -1481,6 +2188,53 @@ ncclResult_t ncclTopoCpuType(struct ncclTopoSystem* system, int* arch, int* vend
  */
 NCCL_PARAM(IgnoreCpuAffinity, "IGNORE_CPU_AFFINITY", 0);
 
+/* 中文内部逻辑 F0519：ncclTopoGetCpuAffinity
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclTopoNode* cpu = NULL, *gpu = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 int g=0;；继续条件 g<system->nodes[GPU].count；每轮更新 g++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(system->nodes[GPU].nodes[g].gpu.rank == rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：gpu = system->nodes[GPU].nodes+g;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 准备局部状态：int cpuIndex = -1, minHops = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       7. 循环：初始 int c=0;；继续条件 c<system->nodes[CPU].count；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         8. 准备局部状态：int nHops = system->nodes[GPU].nodes[g].paths[CPU][c].count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         9. 条件判断：(cpuIndex == -1 || nHops < minHops)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           10. 真分支：；仅条件为真执行以下子项。
+ *             11. 调用 / 计算 / 写入：cpuIndex = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             12. 调用 / 计算 / 写入：minHops = nHops;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       14. 调用 / 计算 / 写入：cpu = system->nodes[CPU].nodes+cpuIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 16. 条件判断：(cpu == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   17. 真分支：；仅条件为真执行以下子项。
+ *     18. 调用 / 计算 / 写入：WARN("Set CPU affinity : unable to find GPU/CPU for rank %d", rank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     19. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 20. 准备局部状态：cpu_set_t mask;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 21. 调用 / 计算 / 写入：SYSCHECK(sched_getaffinity(0, sizeof(cpu_set_t), &mask), "sched_getaffinity");；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 22. 编译期分支/指令：#ifdef ENABLE_TRACE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   23. 准备局部状态：char affinityStr[sizeof(cpu_set_t)*2];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   24. 调用 / 计算 / 写入：NCCLCHECK(ncclCpusetToStr(&mask, affinityStr));；失败时可能提前return，成功才继续；把 cpu_set_t 格式化成十六进制文本，方便导出/诊断拓扑 CPU affinity。
+ *   25. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "Current affinity for GPU %d is %s", gpu->gpu.dev, affinityStr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 26. 准备局部状态：cpu_set_t cpuMask = cpu->cpu.affinity;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 27. 编译期分支/指令：#ifdef ENABLE_TRACE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   28. 准备局部状态：char affinityStr[sizeof(cpu_set_t)*2];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   29. 调用 / 计算 / 写入：NCCLCHECK(ncclCpusetToStr(&cpuMask, affinityStr));；失败时可能提前return，成功才继续；把 cpu_set_t 格式化成十六进制文本，方便导出/诊断拓扑 CPU affinity。
+ *   30. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "CPU GPU affinity for GPU %d is %s", gpu->gpu.dev, affinityStr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 31. 准备局部状态：cpu_set_t finalMask;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 32. 条件判断：(ncclParamIgnoreCpuAffinity())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   33. 真分支：；仅条件为真执行以下子项。
+ *     34. 调用 / 计算 / 写入：finalMask = cpuMask;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   35. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     36. 调用 / 计算 / 写入：CPU_AND(&finalMask, &mask, &cpuMask);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 37. 调用 / 计算 / 写入：memcpy(affinity, &finalMask, sizeof(cpu_set_t));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 38. 条件判断：(CPU_COUNT(&finalMask))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   39. 真分支：；仅条件为真执行以下子项。
+ *     40. 准备局部状态：char affinityStr[sizeof(cpu_set_t)*2];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     41. 调用 / 计算 / 写入：NCCLCHECK(ncclCpusetToStr(&finalMask, affinityStr));；失败时可能提前return，成功才继续；把 cpu_set_t 格式化成十六进制文本，方便导出/诊断拓扑 CPU affinity。
+ *     42. 调用 / 计算 / 写入：INFO(NCCL_INIT, "Setting affinity for GPU %d to %s", gpu->gpu.dev, affinityStr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 43. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0519
+ */
 /* 中文逐项-函数 F0519：ncclTopoGetCpuAffinity
  * 用途与位置：结合 GPU 的近端 CPU/NUMA 亲和范围与当前进程约束，生成线程亲和性掩码。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -1605,6 +2359,12 @@ ncclResult_t ncclTopoGetCpuAffinity(struct ncclTopoSystem* system, int rank, cpu
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0520：ncclTopoGetNetCount
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*count = system->nodes[NET].count;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0520
+ */
 /* 中文逐项-函数 F0520：ncclTopoGetNetCount
  * 用途与位置：返回当前裁剪后硬件图中的 NET 设备数量，用于判断是否存在网络路径。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -1618,6 +2378,26 @@ ncclResult_t ncclTopoGetNetCount(struct ncclTopoSystem* system, int* count) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0521：ncclTopoGetCompCap
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(system->nodes[GPU].count == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：int min, max;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：min = max = system->nodes[GPU].nodes[0].gpu.cudaCompCap;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 循环：初始 int g=1;；继续条件 g<system->nodes[GPU].count；每轮更新 g++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 调用 / 计算 / 写入：min = std::min(min, system->nodes[GPU].nodes[g].gpu.cudaCompCap);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   8. 调用 / 计算 / 写入：max = std::max(max, system->nodes[GPU].nodes[g].gpu.cudaCompCap);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 10. 条件判断：(ccMin)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：*ccMin = min;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 条件判断：(ccMax)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 调用 / 计算 / 写入：*ccMax = max;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0521
+ */
 /* 中文逐项-函数 F0521：ncclTopoGetCompCap
  * 用途与位置：遍历 GPU 得到计算能力的最小/最大值，使协议与调优模型兼容参与设备。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -1651,6 +2431,18 @@ ncclResult_t ncclTopoGetCompCap(struct ncclTopoSystem* system, int* ccMin, int* 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0522：ncclTopoGetLocalRank
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int g=0;；继续条件 g<system->nodes[GPU].count；每轮更新 g++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 条件判断：(system->nodes[GPU].nodes[g].gpu.rank == rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     3. 真分支：；仅条件为真执行以下子项。
+ *       4. 调用 / 计算 / 写入：*localRank = g;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 7. 调用 / 计算 / 写入：WARN("Could not find local GPU with rank %d\n", rank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__graph__topo_cc.md#f0522
+ */
 /* 中文逐项-函数 F0522：ncclTopoGetLocalRank
  * 用途与位置：把全局用户 rank 映射到当前硬件系统内的 GPU 下标/局部位置。
  * 参数 system（struct ncclTopoSystem* system）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。

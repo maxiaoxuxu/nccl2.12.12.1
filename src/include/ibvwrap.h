@@ -3667,6 +3667,11 @@ struct verbs_context {
 	if (vctx && (vctx->sz >= sizeof(*vctx) - offsetof(struct verbs_context, op))) \
 		vctx->op = ptr; })
 
+/* 中文内部逻辑 F0655：verbs_get_device
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (dev->ops.alloc_context) ? NULL : container_of(dev, struct verbs_device, device);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__ibvwrap_h.md#f0655
+ */
 /* 中文逐项-函数 F0655：verbs_get_device
  * 用途与位置：从上下文得到 verbs 扩展设备对象，支持按 ABI 能力寻找正确的操作函数。
  * 参数 dev（struct ibv_device *dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -3806,6 +3811,17 @@ ncclResult_t wrap_ibv_create_cq(struct ibv_cq **ret, struct ibv_context *context
  * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t wrap_ibv_destroy_cq(struct ibv_cq *cq);
  */
 ncclResult_t wrap_ibv_destroy_cq(struct ibv_cq *cq);
+/* 中文内部逻辑 F0656：wrap_ibv_poll_cq
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int done = cq->context->ops.poll_cq(cq, num_entries, wc);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 2. 条件判断：(done < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("Call to ibv_poll_cq() returned %d", done);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     5. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 调用 / 计算 / 写入：*num_done = done;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__ibvwrap_h.md#f0656
+ */
 /* 中文逐项-函数 F0656：wrap_ibv_poll_cq
  * 用途与位置：从 CQ 轮询完成项并统一错误处理，返回数量可为零而不代表失败。
  * 参数 cq（struct ibv_cq *cq）：完成队列或 QP 绑定的发送/接收 CQ，保存硬件工作完成项。
@@ -3847,6 +3863,11 @@ ncclResult_t wrap_ibv_modify_qp(struct ibv_qp *qp, struct ibv_qp_attr *attr, int
  * 此处是声明，真正实现/使用调用链在函数定义与函数表处；原始签名：ncclResult_t wrap_ibv_destroy_qp(struct ibv_qp *qp);
  */
 ncclResult_t wrap_ibv_destroy_qp(struct ibv_qp *qp);
+/* 中文内部逻辑 F0657：ibv_post_send
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return qp->context->ops.post_send(qp, wr, bad_wr);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__ibvwrap_h.md#f0657
+ */
 /* 中文逐项-函数 F0657：ibv_post_send
  * 用途与位置：通过 QP 的 provider 操作表提交发送工作请求链，立即返回仅表示提交，不代表载荷完成。
  * 参数 qp（struct ibv_qp *qp）：单个或多个 verbs 队列对，承载实际数据/控制请求，区别于 NCCL 逻辑channel。
@@ -3860,6 +3881,16 @@ static inline int ibv_post_send(struct ibv_qp *qp, struct ibv_send_wr *wr, struc
   return qp->context->ops.post_send(qp, wr, bad_wr);
 }
 
+/* 中文内部逻辑 F0658：wrap_ibv_post_send
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int ret = qp->context->ops.post_send(qp, wr, bad_wr);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(ret != IBV_SUCCESS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("ibv_post_send() failed with error %s, Bad WR %p, First WR %p", strerror(ret), wr, *bad_wr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__ibvwrap_h.md#f0658
+ */
 /* 中文逐项-函数 F0658：wrap_ibv_post_send
  * 用途与位置：通过 QP 的 provider 操作表提交发送工作请求链，立即返回仅表示提交，不代表载荷完成。
  * 参数 qp（struct ibv_qp *qp）：单个或多个 verbs 队列对，承载实际数据/控制请求，区别于 NCCL 逻辑channel。
@@ -3883,6 +3914,16 @@ static inline ncclResult_t wrap_ibv_post_send(struct ibv_qp *qp, struct ibv_send
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0659：wrap_ibv_post_recv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int ret = qp->context->ops.post_recv(qp, wr, bad_wr);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(ret != IBV_SUCCESS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("ibv_post_recv() failed with error %s", strerror(ret));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__ibvwrap_h.md#f0659
+ */
 /* 中文逐项-函数 F0659：wrap_ibv_post_recv
  * 用途与位置：向指定 QP 的接收队列投递 WQE，用于 IB 接收通知；该接口不自动变成 SRQ。
  * 参数 qp（struct ibv_qp *qp）：单个或多个 verbs 队列对，承载实际数据/控制请求，区别于 NCCL 逻辑channel。

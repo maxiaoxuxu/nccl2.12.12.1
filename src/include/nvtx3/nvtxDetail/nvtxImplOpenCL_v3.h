@@ -30,7 +30,16 @@ typedef void (NVTX_API * nvtxNameClProgramW_impl_fntype)(cl_program program, con
 typedef void (NVTX_API * nvtxNameClEventA_impl_fntype)(cl_event evnt, const char* name);
 typedef void (NVTX_API * nvtxNameClEventW_impl_fntype)(cl_event evnt, const wchar_t* name);
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0722：nvtxNameClDeviceA
+NVTX_DECLSPEC /* 中文内部逻辑 F0722：nvtxNameClDeviceA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClDeviceA_impl_fntype local = (nvtxNameClDeviceA_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClDeviceA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(device, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0722
+ */
+/* 中文逐项-函数 F0722：nvtxNameClDeviceA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 device（cl_device_id device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -51,7 +60,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0722：nvtxNameClDeviceA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0723：nvtxNameClDeviceW
+NVTX_DECLSPEC /* 中文内部逻辑 F0723：nvtxNameClDeviceW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClDeviceW_impl_fntype local = (nvtxNameClDeviceW_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClDeviceW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(device, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0723
+ */
+/* 中文逐项-函数 F0723：nvtxNameClDeviceW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 device（cl_device_id device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -72,7 +90,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0723：nvtxNameClDeviceW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0724：nvtxNameClContextA
+NVTX_DECLSPEC /* 中文内部逻辑 F0724：nvtxNameClContextA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClContextA_impl_fntype local = (nvtxNameClContextA_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClContextA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(context, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0724
+ */
+/* 中文逐项-函数 F0724：nvtxNameClContextA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 context（cl_context context）：verbs/CUDA/回调的运行上下文句柄，具体对象由声明类型决定，不是用户张量指针。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -93,7 +120,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0724：nvtxNameClContextA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0725：nvtxNameClContextW
+NVTX_DECLSPEC /* 中文内部逻辑 F0725：nvtxNameClContextW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClContextW_impl_fntype local = (nvtxNameClContextW_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClContextW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(context, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0725
+ */
+/* 中文逐项-函数 F0725：nvtxNameClContextW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 context（cl_context context）：verbs/CUDA/回调的运行上下文句柄，具体对象由声明类型决定，不是用户张量指针。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -114,7 +150,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0725：nvtxNameClContextW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0726：nvtxNameClCommandQueueA
+NVTX_DECLSPEC /* 中文内部逻辑 F0726：nvtxNameClCommandQueueA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClCommandQueueA_impl_fntype local = (nvtxNameClCommandQueueA_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClCommandQueueA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(command_queue, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0726
+ */
+/* 中文逐项-函数 F0726：nvtxNameClCommandQueueA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 command_queue（cl_command_queue command_queue）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -135,7 +180,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0726：nvtxNameClCommandQueueA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0727：nvtxNameClCommandQueueW
+NVTX_DECLSPEC /* 中文内部逻辑 F0727：nvtxNameClCommandQueueW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClCommandQueueW_impl_fntype local = (nvtxNameClCommandQueueW_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClCommandQueueW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(command_queue, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0727
+ */
+/* 中文逐项-函数 F0727：nvtxNameClCommandQueueW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 command_queue（cl_command_queue command_queue）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -156,7 +210,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0727：nvtxNameClCommandQueueW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0728：nvtxNameClMemObjectA
+NVTX_DECLSPEC /* 中文内部逻辑 F0728：nvtxNameClMemObjectA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClMemObjectA_impl_fntype local = (nvtxNameClMemObjectA_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClMemObjectA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(memobj, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0728
+ */
+/* 中文逐项-函数 F0728：nvtxNameClMemObjectA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 memobj（cl_mem memobj）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -177,7 +240,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0728：nvtxNameClMemObjectA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0729：nvtxNameClMemObjectW
+NVTX_DECLSPEC /* 中文内部逻辑 F0729：nvtxNameClMemObjectW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClMemObjectW_impl_fntype local = (nvtxNameClMemObjectW_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClMemObjectW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(memobj, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0729
+ */
+/* 中文逐项-函数 F0729：nvtxNameClMemObjectW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 memobj（cl_mem memobj）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -198,7 +270,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0729：nvtxNameClMemObjectW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0730：nvtxNameClSamplerA
+NVTX_DECLSPEC /* 中文内部逻辑 F0730：nvtxNameClSamplerA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClSamplerA_impl_fntype local = (nvtxNameClSamplerA_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClSamplerA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(sampler, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0730
+ */
+/* 中文逐项-函数 F0730：nvtxNameClSamplerA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 sampler（cl_sampler sampler）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -219,7 +300,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0730：nvtxNameClSamplerA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0731：nvtxNameClSamplerW
+NVTX_DECLSPEC /* 中文内部逻辑 F0731：nvtxNameClSamplerW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClSamplerW_impl_fntype local = (nvtxNameClSamplerW_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClSamplerW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(sampler, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0731
+ */
+/* 中文逐项-函数 F0731：nvtxNameClSamplerW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 sampler（cl_sampler sampler）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -240,7 +330,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0731：nvtxNameClSamplerW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0732：nvtxNameClProgramA
+NVTX_DECLSPEC /* 中文内部逻辑 F0732：nvtxNameClProgramA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClProgramA_impl_fntype local = (nvtxNameClProgramA_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClProgramA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(program, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0732
+ */
+/* 中文逐项-函数 F0732：nvtxNameClProgramA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 program（cl_program program）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -261,7 +360,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0732：nvtxNameClProgramA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0733：nvtxNameClProgramW
+NVTX_DECLSPEC /* 中文内部逻辑 F0733：nvtxNameClProgramW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClProgramW_impl_fntype local = (nvtxNameClProgramW_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClProgramW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(program, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0733
+ */
+/* 中文逐项-函数 F0733：nvtxNameClProgramW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 program（cl_program program）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -282,7 +390,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0733：nvtxNameClProgramW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0734：nvtxNameClEventA
+NVTX_DECLSPEC /* 中文内部逻辑 F0734：nvtxNameClEventA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClEventA_impl_fntype local = (nvtxNameClEventA_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClEventA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(evnt, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0734
+ */
+/* 中文逐项-函数 F0734：nvtxNameClEventA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 evnt（cl_event evnt）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -303,7 +420,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0734：nvtxNameClEventA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0735：nvtxNameClEventW
+NVTX_DECLSPEC /* 中文内部逻辑 F0735：nvtxNameClEventW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameClEventW_impl_fntype local = (nvtxNameClEventW_impl_fntype)NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameClEventW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(evnt, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md#f0735
+ */
+/* 中文逐项-函数 F0735：nvtxNameClEventW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 evnt（cl_event evnt）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。

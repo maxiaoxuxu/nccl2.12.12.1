@@ -137,3 +137,7 @@
 | [src/transport/p2p.cc](../../src/transport/p2p.cc) | 12 | 4 | 53 |
 | [src/transport/shm.cc](../../src/transport/shm.cc) | 7 | 3 | 35 |
 | [src/transport.cc](../../src/transport.cc) | 7 | 2 | 75 |
+
+## V3图解与函数内部步骤
+
+[数据分片、原语与不同通信方式的详细图解](visual-guide.md) · [全部函数内部步骤](function-logic-index.md) · [离线函数搜索](function-logic.html)。完整内部步骤也在各函数前的“中文内部逻辑”注释中。

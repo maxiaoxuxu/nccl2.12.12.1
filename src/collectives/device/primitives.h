@@ -58,7 +58,12 @@ struct ProtoSimple {
   static constexpr int Unroll = Unroll_1;
 
   // Data bytes (no flags etc) in one step of the fifo queue.
-  __device__ /* 中文逐项-函数 F0136：calcBytePerStep
+  __device__ /* 中文内部逻辑 F0136：calcBytePerStep
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclShmem.comm.buffSizes[NCCL_PROTO_SIMPLE]/NCCL_STEPS;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0136
+ */
+/* 中文逐项-函数 F0136：calcBytePerStep
  * 用途与位置：计算该协议一个 FIFO step 中的有效载荷字节数，LL/LL128 扣除行内 flag 开销。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_gather.h::runRing；src/collectives/device/all_reduce.h::runRing；src/collectives/device/all_reduce.h::runTreeUpDown；src/collectives/device/all_reduce.h::runTreeSplit；src/collectives/device/broadcast.h::runRing；src/collectives/device/reduce.h::runRing；src/collectives/device/reduce_scatter.h::runRing。
@@ -68,7 +73,12 @@ struct ProtoSimple {
     return ncclShmem.comm.buffSizes[NCCL_PROTO_SIMPLE]/NCCL_STEPS;
   }
   // Granularity of data bytes transferred per thread.
-  __device__ /* 中文逐项-函数 F0137：calcBytePerGrain
+  __device__ /* 中文内部逻辑 F0137：calcBytePerGrain
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return sizeof(uint64_t);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0137
+ */
+/* 中文逐项-函数 F0137：calcBytePerGrain
  * 用途与位置：给出该协议按线程划分数据时的有效字节粒度，用于确定对齐和最小 chunk。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_gather.h::runRing；src/collectives/device/all_reduce.h::runRing；src/collectives/device/all_reduce.h::runTreeUpDown；src/collectives/device/all_reduce.h::runTreeSplit；src/collectives/device/broadcast.h::runRing；src/collectives/device/reduce.h::runRing；src/collectives/device/reduce_scatter.h::runRing。
@@ -82,7 +92,12 @@ struct ProtoSimple {
  * MaxGroupWidth（int；成员 ProtoSimple）：该协议一个原语组占用的最大命名同步组宽度，防止并行收发组屏障冲突。
  */
   static constexpr int MaxGroupWidth = 2;
-  __device__ /* 中文逐项-函数 F0138：calcGroupWidth
+  __device__ /* 中文内部逻辑 F0138：calcGroupWidth
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return send && nthreads-WARP_SIZE >= 64 ? 2 : 1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0138
+ */
+/* 中文逐项-函数 F0138：calcGroupWidth
  * 用途与位置：返回该协议线程组需要占用的 group/barrier 编号宽度，Simple 同步 warp 可能需要更宽分组。
  * 参数 send（bool send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
  * 参数 nthreads（int nthreads）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
@@ -105,7 +120,12 @@ struct ProtoLL {
   static constexpr int Id = NCCL_PROTO_LL;
 
   // Data bytes (no flags etc) in one step of the fifo queue.
-  __device__ /* 中文逐项-函数 F0139：calcBytePerStep
+  __device__ /* 中文内部逻辑 F0139：calcBytePerStep
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclShmem.comm.buffSizes[NCCL_PROTO_LL]/NCCL_STEPS/2;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0139
+ */
+/* 中文逐项-函数 F0139：calcBytePerStep
  * 用途与位置：计算该协议一个 FIFO step 中的有效载荷字节数，LL/LL128 扣除行内 flag 开销。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_gather.h::runRing；src/collectives/device/all_reduce.h::runRing；src/collectives/device/all_reduce.h::runTreeUpDown；src/collectives/device/all_reduce.h::runTreeSplit；src/collectives/device/broadcast.h::runRing；src/collectives/device/reduce.h::runRing；src/collectives/device/reduce_scatter.h::runRing。
@@ -115,7 +135,12 @@ struct ProtoLL {
     return ncclShmem.comm.buffSizes[NCCL_PROTO_LL]/NCCL_STEPS/2; // Half is data
   }
   // Granularity of data bytes transferred per thread.
-  __device__ /* 中文逐项-函数 F0140：calcBytePerGrain
+  __device__ /* 中文内部逻辑 F0140：calcBytePerGrain
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return sizeof(uint64_t);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0140
+ */
+/* 中文逐项-函数 F0140：calcBytePerGrain
  * 用途与位置：给出该协议按线程划分数据时的有效字节粒度，用于确定对齐和最小 chunk。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_gather.h::runRing；src/collectives/device/all_reduce.h::runRing；src/collectives/device/all_reduce.h::runTreeUpDown；src/collectives/device/all_reduce.h::runTreeSplit；src/collectives/device/broadcast.h::runRing；src/collectives/device/reduce.h::runRing；src/collectives/device/reduce_scatter.h::runRing。
@@ -129,7 +154,12 @@ struct ProtoLL {
  * MaxGroupWidth（int；成员 ProtoLL）：该协议一个原语组占用的最大命名同步组宽度，防止并行收发组屏障冲突。
  */
   static constexpr int MaxGroupWidth = 1;
-  __device__ /* 中文逐项-函数 F0141：calcGroupWidth
+  __device__ /* 中文内部逻辑 F0141：calcGroupWidth
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return 1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0141
+ */
+/* 中文逐项-函数 F0141：calcGroupWidth
  * 用途与位置：返回该协议线程组需要占用的 group/barrier 编号宽度，Simple 同步 warp 可能需要更宽分组。
  * 参数 send（bool send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
  * 参数 nthreads（int nthreads）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
@@ -152,7 +182,12 @@ struct ProtoLL128 {
   static constexpr int Id = NCCL_PROTO_LL128;
 
   // Data bytes (no flags etc) in one step of the fifo queue.
-  __device__ /* 中文逐项-函数 F0142：calcBytePerStep
+  __device__ /* 中文内部逻辑 F0142：calcBytePerStep
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (ncclShmem.comm.buffSizes[NCCL_PROTO_LL128]/NCCL_STEPS)*NCCL_LL128_DATAELEMS/NCCL_LL128_LINEELEMS;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0142
+ */
+/* 中文逐项-函数 F0142：calcBytePerStep
  * 用途与位置：计算该协议一个 FIFO step 中的有效载荷字节数，LL/LL128 扣除行内 flag 开销。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_gather.h::runRing；src/collectives/device/all_reduce.h::runRing；src/collectives/device/all_reduce.h::runTreeUpDown；src/collectives/device/all_reduce.h::runTreeSplit；src/collectives/device/broadcast.h::runRing；src/collectives/device/reduce.h::runRing；src/collectives/device/reduce_scatter.h::runRing。
@@ -163,7 +198,12 @@ struct ProtoLL128 {
     return (ncclShmem.comm.buffSizes[NCCL_PROTO_LL128]/NCCL_STEPS)*NCCL_LL128_DATAELEMS/NCCL_LL128_LINEELEMS;
   }
   // Granularity of data bytes transferred per thread.
-  __device__ /* 中文逐项-函数 F0143：calcBytePerGrain
+  __device__ /* 中文内部逻辑 F0143：calcBytePerGrain
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return NCCL_LL128_SHMEM_ELEMS_PER_THREAD*NCCL_LL128_DATAELEMS*sizeof(uint64_t)/NCCL_LL128_LINEELEMS;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0143
+ */
+/* 中文逐项-函数 F0143：calcBytePerGrain
  * 用途与位置：给出该协议按线程划分数据时的有效字节粒度，用于确定对齐和最小 chunk。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/all_gather.h::runRing；src/collectives/device/all_reduce.h::runRing；src/collectives/device/all_reduce.h::runTreeUpDown；src/collectives/device/all_reduce.h::runTreeSplit；src/collectives/device/broadcast.h::runRing；src/collectives/device/reduce.h::runRing；src/collectives/device/reduce_scatter.h::runRing。
@@ -178,7 +218,12 @@ struct ProtoLL128 {
  * MaxGroupWidth（int；成员 ProtoLL128）：该协议一个原语组占用的最大命名同步组宽度，防止并行收发组屏障冲突。
  */
   static constexpr int MaxGroupWidth = 1;
-  __device__ /* 中文逐项-函数 F0144：calcGroupWidth
+  __device__ /* 中文内部逻辑 F0144：calcGroupWidth
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return 1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0144
+ */
+/* 中文逐项-函数 F0144：calcGroupWidth
  * 用途与位置：返回该协议线程组需要占用的 group/barrier 编号宽度，Simple 同步 warp 可能需要更宽分组。
  * 参数 send（bool send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
  * 参数 nthreads（int nthreads）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
@@ -219,7 +264,11 @@ struct FanAsymmetric {
  */
   int nr, ns;
   FanAsymmetric() = default;
-  __device__ /* 中文逐项-函数 F0145：FanAsymmetric
+  __device__ /* 中文内部逻辑 F0145：FanAsymmetric
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0145
+ */
+/* 中文逐项-函数 F0145：FanAsymmetric
  * 用途与位置：构造当前原语的有效接收/发送邻居数量；对称版本要求收发数相同以节省状态。
  * 参数 nrecv（int nrecv）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 nsend（int nsend）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -228,14 +277,24 @@ struct FanAsymmetric {
  */FanAsymmetric(int nrecv, int nsend): nr(nrecv), ns(nsend) {
     // assert(nrecv <= MaxRecv && nsend <= MaxSend);
   }
-  __device__ /* 中文逐项-函数 F0146：nrecv
+  __device__ /* 中文内部逻辑 F0146：nrecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return MaxRecv ? nr : 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0146
+ */
+/* 中文逐项-函数 F0146：nrecv
  * 用途与位置：返回本原语实际有效邻居数；编译期最大邻居度为零时直接返回零，便于消除无用分支。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  * 源码返回表达式：return MaxRecv ? nr : 0;。CHECK类宏还可能提前返回/跳转。
  */int nrecv() const { return MaxRecv ? nr : 0; }
-  __device__ /* 中文逐项-函数 F0147：nsend
+  __device__ /* 中文内部逻辑 F0147：nsend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return MaxSend ? ns : 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0147
+ */
+/* 中文逐项-函数 F0147：nsend
  * 用途与位置：返回本原语实际有效邻居数；编译期最大邻居度为零时直接返回零，便于消除无用分支。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -260,7 +319,11 @@ struct FanSymmetric {
  */
   int n;
   FanSymmetric() = default;
-  __device__ /* 中文逐项-函数 F0148：FanSymmetric
+  __device__ /* 中文内部逻辑 F0148：FanSymmetric
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0148
+ */
+/* 中文逐项-函数 F0148：FanSymmetric
  * 用途与位置：构造当前原语的有效接收/发送邻居数量；对称版本要求收发数相同以节省状态。
  * 参数 nrecv（int nrecv）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 nsend（int nsend）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -269,14 +332,24 @@ struct FanSymmetric {
  */FanSymmetric(int nrecv, int nsend): n(nrecv) {
     // assert(nrecv == nsend && nrecv <= MaxArity);
   }
-  __device__ /* 中文逐项-函数 F0149：nrecv
+  __device__ /* 中文内部逻辑 F0149：nrecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return n;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0149
+ */
+/* 中文逐项-函数 F0149：nrecv
  * 用途与位置：返回本原语实际有效邻居数；编译期最大邻居度为零时直接返回零，便于消除无用分支。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  * 源码返回表达式：return n;。CHECK类宏还可能提前返回/跳转。
  */int nrecv() const { return n; }
-  __device__ /* 中文逐项-函数 F0150：nsend
+  __device__ /* 中文内部逻辑 F0150：nsend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return n;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0150
+ */
+/* 中文逐项-函数 F0150：nsend
  * 用途与位置：返回本原语实际有效邻居数；编译期最大邻居度为零时直接返回零，便于消除无用分支。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -301,7 +374,12 @@ template<typename RealPrimitives>
  * 所以 direct、GPU P2P、GDR 和 GPU 发起网络操作不能仅凭函数名字画等号。
  */
 struct PrimitivesWithoutDirect {
-  __device__ /* 中文逐项-函数 F0151：directSend
+  __device__ /* 中文内部逻辑 F0151：directSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：static_cast<RealPrimitives*>(this)->send(inpIx, eltN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0151
+ */
+/* 中文逐项-函数 F0151：directSend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteOutIx（intptr_t remoteOutIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -311,7 +389,12 @@ struct PrimitivesWithoutDirect {
  */void directSend(intptr_t inpIx, intptr_t remoteOutIx, int eltN) {
     static_cast<RealPrimitives*>(this)->send(inpIx, eltN);
   }
-  __device__ /* 中文逐项-函数 F0152：directSendFromOutput
+  __device__ /* 中文内部逻辑 F0152：directSendFromOutput
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：static_cast<RealPrimitives*>(this)->sendFromOutput(outIx, eltN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0152
+ */
+/* 中文逐项-函数 F0152：directSendFromOutput
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteOutIx（intptr_t remoteOutIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -321,7 +404,12 @@ struct PrimitivesWithoutDirect {
  */void directSendFromOutput(intptr_t outIx, intptr_t remoteOutIx, int eltN) {
     static_cast<RealPrimitives*>(this)->sendFromOutput(outIx, eltN);
   }
-  __device__ /* 中文逐项-函数 F0153：directRecv
+  __device__ /* 中文内部逻辑 F0153：directRecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：static_cast<RealPrimitives*>(this)->recv(outIx, eltN, false);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0153
+ */
+/* 中文逐项-函数 F0153：directRecv
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 eltN（int eltN）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
@@ -330,7 +418,12 @@ struct PrimitivesWithoutDirect {
  */void directRecv(intptr_t outIx, int eltN) {
     static_cast<RealPrimitives*>(this)->recv(outIx, eltN, /*postOp=*/false);
   }
-  __device__ /* 中文逐项-函数 F0154：directCopySend
+  __device__ /* 中文内部逻辑 F0154：directCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：static_cast<RealPrimitives*>(this)->copySend(inpIx, outIx, eltN, postOp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0154
+ */
+/* 中文逐项-函数 F0154：directCopySend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -342,7 +435,12 @@ struct PrimitivesWithoutDirect {
  */void directCopySend(intptr_t inpIx, intptr_t outIx, intptr_t remoteOutIx, int eltN, bool postOp=false) {
     static_cast<RealPrimitives*>(this)->copySend(inpIx, outIx, eltN, postOp);
   }
-  __device__ /* 中文逐项-函数 F0155：directRecvCopySend
+  __device__ /* 中文内部逻辑 F0155：directRecvCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：static_cast<RealPrimitives*>(this)->recvCopySend(outIx, eltN, false);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0155
+ */
+/* 中文逐项-函数 F0155：directRecvCopySend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteOutIx（intptr_t remoteOutIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -352,7 +450,12 @@ struct PrimitivesWithoutDirect {
  */void directRecvCopySend(intptr_t outIx, intptr_t remoteOutIx, int eltN) {
     static_cast<RealPrimitives*>(this)->recvCopySend(outIx, eltN, /*postOp=*/false);
   }
-  __device__ /* 中文逐项-函数 F0156：directRecvReduceCopySend
+  __device__ /* 中文内部逻辑 F0156：directRecvReduceCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：static_cast<RealPrimitives*>(this)->recvReduceCopySend(inpIx, outIx, eltN, postOp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__primitives_h.md#f0156
+ */
+/* 中文逐项-函数 F0156：directRecvReduceCopySend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。

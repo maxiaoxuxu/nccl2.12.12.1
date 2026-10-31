@@ -17,6 +17,11 @@
  * volatile 和 memory clobber 影响编译器访存处理；跨线程/跨设备发布仍需上层屏障和 fence。
  * 向量 load/store 的宽度不意味着对所有观察者具有整段 16B 原子性。
  */
+/* 中文内部逻辑 F0130：load128
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：asm volatile("ld.volatile.global.v2.u64 {%0,%1}, [%2];" : "=l"(v0), "=l"(v1) : "l"(ptr));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__op128_h.md#f0130
+ */
 /* 中文逐项-函数 F0130：load128
  * 用途与位置：一次加载两个 64 位寄存器组成的 16 字节数据包，用于向量化搬运。
  * 参数 ptr（const uint64_t* ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -30,6 +35,11 @@ inline __device__ void load128(const uint64_t* ptr, uint64_t &v0, uint64_t &v1) 
       : "=l"(v0), "=l"(v1) : "l"(ptr));
 }
 
+/* 中文内部逻辑 F0131：store128
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：asm volatile("st.volatile.global.v2.u64 [%2], {%0,%1};" :: "l"(v0), "l"(v1), "l"(ptr));；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__op128_h.md#f0131
+ */
 /* 中文逐项-函数 F0131：store128
  * 用途与位置：把两个 64 位寄存器组成的 16 字节包写到全局目标，减少标量访存指令数量。
  * 参数 ptr（uint64_t* ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -43,6 +53,13 @@ inline __device__ void store128(uint64_t* ptr, uint64_t v0, uint64_t v1) {
       :: "l"(v0), "l"(v1), "l"(ptr));
 }
 
+/* 中文内部逻辑 F0132：shmemCvtPtr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：uint64_t* shmemAsmPtr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：asm volatile("cvta.to.shared.u64 %0, %1;" : "=l"(shmemAsmPtr) : "l"(shmemGenericPtr));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 函数返回：return shmemAsmPtr;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__op128_h.md#f0132
+ */
 /* 中文逐项-函数 F0132：shmemCvtPtr
  * 用途与位置：把 CUDA 通用指针转换为 PTX shared 地址空间指针，供共享内存汇编指令使用。
  * 参数 shmemGenericPtr（volatile uint64_t* shmemGenericPtr）：对应数据或控制字段的缓存地址，先确认主机/设备地址空间，再看后续读写位置。
@@ -61,6 +78,11 @@ inline __device__ uint64_t* shmemCvtPtr(volatile uint64_t* shmemGenericPtr) {
   return shmemAsmPtr;
 }
 
+/* 中文内部逻辑 F0133：loadShmem128
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：asm volatile("ld.volatile.shared.v2.u64 {%0,%1}, [%2];" : "=l"(v0), "=l"(v1) : "l"(shmemAsmPtr));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__op128_h.md#f0133
+ */
 /* 中文逐项-函数 F0133：loadShmem128
  * 用途与位置：从 SM 共享内存读取 16 字节，避免把共享内存地址误交给全局加载指令。
  * 参数 shmemAsmPtr（uint64_t* shmemAsmPtr）：对应数据或控制字段的缓存地址，先确认主机/设备地址空间，再看后续读写位置。
@@ -74,6 +96,11 @@ inline __device__ void loadShmem128(uint64_t* shmemAsmPtr, uint64_t &v0, uint64_
       : "=l"(v0), "=l"(v1) : "l"(shmemAsmPtr));
 }
 
+/* 中文内部逻辑 F0134：storeShmem128
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：asm volatile("st.volatile.shared.v2.u64 [%2], {%0,%1};" :: "l"(v0), "l"(v1), "l"(shmemAsmPtr));；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__op128_h.md#f0134
+ */
 /* 中文逐项-函数 F0134：storeShmem128
  * 用途与位置：向 SM 共享内存写出 16 字节，供同 block 的线程在屏障后消费。
  * 参数 shmemAsmPtr（uint64_t* shmemAsmPtr）：对应数据或控制字段的缓存地址，先确认主机/设备地址空间，再看后续读写位置。
@@ -87,6 +114,35 @@ inline __device__ void storeShmem128(uint64_t* shmemAsmPtr, uint64_t v0, uint64_
       :: "l"(v0), "l"(v1), "l"(shmemAsmPtr));
 }
 
+/* 中文内部逻辑 F0135：loadShmemMisaligned128
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 源码语法片段：union { uint32_t tmp4[4]; uint64_t tmp8[2]; }；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 2. 条件判断：(sizeof(T) < 4)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 准备局部状态：uint32_t *ptr4 = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(ptr) & -uintptr_t(4));；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     6. 循环：初始 int e=0;；继续条件 e < 4；每轮更新 e++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       7. 准备局部状态：uint32_t lo, hi;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       8. 调用 / 计算 / 写入：asm("ld.shared.b32 %0,[%1];" : "=r"(lo) : "l"(ptr4+e+0));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       9. 调用 / 计算 / 写入：asm("ld.shared.b32 %0,[%1];" : "=r"(hi) : "l"(ptr4+e+1));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       10. 调用 / 计算 / 写入：tmp4[e] = __funnelshift_r(lo, hi, 8*(int(reinterpret_cast<uintptr_t>(ptr))%4));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   12. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     13. 条件判断：(sizeof(T) == 4)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       14. 真分支：；仅条件为真执行以下子项。
+ *         15. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         16. 循环：初始 int e=0;；继续条件 e < 4；每轮更新 e++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           17. 调用 / 计算 / 写入：asm("ld.shared.b32 %0,[%1];" : "=r"(tmp4[e]) : "l"(ptr+e));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       19. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         20. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         21. 循环：初始 int e=0;；继续条件 e < 2；每轮更新 e++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           22. 调用 / 计算 / 写入：asm("ld.shared.b64 %0,[%1];" : "=l"(tmp8[e]) : "l"(ptr+e));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         23. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 24. 调用 / 计算 / 写入：v0 = tmp8[0];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 25. 调用 / 计算 / 写入：v1 = tmp8[1];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__op128_h.md#f0135
+ */
 /* 中文逐项-函数 F0135：loadShmemMisaligned128
  * 用途与位置：按元素宽度拼接可能不对齐的共享内存数据到两个 64 位寄存器。
  * 参数 ptr（T *ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。

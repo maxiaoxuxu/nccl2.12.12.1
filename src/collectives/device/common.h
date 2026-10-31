@@ -35,7 +35,14 @@
  */
 #define NCCL_MAX_DEV_ARITY (NCCL_MAX_TREE_ARITY-1)  // Using balanced tree instead of split tree
 
-__device__ /* 中文逐项-函数 F0072：barrierReduceAny
+__device__ /* 中文内部逻辑 F0072：barrierReduceAny
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：uint32_t popc;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：asm ("{" ".reg .pred barr_pred;" "setp.eq.u32 barr_pred, %1, 1;" "bar.red.popc.u32 %0, 2, barr_pred;" "}" : "=r"(popc) : "r"(bit));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 函数返回：return popc != 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__common_h.md#f0072
+ */
+/* 中文逐项-函数 F0072：barrierReduceAny
  * 用途与位置：执行 block 线程投票式屏障，检查任一线程是否报告中止，使整个 block 一致退出。
  * 参数 bit（int bit）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/collectives/device/common.h::ncclKernel。
@@ -56,6 +63,27 @@ __device__ /* 中文逐项-函数 F0072：barrierReduceAny
 }
 
 // Copy src to dst and fill extra size with zeroes
+/* 中文内部逻辑 F0073：copyToShmem
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 源码语法片段：static_assert(sizeof(Tdst)%(2*sizeof(uint64_t)) == 0 && sizeof(Tsrc)%(2*sizeof(uint64_t)) == 0, "copyToShmem needs sizes which are multiple of 16B");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 2. 源码语法片段：static_assert(sizeof(Tdst) >= sizeof(Tsrc), "Tdst size is too small");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 3. 源码语法片段：static_assert(sizeof(Tdst) <= WARP_SIZE*2*sizeof(uint64_t), "copyToShmem limited to 512B to make sure it can always be done in one cycle");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 4. 准备局部状态：uint64_t *d = reinterpret_cast<uint64_t*>(dst);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：uint64_t const *s = reinterpret_cast<uint64_t const*>(src);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：uint64_t *shmemPtr = shmemCvtPtr(d);；把 CUDA 通用指针转换为 PTX shared 地址空间指针，供共享内存汇编指令使用。
+ * 7. 准备局部状态：int offset = 2*tid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 准备局部状态：uint64_t v0, v1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 条件判断：(offset >= sizeof(Tsrc)/sizeof(uint64_t))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：v0 = v1 = 0ULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   12. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     13. 调用 / 计算 / 写入：v0 = s[offset] ;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     14. 调用 / 计算 / 写入：v1 = s[offset+1];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 条件判断：(offset < sizeof(Tdst)/sizeof(uint64_t))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   16. 真分支：；仅条件为真执行以下子项。
+ *     17. 调用 / 计算 / 写入：storeShmem128(shmemPtr+offset, v0, v1);；向 SM 共享内存写出 16 字节，供同 block 的线程在屏障后消费。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__common_h.md#f0073
+ */
 /* 中文逐项-函数 F0073：copyToShmem
  * 用途与位置：由 block 线程协作把全局工作/通信元数据复制到共享内存，减少后续重复读取的全局访问。
  * 参数 dst（Tdst *dst）：输出数据地址，必须容纳当前 API 语义所需结果；AG 是多 rank 拼接，RS 只保留本段。
@@ -107,6 +135,40 @@ __device__ void copyToShmem(Tdst *dst, Tsrc const *src, int tid, int nthreads) {
   if (offset < sizeof(Tdst)/sizeof(uint64_t)) storeShmem128(shmemPtr+offset, v0, v1);
 }
 
+/* 中文内部逻辑 F0074：copyToShmem
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 源码语法片段：static_assert(sizeof(uint64_t) <= alignof(T), "Uhoh");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 2. 准备局部状态：uint64_t *d = reinterpret_cast<uint64_t*>(dst);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：uint64_t const *s = reinterpret_cast<uint64_t const*>(src);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int t = threadIdx.x - turn;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：(t < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：t += blockDim.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 准备局部状态：int n = sizeof(T)/sizeof(uint64_t);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：int delta = (n + WARP_SIZE-1) & -WARP_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 条件判断：(delta < blockDim.x)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：turn += delta;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 条件判断：(turn >= blockDim.x)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       14. 真分支：；仅条件为真执行以下子项。
+ *         15. 调用 / 计算 / 写入：turn -= blockDim.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   16. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     17. 调用 / 计算 / 写入：turn = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 调用 / 计算 / 写入：n -= t;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 调用 / 计算 / 写入：d += t;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 20. 调用 / 计算 / 写入：s += t;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ * 22. 循环：初始 int i=0;；继续条件 i < divUp(sizeof(T), WARP_SIZE*sizeof(uint64_t))；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   23. 条件判断：(n > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     24. 真分支：；仅条件为真执行以下子项。
+ *       25. 调用 / 计算 / 写入：*d = *s;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       26. 调用 / 计算 / 写入：d += blockDim.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       27. 调用 / 计算 / 写入：s += blockDim.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       28. 调用 / 计算 / 写入：n -= blockDim.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 29. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 30. 函数返回：return turn;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__common_h.md#f0074
+ */
 /* 中文逐项-函数 F0074：copyToShmem
  * 用途与位置：由 block 线程协作把全局工作/通信元数据复制到共享内存，减少后续重复读取的全局访问。
  * 参数 dst（T *dst）：输出数据地址，必须容纳当前 API 语义所需结果；AG 是多 rank 拼接，RS 只保留本段。
@@ -179,7 +241,11 @@ __device__ int copyToShmem(T *dst, T const *src, int turn=0) {
  */
 template<ncclFunc_t Fn, typename T, typename RedOp, int Algo, int Proto>
 struct RunWorkElement {
-  __device__ /* 中文逐项-函数 F0075：run
+  __device__ /* 中文内部逻辑 F0075：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__common_h.md#f0075
+ */
+/* 中文逐项-函数 F0075：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement。
  * 参数 <未命名参数>（ncclWorkElem*）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -196,7 +262,19 @@ template<ncclFunc_t Fn, typename T, typename RedOp, int Algo, int Proto>
 struct RunWork {
   // This __forceinline__ is necessary. The compiler was inserting a function call
   // here from the LL ncclKernel.
-  __device__ __forceinline__ /* 中文逐项-函数 F0076：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0076：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int wid = threadIdx.x / WARP_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int inc = w->header.type == ncclWorkTypeRegColl ? sizeof(ncclWorkElemReg) / sizeof(ncclWorkElem) : 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 编译期分支/指令：#pragma unroll 1；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ * 4. 循环：初始 int e=0;；继续条件 e < NCCL_MAX_WORK_ELEMENTS && w->elems[e].header.type != ncclWorkTypeUnused；每轮更新 e += inc；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   5. 条件判断：(wid < w->header.nWarps)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     6. 真分支：；仅条件为真执行以下子项。
+ *       7. 调用 / 计算 / 写入：RunWorkElement<Fn, T, RedOp, Algo, Proto>().run(&w->elems[e]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__common_h.md#f0076
+ */
+/* 中文逐项-函数 F0076：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWork。
  * 参数 w（ncclWork *w）：当前遍历或处理对象的局部引用/值，类型和下面初始化来源确定其具体身份。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -310,6 +388,25 @@ struct ncclShmemData {
 };
 static_assert(offsetof(struct ncclShmemData, work)%16 == 0, "shmem.work needs to be 16B aligned");
 
+/* 中文内部逻辑 F0077：ncclRedopPtrDeref
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(we->header.type != ncclWorkTypeUnused && we->redOpArgIsPtr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 条件判断：(we->redOpArg%2 != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       4. 真分支：；仅条件为真执行以下子项。
+ *         5. 调用 / 计算 / 写入：we->redOpArg = *reinterpret_cast<uint8_t*>(we->redOpArg);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         7. 条件判断：(we->redOpArg%4 != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           8. 真分支：；仅条件为真执行以下子项。
+ *             9. 调用 / 计算 / 写入：we->redOpArg = *reinterpret_cast<uint16_t*>(we->redOpArg);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           10. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             11. 条件判断：(we->redOpArg%8 != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               12. 真分支：；仅条件为真执行以下子项。
+ *                 13. 调用 / 计算 / 写入：we->redOpArg = *reinterpret_cast<uint32_t*>(we->redOpArg);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               14. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                 15. 调用 / 计算 / 写入：we->redOpArg = *reinterpret_cast<uint64_t*>(we->redOpArg);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__common_h.md#f0077
+ */
 /* 中文逐项-函数 F0077：ncclRedopPtrDeref
  * 用途与位置：若归约标量以设备指针传入，按地址对齐选择可安全加载的宽度，把值的位模式放回 work。
  * 参数 we（struct ncclWorkElem* we）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -344,6 +441,66 @@ static __device__ void ncclRedopPtrDeref(struct ncclWorkElem* we) {
  */
 extern __shared__ ncclShmemData ncclShmem;
 
+/* 中文内部逻辑 F0078：ncclKernel
+ * 精读：blockIdx.x选择实际channel，先把comm/channel元数据复制到共享内存。
+ * 精读：channel0可用首条内联参数，其他任务从FIFO复制；取走描述后就可把主机槽标Unused。
+ * 精读：按funcIndex匹配静态模板或设备函数表执行；isLast结束当前批，abort则整block一致退出。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int tid = threadIdx.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int nthreads = blockDim.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：int bid = blockIdx.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int turn = copyToShmem(&ncclShmem.comm, comm);；由 block 线程协作把全局工作/通信元数据复制到共享内存，减少后续重复读取的全局访问。
+ * 5. 准备局部状态：ncclChannel *channel = &((ncclDevCommAndChannels*)comm)->channels[bid];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：turn = copyToShmem(&ncclShmem.channel, channel, turn);；由 block 线程协作把全局工作/通信元数据复制到共享内存，减少后续重复读取的全局访问。
+ * 7. 条件判断：(bid == 0 && first.header.type != ncclWorkTypeUnused)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：copyToShmem(&ncclShmem.work, &first, tid, nthreads);；由 block 线程协作把全局工作/通信元数据复制到共享内存，减少后续重复读取的全局访问。
+ * 10. 调用 / 计算 / 写入：__syncthreads();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ * 11. 准备局部状态：ncclWork *workFifoHost = ncclShmem.channel.workFifo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 准备局部状态：ncclWork *workFifoDev = ncclShmem.channel.workFifoDev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 13. 准备局部状态：int workFifoIx = ncclShmem.channel.index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 条件判断：(bid == 0 && first.header.type != ncclWorkTypeUnused)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 控制转移：goto SkipLoadWork;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 17. 循环：初始 ；继续条件 (true)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   18. 调用 / 计算 / 写入：copyToShmem(&ncclShmem.work, &workFifoDev[workFifoIx], tid, nthreads);；由 block 线程协作把全局工作/通信元数据复制到共享内存，减少后续重复读取的全局访问。
+ *   19. 准备局部状态：int aborted = tid == 0 ? *comm->abortFlag : 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   20. 条件判断：(barrierReduceAny(aborted))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     21. 真分支：；仅条件为真执行以下子项。
+ *       22. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   23. 条件判断：(tid == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     24. 真分支：；仅条件为真执行以下子项。
+ *       25. 调用 / 计算 / 写入：workFifoHost[workFifoIx].header.type = ncclWorkTypeUnused;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   26. 跳转标签：SkipLoadWork；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *     27. 调用 / 计算 / 写入：workFifoIx = (workFifoIx + 1)%NCCL_MAX_OPS;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   28. 条件判断：(tid == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     29. 真分支：；仅条件为真执行以下子项。
+ *       30. 调用 / 计算 / 写入：channel->index = workFifoIx;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   31. 调用 / 计算 / 写入：__syncwarp();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ *   32. 条件判断：(ncclShmem.work.header.type == ncclWorkTypeColl)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     33. 真分支：；仅条件为真执行以下子项。
+ *       34. 条件判断：(tid < NCCL_MAX_WORK_ELEMENTS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         35. 真分支：；仅条件为真执行以下子项。
+ *           36. 调用 / 计算 / 写入：ncclRedopPtrDeref(&ncclShmem.work.elems[tid]);；若归约标量以设备指针传入，按地址对齐选择可安全加载的宽度，把值的位模式放回 work。
+ *     37. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       38. 条件判断：(ncclShmem.work.header.type == ncclWorkTypeRegColl)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         39. 真分支：；仅条件为真执行以下子项。
+ *           40. 条件判断：(tid < NCCL_MAX_WORK_ELEMENTS_REG)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             41. 真分支：；仅条件为真执行以下子项。
+ *               42. 调用 / 计算 / 写入：ncclRedopPtrDeref(&ncclShmem.work.regElems[tid].elem);；若归约标量以设备指针传入，按地址对齐选择可安全加载的宽度，把值的位模式放回 work。
+ *   43. 调用 / 计算 / 写入：__syncthreads();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ *   44. 条件判断：(ncclShmem.work.header.funcIndex == FnIndex)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     45. 真分支：；仅条件为真执行以下子项。
+ *       46. 调用 / 计算 / 写入：RunWork<Fn, T, RedOp, Algo, Proto>().run(&ncclShmem.work);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     47. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       48. 调用 / 计算 / 写入：ncclFuncs[ncclShmem.work.header.funcIndex]();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   49. 条件判断：(ncclShmem.work.header.isLast)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     50. 真分支：；仅条件为真执行以下子项。
+ *       51. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   52. 调用 / 计算 / 写入：__syncthreads();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ * 53. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__common_h.md#f0078
+ */
 /* 中文逐项-函数 F0078：ncclKernel
  * 用途与位置：以 blockIdx.x 选择 channel，读取/释放描述符 FIFO 槽，再按 funcIndex 执行本批设备任务到 isLast。
  * 参数 comm（struct ncclDevComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。

@@ -10,6 +10,22 @@
 #include "nvmlwrap.h"
 
 // Get current Compute Capability
+/* 中文内部逻辑 F0991：ncclCudaCompCap
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int cudaDev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(cudaGetDevice(&cudaDev) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ccMajor, ccMinor;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 条件判断：(cudaDeviceGetAttribute(&ccMajor, cudaDevAttrComputeCapabilityMajor, cudaDev) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 9. 条件判断：(cudaDeviceGetAttribute(&ccMinor, cudaDevAttrComputeCapabilityMinor, cudaDev) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 12. 函数返回：return ccMajor*10+ccMinor;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0991
+ */
 /* 中文逐项-函数 F0991：ncclCudaCompCap
  * 用途与位置：查询当前 CUDA 设备主次计算能力并编码成整数，供协议和架构策略判断。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -41,6 +57,12 @@ int ncclCudaCompCap() {
   return ccMajor*10+ccMinor;
 }
 
+/* 中文内部逻辑 F0992：int64ToBusId
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：sprintf(busId, "%04lx:%02lx:%02lx.%01lx", (id) >> 20, (id & 0xff000) >> 12, (id & 0xff0) >> 4, (id & 0xf));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0992
+ */
 /* 中文逐项-函数 F0992：int64ToBusId
  * 用途与位置：在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
  * 参数 id（int64_t id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -54,6 +76,26 @@ ncclResult_t int64ToBusId(int64_t id, char* busId) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0993：busIdToInt64
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char hexStr[17];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int hexOffset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 循环：初始 int i = 0;；继续条件 hexOffset < sizeof(hexStr) - 1；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 准备局部状态：char c = busId[i];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   5. 条件判断：(c == '.' || c == ':')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     6. 真分支：；仅条件为真执行以下子项。
+ *       7. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   8. 条件判断：((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     9. 真分支：；仅条件为真执行以下子项。
+ *       10. 调用 / 计算 / 写入：hexStr[hexOffset++] = busId[i];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       12. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ * 13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 14. 调用 / 计算 / 写入：hexStr[hexOffset] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 调用 / 计算 / 写入：*id = strtol(hexStr, NULL, 16);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0993
+ */
 /* 中文逐项-函数 F0993：busIdToInt64
  * 用途与位置：在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
  * 参数 busId（const char* busId）：PCI BDF 的整数标识，用于将 CUDA、NVML 与拓扑中的同一设备关联。
@@ -98,6 +140,14 @@ ncclResult_t busIdToInt64(const char* busId, int64_t* id) {
 }
 
 // Convert a logical cudaDev index to the NVML device minor number
+/* 中文内部逻辑 F0994：getBusId
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char busIdStr[] = "00000000:00:00.0";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：CUDACHECK(cudaDeviceGetPCIBusId(busIdStr, sizeof(busIdStr), cudaDev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(busIdToInt64(busIdStr, busId));；失败时可能提前return，成功才继续；在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0994
+ */
 /* 中文逐项-函数 F0994：getBusId
  * 用途与位置：查询本进程 CUDA 设备的 PCI 地址并转为整数标识，不能把设备 ordinal 当作 busId。
  * 参数 cudaDev（int cudaDev）：本进程 CUDA 可见设备序号，供切换设备上下文使用。
@@ -120,6 +170,20 @@ ncclResult_t getBusId(int cudaDev, int64_t *busId) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0995：getHostName
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gethostname(hostname, maxlen) != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：strncpy(hostname, "unknown", maxlen);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int i = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 循环：初始 ；继续条件 ((hostname[i] != delim) && (hostname[i] != '\0') && (i < maxlen-1))；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 调用 / 计算 / 写入：i++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 调用 / 计算 / 写入：hostname[i] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0995
+ */
 /* 中文逐项-函数 F0995：getHostName
  * 用途与位置：取得并按分隔符截短主机名，主要用于标识/日志。
  * 参数 hostname（char* hostname）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -146,6 +210,15 @@ ncclResult_t getHostName(char* hostname, int maxlen, const char delim) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0996：getHash
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：uint64_t result = 5381;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 int c = 0;；继续条件 c < n；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 调用 / 计算 / 写入：result = ((result << 5) + result) ^ string[c];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 5. 函数返回：return result;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0996
+ */
 /* 中文逐项-函数 F0996：getHash
  * 用途与位置：对给定字符串字节计算哈希，供主机/进程身份摘要使用，不承担安全认证。
  * 参数 string（const char* string）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -185,6 +258,31 @@ uint64_t getHash(const char* string, int n) {
  * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
  */
 #define HOSTID_FILE "/proc/sys/kernel/random/boot_id"
+/* 中文内部逻辑 F0997：getHostHash
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char hostHash[1024];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：char *hostId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：(void) getHostName(hostHash, sizeof(hostHash), '\0');；取得并按分隔符截短主机名，主要用于标识/日志。
+ * 4. 准备局部状态：int offset = strlen(hostHash);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：((hostId = getenv("NCCL_HOSTID")) != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：INFO(NCCL_ENV, "NCCL_HOSTID set by environment to %s", hostId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     8. 调用 / 计算 / 写入：strncpy(hostHash, hostId, sizeof(hostHash));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   9. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     10. 准备局部状态：FILE *file = fopen(HOSTID_FILE, "r");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     11. 条件判断：(file != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       12. 真分支：；仅条件为真执行以下子项。
+ *         13. 准备局部状态：char *p;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         14. 条件判断：(fscanf(file, "%ms", &p) == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           15. 真分支：；仅条件为真执行以下子项。
+ *             16. 调用 / 计算 / 写入：strncpy(hostHash+offset, p, sizeof(hostHash)-offset-1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             17. 调用 / 计算 / 写入：free(p);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     18. 调用 / 计算 / 写入：fclose(file);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 19. 调用 / 计算 / 写入：hostHash[sizeof(hostHash)-1]='\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 20. 调用 / 计算 / 写入：TRACE(NCCL_INIT,"unique hostname '%s'", hostHash);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 21. 函数返回：return getHash(hostHash, strlen(hostHash));；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0997
+ */
 /* 中文逐项-函数 F0997：getHostHash
  * 用途与位置：由主机/启动环境相关身份生成一致摘要，帮助识别同一主机上的参与者。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -250,6 +348,20 @@ uint64_t getHostHash(void) {
  *
  * $$ $(readlink /proc/self/ns/pid)
  */
+/* 中文内部逻辑 F0998：getPidHash
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char pname[1024];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：sprintf(pname, "%ld", (long) getpid());；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 3. 准备局部状态：int plen = strlen(pname);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int len = readlink("/proc/self/ns/pid", pname+plen, sizeof(pname)-1-plen);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：(len < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：len = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：pname[plen+len]='\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：TRACE(NCCL_INIT,"unique PID '%s'", pname);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 函数返回：return getHash(pname, strlen(pname));；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0998
+ */
 /* 中文逐项-函数 F0998：getPidHash
  * 用途与位置：结合进程命名空间/进程标识形成摘要，用于判断是否同进程共享本地指针与发射状态。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -284,6 +396,45 @@ uint64_t getPidHash(void) {
   return getHash(pname, strlen(pname));
 }
 
+/* 中文内部逻辑 F0999：parseStringList
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(!string)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：const char* ptr = string;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：int ifNum = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int ifC = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：char c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 先执行一次的循环：初始 ；继续条件 (ifNum < maxList && c)；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *   9. 调用 / 计算 / 写入：c = *ptr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   10. 条件判断：(c == ':')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     11. 真分支：；仅条件为真执行以下子项。
+ *       12. 条件判断：(ifC > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         13. 真分支：；仅条件为真执行以下子项。
+ *           14. 调用 / 计算 / 写入：ifList[ifNum].prefix[ifC] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           15. 调用 / 计算 / 写入：ifList[ifNum].port = atoi(ptr+1);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           16. 调用 / 计算 / 写入：ifNum++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           17. 调用 / 计算 / 写入：ifC = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       18. 循环：初始 ；继续条件 (c != ',' && c != '\0')；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         19. 调用 / 计算 / 写入：c = *(++ptr);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       20. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     21. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       22. 条件判断：(c == ',' || c == '\0')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         23. 真分支：；仅条件为真执行以下子项。
+ *           24. 条件判断：(ifC > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             25. 真分支：；仅条件为真执行以下子项。
+ *               26. 调用 / 计算 / 写入：ifList[ifNum].prefix[ifC] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               27. 调用 / 计算 / 写入：ifList[ifNum].port = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               28. 调用 / 计算 / 写入：ifNum++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               29. 调用 / 计算 / 写入：ifC = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         30. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           31. 调用 / 计算 / 写入：ifList[ifNum].prefix[ifC] = c;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           32. 调用 / 计算 / 写入：ifC++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   33. 调用 / 计算 / 写入：ptr++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 34. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 35. 函数返回：return ifNum;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f0999
+ */
 /* 中文逐项-函数 F0999：parseStringList
  * 用途与位置：把逗号分隔的接口名前缀及可选端口解析成过滤表。
  * 参数 string（const char* string）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -342,6 +493,12 @@ int parseStringList(const char* string, struct netIf* ifList, int maxList) {
   return ifNum;
 }
 
+/* 中文内部逻辑 F1000：matchIf
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int matchLen = matchExact ? strlen(string) + 1 : strlen(ref);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 函数返回：return strncmp(string, ref, matchLen) == 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f1000
+ */
 /* 中文逐项-函数 F1000：matchIf
  * 用途与位置：按完整名字/前缀及可选端口规则判断接口是否命中配置列表。
  * 参数 string（const char* string）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -361,6 +518,20 @@ static bool matchIf(const char* string, const char* ref, bool matchExact) {
   return strncmp(string, ref, matchLen) == 0;
 }
 
+/* 中文内部逻辑 F1001：matchPort
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(port1 == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return true;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 条件判断：(port2 == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return true;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 条件判断：(port1 == port2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 函数返回：return true;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 10. 函数返回：return false;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f1001
+ */
 /* 中文逐项-函数 F1001：matchPort
  * 用途与位置：按完整名字/前缀及可选端口规则判断接口是否命中配置列表。
  * 参数 port1（const int port1）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -378,6 +549,19 @@ static bool matchPort(const int port1, const int port2) {
 }
 
 
+/* 中文内部逻辑 F1002：matchIfList
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(listSize == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return true;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 循环：初始 int i=0;；继续条件 i<listSize；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   5. 条件判断：(matchIf(string, ifList[i].prefix, matchExact) && matchPort(port, ifList[i].port))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     6. 真分支：；仅条件为真执行以下子项。
+ *       7. 函数返回：return true;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 函数返回：return false;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__utils_cc.md#f1002
+ */
 /* 中文逐项-函数 F1002：matchIfList
  * 用途与位置：按完整名字/前缀及可选端口规则判断接口是否命中配置列表。
  * 参数 string（const char* string）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。

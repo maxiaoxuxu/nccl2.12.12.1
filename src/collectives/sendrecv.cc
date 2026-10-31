@@ -21,6 +21,17 @@ NCCL_API(ncclResult_t, ncclSend, const void* sendbuff, size_t count, ncclDataTyp
  * 调用内部 GroupStart/End 支持单条提交，应用外层 Group 则能让多条收发一起排队发射。
  * 调用链：SaveP2p -> GroupEnd 分块与预建链 -> SetupP2pKernel -> FIFO -> device/sendrecv.h。
  */
+/* 中文内部逻辑 F0379：ncclSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：struct ncclInfo info = { ncclFuncSend, "Send", NULL, (void*)sendbuff, count, datatype, ncclSum, peer, comm, stream, 1, 1 };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：ncclResult_t ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclGroupStart());；失败时可能提前return，成功才继续；进入线程局部 Group 嵌套，最外层首次进入时清理组任务状态。
+ * 5. 调用 / 计算 / 写入：ret = ncclEnqueueCheck(&info);；通信 API 的统一检查与分流入口，组内保存任务，普通路径准备队列并发布/发射执行。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclGroupEnd());；失败时可能提前return，成功才继续；最外层出口统一执行初始化、P2P 预建链、消息分块、collective 聚合、Proxy 发布和 kernel 发射。
+ * 7. 函数返回：return ret;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__sendrecv_cc.md#f0379
+ */
 /* 中文逐项-函数 F0379：ncclSend
  * 用途与位置：把消息按 peer 加入 P2P 排队，通过嵌套 Group 支持批量匹配发射；不在此直接执行网络发送。
  * 参数 sendbuff（const void* sendbuff）：输入数据地址，偏移单位由实际指针元素类型和当前 API 的归一化结果决定。
@@ -60,6 +71,17 @@ NCCL_API(ncclResult_t, ncclRecv, void* recvbuff, size_t count, ncclDataType_t da
 /* 中文导读：
  * 接收侧按 peer 和 count 记录任务，与对端 Send 匹配；count 的单位仍是 datatype 元素。
  * 在本版本中，全互联交换可由应用按 peer 组合 Send/Recv；调度与资源使用取决于实际出现的 peer 集合。
+ */
+/* 中文内部逻辑 F0380：ncclRecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：struct ncclInfo info = { ncclFuncRecv, "Recv", NULL, recvbuff, count, datatype, ncclSum, peer, comm, stream, 1, 1 };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：ncclResult_t ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclGroupStart());；失败时可能提前return，成功才继续；进入线程局部 Group 嵌套，最外层首次进入时清理组任务状态。
+ * 5. 调用 / 计算 / 写入：ret = ncclEnqueueCheck(&info);；通信 API 的统一检查与分流入口，组内保存任务，普通路径准备队列并发布/发射执行。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclGroupEnd());；失败时可能提前return，成功才继续；最外层出口统一执行初始化、P2P 预建链、消息分块、collective 聚合、Proxy 发布和 kernel 发射。
+ * 7. 函数返回：return ret;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__sendrecv_cc.md#f0380
  */
 /* 中文逐项-函数 F0380：ncclRecv
  * 用途与位置：把匹配 peer 的接收加入 P2P 排队，实际缓冲搬运在设备原语与必要的 Proxy 中完成。

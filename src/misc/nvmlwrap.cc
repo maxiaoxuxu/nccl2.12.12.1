@@ -267,6 +267,14 @@ ncclResult_t ncclNvmlEnsureInitialized() {
   } \
 } while(0)
 
+/* 中文内部逻辑 F0949：ncclNvmlDeviceGetHandleByPciBusId
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 准备局部状态：std::lock_guard<std::mutex> locked(lock);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NVMLCHECK(nvmlDeviceGetHandleByPciBusId, pciBusId, device);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0949
+ */
 /* 中文逐项-函数 F0949：ncclNvmlDeviceGetHandleByPciBusId
  * 用途与位置：按 PCI 地址定位 NVML 设备；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 pciBusId（const char* pciBusId）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -282,6 +290,13 @@ ncclResult_t ncclNvmlDeviceGetHandleByPciBusId(const char* pciBusId, nvmlDevice_
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0950：ncclNvmlDeviceGetHandleByIndex
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 调用 / 计算 / 写入：*device = ncclNvmlDevices[index].handle;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0950
+ */
 /* 中文逐项-函数 F0950：ncclNvmlDeviceGetHandleByIndex
  * 用途与位置：按 NVML 序号取得设备句柄；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 index（unsigned int index）：当前对象的数组/角色下标；channel.index 专指 GPU 工作 FIFO 的持久读取下标。
@@ -296,6 +311,18 @@ ncclResult_t ncclNvmlDeviceGetHandleByIndex(unsigned int index, nvmlDevice_t *de
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0951：ncclNvmlDeviceGetIndex
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 循环：初始 int d=0;；继续条件 d < ncclNvmlDeviceCount；每轮更新 d++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(ncclNvmlDevices[d].handle == device)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：*index = d;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0951
+ */
 /* 中文逐项-函数 F0951：ncclNvmlDeviceGetIndex
  * 用途与位置：由句柄查询 NVML 序号；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 device（nvmlDevice_t device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
@@ -320,6 +347,14 @@ ncclResult_t ncclNvmlDeviceGetIndex(nvmlDevice_t device, unsigned* index) {
   return ncclInvalidArgument;
 }
 
+/* 中文内部逻辑 F0952：ncclNvmlDeviceGetNvLinkState
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 准备局部状态：std::lock_guard<std::mutex> locked(lock);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NVMLTRY(nvmlDeviceGetNvLinkState, device, link, isActive);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0952
+ */
 /* 中文逐项-函数 F0952：ncclNvmlDeviceGetNvLinkState
  * 用途与位置：查询指定 NVLink 是否激活；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 device（nvmlDevice_t device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
@@ -336,6 +371,14 @@ ncclResult_t ncclNvmlDeviceGetNvLinkState(nvmlDevice_t device, unsigned int link
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0953：ncclNvmlDeviceGetNvLinkRemotePciInfo
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 准备局部状态：std::lock_guard<std::mutex> locked(lock);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NVMLTRY(nvmlDeviceGetNvLinkRemotePciInfo, device, link, pci);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0953
+ */
 /* 中文逐项-函数 F0953：ncclNvmlDeviceGetNvLinkRemotePciInfo
  * 用途与位置：查询 NVLink 远端 PCI 标识；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 device（nvmlDevice_t device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
@@ -352,6 +395,14 @@ ncclResult_t ncclNvmlDeviceGetNvLinkRemotePciInfo(nvmlDevice_t device, unsigned 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0954：ncclNvmlDeviceGetNvLinkCapability
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 准备局部状态：std::lock_guard<std::mutex> locked(lock);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NVMLTRY(nvmlDeviceGetNvLinkCapability, device, link, capability, capResult);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0954
+ */
 /* 中文逐项-函数 F0954：ncclNvmlDeviceGetNvLinkCapability
  * 用途与位置：查询 NVLink 能力；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 device（nvmlDevice_t device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
@@ -372,6 +423,19 @@ ncclResult_t ncclNvmlDeviceGetNvLinkCapability(
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0955：ncclNvmlDeviceGetCudaComputeCapability
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 循环：初始 int d=0;；继续条件 d < ncclNvmlDeviceCount；每轮更新 d++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(device == ncclNvmlDevices[d].handle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：*major = ncclNvmlDevices[d].computeCapabilityMajor;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 调用 / 计算 / 写入：*minor = ncclNvmlDevices[d].computeCapabilityMinor;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0955
+ */
 /* 中文逐项-函数 F0955：ncclNvmlDeviceGetCudaComputeCapability
  * 用途与位置：查询 GPU 计算能力；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 device（nvmlDevice_t device）：当前设备对象/PCI设备号/网络设备编号；其声明类型与宿主结构决定编号空间。
@@ -399,6 +463,34 @@ ncclResult_t ncclNvmlDeviceGetCudaComputeCapability(nvmlDevice_t device, int* ma
   return ncclInvalidArgument;
 }
 
+/* 中文内部逻辑 F0956：ncclNvmlDeviceGetP2PStatus
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNvmlEnsureInitialized());；失败时可能提前return，成功才继续；线程安全初始化动态 NVML 接口、设备句柄和支持能力缓存，供硬件发现复用。
+ * 2. 条件判断：(p2pIndex == NVML_P2P_CAPS_INDEX_READ || p2pIndex == NVML_P2P_CAPS_INDEX_WRITE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 准备局部状态：int a = -1, b = -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 循环：初始 int d=0;；继续条件 d < ncclNvmlDeviceCount；每轮更新 d++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       6. 条件判断：(device1 == ncclNvmlDevices[d].handle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         7. 真分支：；仅条件为真执行以下子项。
+ *           8. 调用 / 计算 / 写入：a = d;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       9. 条件判断：(device2 == ncclNvmlDevices[d].handle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         10. 真分支：；仅条件为真执行以下子项。
+ *           11. 调用 / 计算 / 写入：b = d;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     13. 条件判断：(a == -1 || b == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       14. 真分支：；仅条件为真执行以下子项。
+ *         15. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     16. 条件判断：(p2pIndex == NVML_P2P_CAPS_INDEX_READ)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       17. 真分支：；仅条件为真执行以下子项。
+ *         18. 调用 / 计算 / 写入：*p2pStatus = ncclNvmlDevicePairs[a][b].p2pStatusRead;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       19. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         20. 调用 / 计算 / 写入：*p2pStatus = ncclNvmlDevicePairs[a][b].p2pStatusWrite;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   21. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     22. 准备局部状态：std::lock_guard<std::mutex> locked(lock);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     23. 调用 / 计算 / 写入：NVMLCHECK(nvmlDeviceGetP2PStatus, device1, device2, p2pIndex, p2pStatus);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 24. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__nvmlwrap_cc.md#f0956
+ */
 /* 中文逐项-函数 F0956：ncclNvmlDeviceGetP2PStatus
  * 用途与位置：查询 GPU 对之间的特定 P2P 能力状态；先保证管理库初始化，再在锁保护下调用动态符号，结果供拓扑发现使用。
  * 参数 device1（nvmlDevice_t device1）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。

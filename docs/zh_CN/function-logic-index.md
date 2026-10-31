@@ -1,0 +1,91 @@
+# 全部函数内部逻辑索引
+
+[离线搜索与展开](function-logic.html)。
+
+每个函数均有源码旁的“中文内部逻辑 F编号”，并在以下页面展开分支、循环、调用/写入和退出。关键协议另有[详细图解](visual-guide.md)。
+
+| 源码文件 | 函数定义数 | 内部步骤页面 |
+| --- | ---: | --- |
+| `ext-net/dummy/plugin.c` | 30 | [逐函数展开](logic/ext-net__dummy__plugin_c.md) |
+| `src/bootstrap.cc` | 17 | [逐函数展开](logic/src__bootstrap_cc.md) |
+| `src/channel.cc` | 2 | [逐函数展开](logic/src__channel_cc.md) |
+| `src/collectives/all_gather.cc` | 1 | [逐函数展开](logic/src__collectives__all_gather_cc.md) |
+| `src/collectives/all_reduce.cc` | 1 | [逐函数展开](logic/src__collectives__all_reduce_cc.md) |
+| `src/collectives/broadcast.cc` | 2 | [逐函数展开](logic/src__collectives__broadcast_cc.md) |
+| `src/collectives/device/all_gather.h` | 4 | [逐函数展开](logic/src__collectives__device__all_gather_h.md) |
+| `src/collectives/device/all_reduce.h` | 10 | [逐函数展开](logic/src__collectives__device__all_reduce_h.md) |
+| `src/collectives/device/broadcast.h` | 4 | [逐函数展开](logic/src__collectives__device__broadcast_h.md) |
+| `src/collectives/device/common.h` | 7 | [逐函数展开](logic/src__collectives__device__common_h.md) |
+| `src/collectives/device/common_kernel.h` | 49 | [逐函数展开](logic/src__collectives__device__common_kernel_h.md) |
+| `src/collectives/device/functions.cu` | 1 | [逐函数展开](logic/src__collectives__device__functions_cu.md) |
+| `src/collectives/device/onerank_reduce.cu` | 1 | [逐函数展开](logic/src__collectives__device__onerank_reduce_cu.md) |
+| `src/collectives/device/op128.h` | 6 | [逐函数展开](logic/src__collectives__device__op128_h.md) |
+| `src/collectives/device/primitives.h` | 21 | [逐函数展开](logic/src__collectives__device__primitives_h.md) |
+| `src/collectives/device/prims_ll.h` | 38 | [逐函数展开](logic/src__collectives__device__prims_ll_h.md) |
+| `src/collectives/device/prims_ll128.h` | 32 | [逐函数展开](logic/src__collectives__device__prims_ll128_h.md) |
+| `src/collectives/device/prims_simple.h` | 33 | [逐函数展开](logic/src__collectives__device__prims_simple_h.md) |
+| `src/collectives/device/reduce.h` | 4 | [逐函数展开](logic/src__collectives__device__reduce_h.md) |
+| `src/collectives/device/reduce_kernel.h` | 106 | [逐函数展开](logic/src__collectives__device__reduce_kernel_h.md) |
+| `src/collectives/device/reduce_scatter.h` | 4 | [逐函数展开](logic/src__collectives__device__reduce_scatter_h.md) |
+| `src/collectives/device/sendrecv.h` | 3 | [逐函数展开](logic/src__collectives__device__sendrecv_h.md) |
+| `src/collectives/reduce.cc` | 1 | [逐函数展开](logic/src__collectives__reduce_cc.md) |
+| `src/collectives/reduce_scatter.cc` | 1 | [逐函数展开](logic/src__collectives__reduce_scatter_cc.md) |
+| `src/collectives/sendrecv.cc` | 2 | [逐函数展开](logic/src__collectives__sendrecv_cc.md) |
+| `src/debug.cc` | 3 | [逐函数展开](logic/src__debug_cc.md) |
+| `src/enhcompat.cc` | 5 | [逐函数展开](logic/src__enhcompat_cc.md) |
+| `src/enqueue.cc` | 40 | [逐函数展开](logic/src__enqueue_cc.md) |
+| `src/graph/connect.cc` | 11 | [逐函数展开](logic/src__graph__connect_cc.md) |
+| `src/graph/paths.cc` | 20 | [逐函数展开](logic/src__graph__paths_cc.md) |
+| `src/graph/rings.cc` | 2 | [逐函数展开](logic/src__graph__rings_cc.md) |
+| `src/graph/search.cc` | 31 | [逐函数展开](logic/src__graph__search_cc.md) |
+| `src/graph/topo.cc` | 30 | [逐函数展开](logic/src__graph__topo_cc.md) |
+| `src/graph/topo.h` | 3 | [逐函数展开](logic/src__graph__topo_h.md) |
+| `src/graph/trees.cc` | 2 | [逐函数展开](logic/src__graph__trees_cc.md) |
+| `src/graph/tuning.cc` | 4 | [逐函数展开](logic/src__graph__tuning_cc.md) |
+| `src/graph/xml.cc` | 37 | [逐函数展开](logic/src__graph__xml_cc.md) |
+| `src/graph/xml.h` | 20 | [逐函数展开](logic/src__graph__xml_h.md) |
+| `src/group.cc` | 11 | [逐函数展开](logic/src__group_cc.md) |
+| `src/include/align.h` | 3 | [逐函数展开](logic/src__include__align_h.md) |
+| `src/include/alloc.h` | 7 | [逐函数展开](logic/src__include__alloc_h.md) |
+| `src/include/channel.h` | 3 | [逐函数展开](logic/src__include__channel_h.md) |
+| `src/include/coll_net.h` | 14 | [逐函数展开](logic/src__include__coll_net_h.md) |
+| `src/include/comm.h` | 1 | [逐函数展开](logic/src__include__comm_h.md) |
+| `src/include/core.h` | 1 | [逐函数展开](logic/src__include__core_h.md) |
+| `src/include/cpuset.h` | 3 | [逐函数展开](logic/src__include__cpuset_h.md) |
+| `src/include/enqueue.h` | 3 | [逐函数展开](logic/src__include__enqueue_h.md) |
+| `src/include/gdrwrap.h` | 20 | [逐函数展开](logic/src__include__gdrwrap_h.md) |
+| `src/include/ibvwrap.h` | 5 | [逐函数展开](logic/src__include__ibvwrap_h.md) |
+| `src/include/net.h` | 15 | [逐函数展开](logic/src__include__net_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxImpl.h` | 3 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxImpl_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxImplCore.h` | 30 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxImplCudaRt_v3.h` | 6 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxImplCudaRt_v3_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxImplCuda_v3.h` | 8 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxImplCuda_v3_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxImplOpenCL_v3.h` | 14 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxImplOpenCL_v3_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxImplSync_v3.h` | 6 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxImplSync_v3_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxInit.h` | 2 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxInit_h.md) |
+| `src/include/nvtx3/nvtxDetail/nvtxInitDefs.h` | 65 | [逐函数展开](logic/src__include__nvtx3__nvtxDetail__nvtxInitDefs_h.md) |
+| `src/include/nvtx3.hpp` | 60 | [逐函数展开](logic/src__include__nvtx3_hpp.md) |
+| `src/include/p2p.h` | 1 | [逐函数展开](logic/src__include__p2p_h.md) |
+| `src/include/timer.h` | 2 | [逐函数展开](logic/src__include__timer_h.md) |
+| `src/include/utils.h` | 9 | [逐函数展开](logic/src__include__utils_h.md) |
+| `src/init.cc` | 28 | [逐函数展开](logic/src__init_cc.md) |
+| `src/misc/argcheck.cc` | 3 | [逐函数展开](logic/src__misc__argcheck_cc.md) |
+| `src/misc/gdrwrap.cc` | 12 | [逐函数展开](logic/src__misc__gdrwrap_cc.md) |
+| `src/misc/ibvwrap.cc` | 25 | [逐函数展开](logic/src__misc__ibvwrap_cc.md) |
+| `src/misc/nvmlwrap.cc` | 8 | [逐函数展开](logic/src__misc__nvmlwrap_cc.md) |
+| `src/misc/param.cc` | 4 | [逐函数展开](logic/src__misc__param_cc.md) |
+| `src/misc/profiler.cc` | 4 | [逐函数展开](logic/src__misc__profiler_cc.md) |
+| `src/misc/shmutils.cc` | 6 | [逐函数展开](logic/src__misc__shmutils_cc.md) |
+| `src/misc/socket.cc` | 20 | [逐函数展开](logic/src__misc__socket_cc.md) |
+| `src/misc/utils.cc` | 12 | [逐函数展开](logic/src__misc__utils_cc.md) |
+| `src/net.cc` | 11 | [逐函数展开](logic/src__net_cc.md) |
+| `src/proxy.cc` | 38 | [逐函数展开](logic/src__proxy_cc.md) |
+| `src/transport/coll_net.cc` | 22 | [逐函数展开](logic/src__transport__coll_net_cc.md) |
+| `src/transport/net.cc` | 22 | [逐函数展开](logic/src__transport__net_cc.md) |
+| `src/transport/net_ib.cc` | 34 | [逐函数展开](logic/src__transport__net_ib_cc.md) |
+| `src/transport/net_socket.cc` | 23 | [逐函数展开](logic/src__transport__net_socket_cc.md) |
+| `src/transport/p2p.cc` | 12 | [逐函数展开](logic/src__transport__p2p_cc.md) |
+| `src/transport/shm.cc` | 7 | [逐函数展开](logic/src__transport__shm_cc.md) |
+| `src/transport.cc` | 7 | [逐函数展开](logic/src__transport_cc.md) |
+
+静态提取统计：1178个函数，15912个语句/控制步骤；0个函数未完整解析、0处片段明确保留原文。没有把结构展开冒充人工证明或动态线程时序。

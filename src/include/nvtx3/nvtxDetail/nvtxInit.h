@@ -218,7 +218,111 @@ __attribute__((weak)) NvtxInitializeInjectionNvtxFunc_t InitializeInjectionNvtx2
 *  - Statically-linked injection library defining InitializeInjectionNvtx2_fnptr
 */
 NVTX_LINKONCE_FWDDECL_FUNCTION int NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInjectionLibrary)(void);
-NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0742：nvtxInitializeInjectionLibrary
+NVTX_LINKONCE_DEFINE_FUNCTION /* 中文内部逻辑 F0742：nvtxInitializeInjectionLibrary
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const char* const initFuncName = "InitializeInjectionNvtx2";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：NvtxInitializeInjectionNvtxFunc_t init_fnptr = (NvtxInitializeInjectionNvtxFunc_t)0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：NVTX_DLLHANDLE injectionLibraryHandle = (NVTX_DLLHANDLE)0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int entryPointStatus = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 编译期分支/指令：#if NVTX_SUPPORT_ALREADY_INJECTED_LIBRARY；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   6. 调用 / 计算 / 写入：init_fnptr = (NvtxInitializeInjectionNvtxFunc_t)NVTX_DLLFUNC(0, initFuncName);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 编译期分支/指令：#if NVTX_SUPPORT_DYNAMIC_INJECTION_LIBRARY；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   8. 条件判断：(!init_fnptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     9. 真分支：；仅条件为真执行以下子项。
+ *       10. 编译期分支/指令：#if NVTX_SUPPORT_ENV_VARS；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         11. 准备局部状态：const NVTX_PATHCHAR* const nvtxEnvVarName = (sizeof(void*) == 4) ? NVTX_STR("NVTX_INJECTION32_PATH") : NVTX_STR("NVTX_INJECTION64_PATH");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       12. 准备局部状态：NVTX_PATHCHAR injectionLibraryPathBuf[NVTX_BUFSIZE];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       13. 准备局部状态：const NVTX_PATHCHAR* injectionLibraryPath = (const NVTX_PATHCHAR*)0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       14. 调用 / 计算 / 写入：(void)injectionLibraryPathBuf;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *       15. 编译期分支/指令：#if NVTX_SUPPORT_ENV_VARS；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         16. 编译期分支/指令：#if defined(_MSC_VER)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         17. 调用 / 计算 / 写入：injectionLibraryPath = NVTX_GETENV(nvtxEnvVarName);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         18. 编译期分支/指令：#if defined(_MSC_VER)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *       19. 编译期分支/指令：#if defined(__ANDROID__)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         20. 条件判断：(!injectionLibraryPath)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           21. 真分支：；仅条件为真执行以下子项。
+ *             22. 准备局部状态：const char *bits = (sizeof(void*) == 4) ? "32" : "64";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             23. 准备局部状态：char cmdlineBuf[32];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             24. 准备局部状态：char pkgName[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             25. 准备局部状态：int count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             26. 准备局部状态：int pid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             27. 准备局部状态：FILE *fp;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             28. 准备局部状态：size_t bytesRead;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             29. 准备局部状态：size_t pos;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             30. 调用 / 计算 / 写入：pid = (int)getpid();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             31. 调用 / 计算 / 写入：count = snprintf(cmdlineBuf, sizeof(cmdlineBuf), "/proc/%d/cmdline", pid);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             32. 条件判断：(count <= 0 || count >= (int)sizeof(cmdlineBuf))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               33. 真分支：；仅条件为真执行以下子项。
+ *                 34. 调用 / 计算 / 写入：NVTX_ERR("Path buffer too small for: /proc/%d/cmdline\n", pid);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                 35. 函数返回：return NVTX_ERR_INIT_ACCESS_LIBRARY;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *             36. 调用 / 计算 / 写入：fp = fopen(cmdlineBuf, "r");；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             37. 条件判断：(!fp)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               38. 真分支：；仅条件为真执行以下子项。
+ *                 39. 调用 / 计算 / 写入：NVTX_ERR("File couldn't be opened: %s\n", cmdlineBuf);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                 40. 函数返回：return NVTX_ERR_INIT_ACCESS_LIBRARY;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *             41. 调用 / 计算 / 写入：bytesRead = fread(pkgName, 1, sizeof(pkgName) - 1, fp);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             42. 调用 / 计算 / 写入：fclose(fp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             43. 条件判断：(bytesRead == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               44. 真分支：；仅条件为真执行以下子项。
+ *                 45. 调用 / 计算 / 写入：NVTX_ERR("Package name couldn't be read from file: %s\n", cmdlineBuf);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                 46. 函数返回：return NVTX_ERR_INIT_ACCESS_LIBRARY;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *             47. 调用 / 计算 / 写入：pkgName[bytesRead] = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             48. 调用 / 计算 / 写入：pos = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             49. 循环：初始 ；继续条件 (pos < bytesRead && pkgName[pos] != ':' && pkgName[pos] != '\0')；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               50. 调用 / 计算 / 写入：++pos;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             51. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *             52. 调用 / 计算 / 写入：pkgName[pos] = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             53. 调用 / 计算 / 写入：count = snprintf(injectionLibraryPathBuf, NVTX_BUFSIZE, "/data/data/%s/files/libNvtxInjection%s.so", pkgName, bits);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             54. 条件判断：(count <= 0 || count >= NVTX_BUFSIZE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               55. 真分支：；仅条件为真执行以下子项。
+ *                 56. 调用 / 计算 / 写入：NVTX_ERR("Path buffer too small for: /data/data/%s/files/libNvtxInjection%s.so\n", pkgName, bits);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                 57. 函数返回：return NVTX_ERR_INIT_ACCESS_LIBRARY;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *             58. 条件判断：(injectionLibraryPathBuf[0] == '/')；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               59. 真分支：；仅条件为真执行以下子项。
+ *                 60. 编译期分支/指令：#if (__ANDROID_API__ < 21)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *                   61. 准备局部状态：int access_err = access(injectionLibraryPathBuf, F_OK | R_OK);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                   62. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *                     63. 准备局部状态：int access_err = faccessat(AT_FDCWD, injectionLibraryPathBuf, F_OK | R_OK, 0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                 64. 条件判断：(access_err != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   65. 真分支：；仅条件为真执行以下子项。
+ *                     66. 调用 / 计算 / 写入：NVTX_ERR("Injection library path wasn't accessible [code=%s] [path=%s]\n", strerror(errno), injectionLibraryPathBuf);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                     67. 函数返回：return NVTX_ERR_INIT_ACCESS_LIBRARY;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *             68. 调用 / 计算 / 写入：injectionLibraryPath = injectionLibraryPathBuf;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       69. 条件判断：(injectionLibraryPath)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         70. 真分支：；仅条件为真执行以下子项。
+ *           71. 调用 / 计算 / 写入：injectionLibraryHandle = NVTX_DLLOPEN(injectionLibraryPath);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           72. 条件判断：(!injectionLibraryHandle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             73. 真分支：；仅条件为真执行以下子项。
+ *               74. 调用 / 计算 / 写入：NVTX_ERR("Failed to load injection library\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *               75. 函数返回：return NVTX_ERR_INIT_LOAD_LIBRARY;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *             76. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *               77. 调用 / 计算 / 写入：init_fnptr = (NvtxInitializeInjectionNvtxFunc_t)NVTX_DLLFUNC(injectionLibraryHandle, initFuncName);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               78. 条件判断：(!init_fnptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 79. 真分支：；仅条件为真执行以下子项。
+ *                   80. 调用 / 计算 / 写入：NVTX_DLLCLOSE(injectionLibraryHandle);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                   81. 调用 / 计算 / 写入：NVTX_ERR("Failed to get address of function InitializeInjectionNvtx2 from injection library\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                   82. 函数返回：return NVTX_ERR_INIT_MISSING_LIBRARY_ENTRY_POINT;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 83. 编译期分支/指令：#if NVTX_SUPPORT_STATIC_INJECTION_LIBRARY；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   84. 条件判断：(!init_fnptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     85. 真分支：；仅条件为真执行以下子项。
+ *       86. 条件判断：(InitializeInjectionNvtx2_fnptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         87. 真分支：；仅条件为真执行以下子项。
+ *           88. 调用 / 计算 / 写入：init_fnptr = InitializeInjectionNvtx2_fnptr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 89. 条件判断：(!init_fnptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   90. 真分支：；仅条件为真执行以下子项。
+ *     91. 函数返回：return NVTX_ERR_NO_INJECTION_LIBRARY_AVAILABLE;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 92. 调用 / 计算 / 写入：entryPointStatus = init_fnptr(NVTX_VERSIONED_IDENTIFIER(nvtxGetExportTable));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 93. 条件判断：(entryPointStatus == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   94. 真分支：；仅条件为真执行以下子项。
+ *     95. 调用 / 计算 / 写入：NVTX_ERR("Failed to initialize injection library -- initialization function returned 0\n");；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     96. 条件判断：(injectionLibraryHandle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       97. 真分支：；仅条件为真执行以下子项。
+ *         98. 调用 / 计算 / 写入：NVTX_DLLCLOSE(injectionLibraryHandle);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     99. 函数返回：return NVTX_ERR_INIT_FAILED_LIBRARY_ENTRY_POINT;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 100. 函数返回：return NVTX_SUCCESS;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxInit_h.md#f0742
+ */
+/* 中文逐项-函数 F0742：nvtxInitializeInjectionLibrary
  * 用途与位置：查找并加载性能工具注入库，协商导出表并建立可用回调；没有工具时使用空操作。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -475,7 +579,30 @@ NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0742：nvtxInitializeInjec
     return NVTX_SUCCESS;
 }
 
-NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0743：nvtxInitOnce
+NVTX_LINKONCE_DEFINE_FUNCTION /* 中文内部逻辑 F0743：nvtxInitOnce
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：unsigned int old;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).initState == NVTX_INIT_STATE_COMPLETE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：NVTX_ATOMIC_CAS_32( old, &NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).initState, NVTX_INIT_STATE_STARTED, NVTX_INIT_STATE_FRESH);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 条件判断：(old == NVTX_INIT_STATE_FRESH)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 准备局部状态：int result;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     9. 准备局部状态：int forceAllToNoops;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     10. 调用 / 计算 / 写入：result = NVTX_VERSIONED_IDENTIFIER(nvtxInitializeInjectionLibrary)();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 调用 / 计算 / 写入：forceAllToNoops = result != NVTX_SUCCESS;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     12. 调用 / 计算 / 写入：NVTX_VERSIONED_IDENTIFIER(nvtxSetInitFunctionsToNoops)(forceAllToNoops);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     13. 调用 / 计算 / 写入：NVTX_ATOMIC_WRITE_32( &NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).initState, NVTX_INIT_STATE_COMPLETE);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   14. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     15. 调用 / 计算 / 写入：NVTX_MEMBAR();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     16. 循环：初始 ；继续条件 (NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).initState != NVTX_INIT_STATE_COMPLETE)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       17. 调用 / 计算 / 写入：NVTX_YIELD();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       18. 调用 / 计算 / 写入：NVTX_MEMBAR();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     19. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxInit_h.md#f0743
+ */
+/* 中文逐项-函数 F0743：nvtxInitOnce
  * 用途与位置：以一次性初始化状态和原子/锁协调工具注入，初始化后让标记API走真实工具回调或no-op。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。

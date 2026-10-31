@@ -9,6 +9,79 @@
 #include "primitives.h"
 
 namespace {
+/* 中文内部逻辑 F0058：runRing
+ * 精读：固定一个channel后，外层gridOffset覆盖全输入；本轮真实块长按剩余量和协议grain调整。
+ * 精读：calcOffset对Simple使用channel连续布局，对LL/LL128使用交错布局；nelem截断尾部。
+ * 精读：先发块(ringIx-1)，逐块接收归约，块ringIx完成时保存并直接开始结果传播。
+ * 精读：后续仅复制完整结果；最后只recv收齐缺块。不能在AllGather阶段重复加本地输入。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const int tid = threadIdx.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：const int nthreads = args->header.nWarps*WARP_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：const int bid = args->bid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：const int nChannels = args->nChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：ncclRing *ring = &ncclShmem.channel.ring;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int ringIx = ring->index;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：const ssize_t chunkSize = int(Proto::calcBytePerStep()/sizeof(T) * (Proto::Id == NCCL_PROTO_SIMPLE ? ALLREDUCE_CHUNKSTEPS : 1));；计算该协议一个 FIFO step 中的有效载荷字节数，LL/LL128 扣除行内 flag 开销。
+ * 8. 准备局部状态：const int nranks = ncclShmem.comm.nRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：const ssize_t loopSize = nChannels*nranks*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 准备局部状态：const ssize_t size = args->count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 准备局部状态：int minChunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 条件判断：(Proto::Id == NCCL_PROTO_LL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 调用 / 计算 / 写入：minChunkSize = nthreads*(Proto::calcBytePerGrain()/sizeof(T));；给出该协议按线程划分数据时的有效字节粒度，用于确定对齐和最小 chunk。
+ * 15. 条件判断：(Proto::Id == NCCL_PROTO_LL128)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   16. 真分支：；仅条件为真执行以下子项。
+ *     17. 调用 / 计算 / 写入：minChunkSize = nthreads*(Proto::calcBytePerGrain()/sizeof(T))/2;；给出该协议按线程划分数据时的有效字节粒度，用于确定对齐和最小 chunk。
+ * 18. 准备局部状态：Primitives<T, RedOp, FanSymmetric<1>, 1, Proto, 0> prims (tid, nthreads, &ring->prev, &ring->next, args->sendbuff, args->recvbuff, args->redOpArg);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 19. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   20. 准备局部状态：ssize_t realChunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   21. 条件判断：(Proto::Id == NCCL_PROTO_SIMPLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     22. 真分支：；仅条件为真执行以下子项。
+ *       23. 调用 / 计算 / 写入：realChunkSize = min(chunkSize, divUp(size-gridOffset, nChannels*nranks));；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *       24. 调用 / 计算 / 写入：realChunkSize = roundUp(realChunkSize, (nthreads-WARP_SIZE)*sizeof(uint64_t)/sizeof(T));；把尺寸/偏移向上对齐到指定粒度，满足向量访存、页或协议槽位契约。
+ *     25. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       26. 调用 / 计算 / 写入：realChunkSize = min(chunkSize, divUp(size-gridOffset, nChannels*nranks*minChunkSize)*minChunkSize);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   27. 调用 / 计算 / 写入：realChunkSize = int(realChunkSize);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   28. 准备局部状态：auto calcOffset = [&] (int chunk)->ssize_t { if (Proto::Id == NCCL_PROTO_SIMPLE) return gridOffset + bid*nranks*realChunkSize + chunk*realChunkSize; else return gridOffset + (chunk*nChannels + bid)*re …（完整代码见函数体）；定义并保存局部lambda对象；其body仅在后续调用时执行，不在声明处立即运行。
+ *     29. 定义局部lambda：；此处建立可调用对象；以下body在以后调用该lambda时才执行，不是声明时立即执行。
+ *       30. 条件判断：(Proto::Id == NCCL_PROTO_SIMPLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         31. 真分支：；仅条件为真执行以下子项。
+ *           32. 函数返回：return gridOffset + bid*nranks*realChunkSize + chunk*realChunkSize;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *         33. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           34. 函数返回：return gridOffset + (chunk*nChannels + bid)*realChunkSize;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   35. 准备局部状态：auto modRanks = [&] (int r)->int { return r - (r >= nranks ? nranks : 0); };；定义并保存局部lambda对象；其body仅在后续调用时执行，不在声明处立即运行。
+ *     36. 定义局部lambda：；此处建立可调用对象；以下body在以后调用该lambda时才执行，不是声明时立即执行。
+ *       37. 函数返回：return r - (r >= nranks ? nranks : 0);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   38. 准备局部状态：ssize_t offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   39. 准备局部状态：int nelem;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   40. 准备局部状态：int chunk;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   41. 调用 / 计算 / 写入：chunk = modRanks(ringIx + nranks-1);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   42. 调用 / 计算 / 写入：offset = calcOffset(chunk);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   43. 调用 / 计算 / 写入：nelem = min(realChunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   44. 调用 / 计算 / 写入：prims.send(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   45. 循环：初始 int j=2;；继续条件 j<nranks；每轮更新 ++j；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     46. 调用 / 计算 / 写入：chunk = modRanks(ringIx + nranks-j);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     47. 调用 / 计算 / 写入：offset = calcOffset(chunk);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     48. 调用 / 计算 / 写入：nelem = min(realChunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     49. 调用 / 计算 / 写入：prims.recvReduceSend(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   50. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   51. 调用 / 计算 / 写入：chunk = ringIx + 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   52. 调用 / 计算 / 写入：offset = calcOffset(chunk);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   53. 调用 / 计算 / 写入：nelem = min(realChunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   54. 调用 / 计算 / 写入：prims.directRecvReduceCopySend(offset, offset, offset, nelem, true);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   55. 循环：初始 int j=1;；继续条件 j<nranks-1；每轮更新 ++j；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     56. 调用 / 计算 / 写入：chunk = modRanks(ringIx + nranks-j);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     57. 调用 / 计算 / 写入：offset = calcOffset(chunk);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     58. 调用 / 计算 / 写入：nelem = min(realChunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     59. 调用 / 计算 / 写入：prims.directRecvCopySend(offset, offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   60. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   61. 调用 / 计算 / 写入：chunk = modRanks(ringIx + 1);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   62. 调用 / 计算 / 写入：offset = calcOffset(chunk);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   63. 调用 / 计算 / 写入：nelem = min(realChunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   64. 调用 / 计算 / 写入：prims.directRecv(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 65. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0058
+ */
 /* 中文逐项-函数 F0058：runRing
  * 用途与位置：执行当前文件对应 API 的设备端环算法：各 channel 按 bid 计算地址，沿 prev/next 用协议原语流水推进；当前API文件为 all_reduce。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -223,6 +296,68 @@ namespace {
     }
   }
 
+/* 中文内部逻辑 F0059：runTreeUpDown
+ * 精读：上行把叶的send、中间节点的多收归约转发、根的最终recvReduceCopy分开。
+ * 精读：同一线程组上行阶段结束后，换向构造广播原语；根从output发送，叶仅接收，中间节点复制转发。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const int tid = threadIdx.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：const int nthreads = args->header.nWarps*WARP_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：const int bid = args->bid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：const int nChannels = args->nChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：ncclTree *tree = &ncclShmem.channel.tree;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：ssize_t chunkSize = int( Proto::Id == NCCL_PROTO_SIMPLE ? args->lastChunkSize : Proto::calcBytePerStep()/sizeof(T));；计算该协议一个 FIFO step 中的有效载荷字节数，LL/LL128 扣除行内 flag 开销。
+ * 7. 准备局部状态：const ssize_t minChunkSize = int( Proto::Id == NCCL_PROTO_SIMPLE ? (nthreads-2*WARP_SIZE)*8*(sizeof(uint64_t)/sizeof(T)) : nthreads*(Proto::calcBytePerGrain()/sizeof(T)));；给出该协议按线程划分数据时的有效字节粒度，用于确定对齐和最小 chunk。
+ * 8. 准备局部状态：const ssize_t loopSize = int(nChannels*chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：const ssize_t size = args->count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 条件判断：(loopSize > size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：chunkSize = divUp((int)size, int(nChannels*minChunkSize))*int(minChunkSize);；计算整数向上取整的商，避免尾数不整除时少覆盖最后一块。
+ * 13. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DEV_ARITY, 1>, 0, Proto, 0> prims (tid, nthreads, tree->down, &tree->up, args->sendbuff, args->recvbuff, args->redOpArg);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 条件判断：(tree->up == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       17. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       18. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *       19. 调用 / 计算 / 写入：prims.recvReduceCopy(offset, offset, nelem, true);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     20. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   21. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     22. 条件判断：(tree->down[0] == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       23. 真分支：；仅条件为真执行以下子项。
+ *         24. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           25. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           26. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *           27. 调用 / 计算 / 写入：prims.send(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         28. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       29. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         30. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           31. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           32. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *           33. 调用 / 计算 / 写入：prims.recvReduceSend(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         34. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 35. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DEV_ARITY>, 1, Proto, 0> prims (tid, nthreads, &tree->up, tree->down, args->sendbuff, args->recvbuff, args->redOpArg);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 36. 条件判断：(tree->up == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   37. 真分支：；仅条件为真执行以下子项。
+ *     38. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       39. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       40. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *       41. 调用 / 计算 / 写入：prims.directSendFromOutput(offset, offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     42. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   43. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     44. 条件判断：(tree->down[0] == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       45. 真分支：；仅条件为真执行以下子项。
+ *         46. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           47. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           48. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *           49. 调用 / 计算 / 写入：prims.directRecv(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         50. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       51. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         52. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           53. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           54. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *           55. 调用 / 计算 / 写入：prims.directRecvCopySend(offset, offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         56. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0059
+ */
 /* 中文逐项-函数 F0059：runTreeUpDown
  * 用途与位置：先向树根归约再向下广播结果，同一个线程组先后执行两个阶段。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -428,6 +563,74 @@ namespace {
     }
   }
 
+/* 中文内部逻辑 F0060：runTreeSplit
+ * 精读：先按协议确定上下行线程拆分；非根上行组与下行组使用不同group/barrier。
+ * 精读：根用融合原语完成多收归约、保留和多发，非根可让前一块下行与后一块上行重叠。
+ * 精读：构造器Direct能力还要与对端地址交换契约兼容，即使某组不实际direct搬数据也不能任意改模板位。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const int tid = threadIdx.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：const int nthreads = args->header.nWarps*WARP_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：const int bid = args->bid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：const int nChannels = args->nChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：ncclTree *tree = &ncclShmem.channel.tree;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：ssize_t chunkSize = int( Proto::Id != NCCL_PROTO_LL ? args->lastChunkSize : Proto::calcBytePerStep()/sizeof(T));；计算该协议一个 FIFO step 中的有效载荷字节数，LL/LL128 扣除行内 flag 开销。
+ * 7. 准备局部状态：const ssize_t minChunkSize = int( Proto::Id == NCCL_PROTO_SIMPLE ? (nthreads - 2*WARP_SIZE)*8*(sizeof(uint64_t)/sizeof(T)) : Proto::Id == NCCL_PROTO_LL ? nthreads*(Proto::calcBytePerGrain()/sizeof(T)) …（完整代码见函数体）；给出该协议按线程划分数据时的有效字节粒度，用于确定对齐和最小 chunk。
+ * 8. 准备局部状态：const ssize_t loopSize = int(nChannels*chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：const ssize_t size = args->count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 准备局部状态：int nthreadsSplit;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 条件判断：(Proto::Id == NCCL_PROTO_SIMPLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   12. 真分支：；仅条件为真执行以下子项。
+ *     13. 调用 / 计算 / 写入：nthreadsSplit = nthreads/2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     14. 条件判断：(nthreadsSplit >= 256)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       15. 真分支：；仅条件为真执行以下子项。
+ *         16. 调用 / 计算 / 写入：nthreadsSplit += 64;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   17. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     18. 调用 / 计算 / 写入：nthreadsSplit = (nthreads*7/(10*WARP_SIZE))*WARP_SIZE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 条件判断：(loopSize > size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 调用 / 计算 / 写入：chunkSize = divUp((int)size, nChannels*int(minChunkSize))*int(minChunkSize);；计算整数向上取整的商，避免尾数不整除时少覆盖最后一块。
+ * 22. 条件判断：(tree->up == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   23. 真分支：；仅条件为真执行以下子项。
+ *     24. 准备局部状态：Primitives<T, RedOp, FanSymmetric<NCCL_MAX_DEV_ARITY>, 1, Proto, 0> prims(tid, nthreads, tree->down, tree->down, args->sendbuff, args->recvbuff, args->redOpArg);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     25. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       26. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       27. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *       28. 调用 / 计算 / 写入：prims.directRecvReduceCopySend(offset, offset, offset, nelem, true);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     29. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   30. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     31. 条件判断：(tid < nthreadsSplit)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       32. 真分支：；仅条件为真执行以下子项。
+ *         33. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DEV_ARITY, 1>, 1, Proto, 0> prims(tid, nthreadsSplit, tree->down, &tree->up, args->sendbuff, args->recvbuff, args->redOpArg, 0*Proto::MaxGroupWidth);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         34. 条件判断：(tree->down[0] == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           35. 真分支：；仅条件为真执行以下子项。
+ *             36. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               37. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               38. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *               39. 调用 / 计算 / 写入：prims.send(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             40. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *           41. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             42. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               43. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               44. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *               45. 调用 / 计算 / 写入：prims.recvReduceSend(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             46. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       47. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         48. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DEV_ARITY>, 1, Proto, 0> prims(tid-nthreadsSplit, nthreads-nthreadsSplit, &tree->up, tree->down, args->sendbuff, args->recvbuff, args->redOpArg, 1*Proto: …（完整代码见函数体）；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         49. 条件判断：(tree->down[0] == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           50. 真分支：；仅条件为真执行以下子项。
+ *             51. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               52. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               53. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *               54. 调用 / 计算 / 写入：prims.directRecv(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             55. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *           56. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             57. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               58. 准备局部状态：ssize_t offset = gridOffset + bid*int(chunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               59. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *               60. 调用 / 计算 / 写入：prims.directRecvCopySend(offset, offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             61. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0060
+ */
 /* 中文逐项-函数 F0060：runTreeSplit
  * 用途与位置：把非根 block 线程分成上行归约与下行广播两组，用不同 barrier/group 形成重叠流水。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -659,7 +862,13 @@ namespace {
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0061：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0061：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 源码语法片段：using Proto = ProtoSimple<ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS>;；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 2. 调用 / 计算 / 写入：runRing<T, RedOp, Proto>(args);；执行当前文件对应 API 的设备端环算法：各 channel 按 bid 计算地址，沿 prev/next 用协议原语流水推进。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0061
+ */
+/* 中文逐项-函数 F0061：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
  * RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE>。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -676,7 +885,15 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SI
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SIMPLE> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0062：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0062：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if CUDART_VERSION >= 11020 && CUDART_VERSION < 11040 && __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 调用 / 计算 / 写入：runTreeUpDown<T, RedOp, ProtoSimple<1, 1>>(args);；先向树根归约再向下广播结果，同一个线程组先后执行两个阶段。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 调用 / 计算 / 写入：runTreeSplit<T, RedOp, ProtoSimple<1, 1>>(args);；把非根 block 线程分成上行归约与下行广播两组，用不同 barrier/group 形成重叠流水。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0062
+ */
+/* 中文逐项-函数 F0062：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
  * RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SIMPLE>。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -696,7 +913,94 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SI
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO_SIMPLE> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0063：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0063：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：static constexpr int COLLNET_COPY_THREADS = 96;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：const int tid = threadIdx.x;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：const int bid = args->bid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：const int nChannels = args->nChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：struct ncclDirect* tree = &ncclShmem.channel.collTree;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：const ssize_t chunkSize = int(args->lastChunkSize);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：const ssize_t size = args->count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 准备局部状态：const ssize_t loopSize = nChannels*tree->nHeads*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：const int hasUp = (tree->up[0] >= 0) ? 1 : 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 准备局部状态：const int hasDn = (tree->down[0] >= 0) ? 1 : 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 准备局部状态：const int nThreadsScatter = WARP_SIZE + ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 3*COLLNET_COPY_THREADS : 0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 准备局部状态：const int nThreadsGather = ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 2*COLLNET_COPY_THREADS : 0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 13. 准备局部状态：const int nThreadsBcast = WARP_SIZE + ((hasUp && hasDn) ? COLLNET_COPY_THREADS : hasUp ? 0 : 2*COLLNET_COPY_THREADS);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 准备局部状态：const int nThreadsReduce = args->header.nWarps*WARP_SIZE - nThreadsScatter - nThreadsGather - nThreadsBcast;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 15. 准备局部状态：const int tidStartBcast = nThreadsGather;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 16. 准备局部状态：const int tidStartScatter = tidStartBcast + nThreadsBcast;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 17. 准备局部状态：const int tidStartReduce = tidStartScatter + nThreadsScatter;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 18. 源码语法片段：using Proto = ProtoSimple<1, 1>;；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 19. 条件判断：(tid >= tidStartScatter && tid < tidStartReduce && hasUp)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 准备局部状态：int group = (2*Proto::MaxGroupWidth) | (1<<16);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     22. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<0, NCCL_MAX_DIRECT_ARITY>, 1, Proto, 0> prims(tid-tidStartScatter, nThreadsScatter, NULL, tree->up, args->sendbuff, args->recvbuff, args->redOpArg, group, args);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     23. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       24. 准备局部状态：ssize_t offset = gridOffset + bid*tree->nHeads*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       25. 准备局部状态：int nelem = min(tree->nHeads*chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *       26. 条件判断：(args->regUsed)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         27. 真分支：；仅条件为真执行以下子项。
+ *           28. 调用 / 计算 / 写入：prims.directScatter(offset, nelem, chunkSize, tree->headRank, tree->shift);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         29. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           30. 调用 / 计算 / 写入：prims.scatter(offset, nelem, chunkSize, tree->headRank, tree->shift);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     31. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   32. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     33. 条件判断：(tid >= tidStartReduce && tree->out != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       34. 真分支：；仅条件为真执行以下子项。
+ *         35. 准备局部状态：int group = (3*Proto::MaxGroupWidth) | (1<<16);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         36. 条件判断：(hasDn)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           37. 真分支：；仅条件为真执行以下子项。
+ *             38. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DIRECT_ARITY, 1>, 1, Proto, 0> prims(tid-tidStartReduce, nThreadsReduce, tree->down, &tree->out, args->sendbuff, args->recvbuff, args->redOpArg, group, args …（完整代码见函数体）；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             39. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               40. 准备局部状态：ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               41. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *               42. 条件判断：(args->regUsed)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 43. 真分支：；仅条件为真执行以下子项。
+ *                   44. 调用 / 计算 / 写入：prims.directRecvReduceSend(offset, offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                 45. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                   46. 调用 / 计算 / 写入：prims.recvReduceSend(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             47. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *           48. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             49. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<0, 1>, 0, Proto, 0> prims(tid-tidStartReduce, nThreadsReduce, nullptr, &tree->out, args->sendbuff, args->recvbuff, args->redOpArg, group);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             50. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               51. 准备局部状态：ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               52. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *               53. 调用 / 计算 / 写入：prims.send(offset, nelem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             54. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       55. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         56. 条件判断：(tid < tidStartBcast && hasUp)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           57. 真分支：；仅条件为真执行以下子项。
+ *             58. 准备局部状态：int group = (0*Proto::MaxGroupWidth) | (0<<16);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             59. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<NCCL_MAX_DIRECT_ARITY, 0>, 1, Proto, 0> prims(tid, nThreadsGather, tree->up, NULL, args->sendbuff, args->recvbuff, args->redOpArg, group, args);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             60. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               61. 准备局部状态：ssize_t offset = gridOffset + bid*tree->nHeads*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               62. 准备局部状态：int nelem = min(tree->nHeads*chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *               63. 调用 / 计算 / 写入：prims.directGather(offset, nelem, chunkSize, tree->headRank, tree->shift);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             64. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *           65. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             66. 条件判断：(tid >= tidStartBcast && tid < tidStartScatter && tree->out != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               67. 真分支：；仅条件为真执行以下子项。
+ *                 68. 准备局部状态：int group = (1*Proto::MaxGroupWidth) | (0<<16);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                 69. 条件判断：(hasDn)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   70. 真分支：；仅条件为真执行以下子项。
+ *                     71. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<1, NCCL_MAX_DIRECT_ARITY>, 1, Proto, 0> prims(tid-tidStartBcast, nThreadsBcast, &tree->out, tree->down, args->sendbuff, args->recvbuff, args->redOpArg, group, args);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                     72. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                       73. 准备局部状态：ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                       74. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *                       75. 调用 / 计算 / 写入：prims.recvCopyDirectSend(offset, offset, nelem, true);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                     76. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *                   77. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                     78. 准备局部状态：Primitives<T, RedOp, FanAsymmetric<1, 0>, 0, Proto, 0> prims(tid-tidStartBcast, nThreadsBcast, &tree->out, nullptr, args->sendbuff, args->recvbuff, args->redOpArg, group);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                     79. 循环：初始 ssize_t gridOffset = 0;；继续条件 gridOffset < size；每轮更新 gridOffset += loopSize；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                       80. 准备局部状态：ssize_t offset = gridOffset + (bid*tree->nHeads+tree->headRank)*chunkSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                       81. 准备局部状态：int nelem = min(chunkSize, size-offset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *                       82. 调用 / 计算 / 写入：prims.recv(offset, nelem, true);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                     83. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0063
+ */
+/* 中文逐项-函数 F0063：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
  * RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO_SIMPLE>。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -1008,7 +1312,12 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0064：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0064：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：runRing<T, RedOp, ProtoLL>(args);；执行当前文件对应 API 的设备端环算法：各 channel 按 bid 计算地址，沿 prev/next 用协议原语流水推进。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0064
+ */
+/* 中文逐项-函数 F0064：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
  * RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL>。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -1024,7 +1333,12 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0065：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0065：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：runTreeSplit<T, RedOp, ProtoLL>(args);；把非根 block 线程分成上行归约与下行广播两组，用不同 barrier/group 形成重叠流水。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0065
+ */
+/* 中文逐项-函数 F0065：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
  * RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL>。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -1040,7 +1354,12 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL128> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0066：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0066：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：runRing<T, RedOp, ProtoLL128>(args);；执行当前文件对应 API 的设备端环算法：各 channel 按 bid 计算地址，沿 prev/next 用协议原语流水推进。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0066
+ */
+/* 中文逐项-函数 F0066：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
  * RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL128>。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。
@@ -1056,7 +1375,12 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_LL
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL128> {
-  __device__ __forceinline__ /* 中文逐项-函数 F0067：run
+  __device__ __forceinline__ /* 中文内部逻辑 F0067：run
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：runTreeSplit<T, RedOp, ProtoLL128>(args);；把非根 block 线程分成上行归约与下行广播两组，用不同 barrier/group 形成重叠流水。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__all_reduce_h.md#f0067
+ */
+/* 中文逐项-函数 F0067：run
  * 用途与位置：作为当前 RunWork/RunWorkElement 特化的设备执行入口，按模板选择算法协议或遍历同一 work 内元素；所属特化 RunWorkElement<ncclFuncAllReduce, T,
  * RedOp, NCCL_ALGO_TREE, NCCL_PROTO_LL128>。
  * 参数 args（ncclWorkElem *args）：当前设备任务，含本次元素范围、bid、nChannels、缓冲与归约参数。

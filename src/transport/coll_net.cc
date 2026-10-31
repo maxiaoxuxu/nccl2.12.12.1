@@ -369,6 +369,12 @@ struct recvResources {
 };
 
 /* Determine if we can communicate with the peer */
+/* 中文内部逻辑 F1052：canConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*ret = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1052
+ */
 /* 中文逐项-函数 F1052：canConnect
  * 用途与位置：由本文件 transport 的拓扑/主机/后端支持条件判断这对参与者是否可使用该传输。
  * 参数 ret（int* ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -403,6 +409,20 @@ struct setupReq {
 
 /* Setup send connector, and return connect information for others in the coll
  * communicator to connect to me */
+/* 中文内部逻辑 F1053：sendSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct setupReq req;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int proxyRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetNetDev(comm, myInfo->rank, graph, channelId, -1, &req.netDev, &proxyRank));；失败时可能提前return，成功才继续；按图、channel 和 peer 选择实际 NIC 与 Proxy rank，处理本地出口和 PXN 代理条件。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCheckGdr(comm->topo, myInfo->busId, req.netDev, 1, &req.useGdr));；失败时可能提前return，成功才继续；结合 NIC/GPU 能力、距离与发送读方向策略判断该路径能否使用 GPU Direct RDMA。
+ * 5. 调用 / 计算 / 写入：send->conn.direct |= req.useGdr ? NCCL_DIRECT_NIC : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetLocalRank(comm->topo, myInfo->rank, &send->proxyConn.localRank));；失败时可能提前return，成功才继续；把全局用户 rank 映射到当前硬件系统内的 GPU 下标/局部位置。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_COLLNET, 1, myInfo->rank, &send->proxyConn));；失败时可能提前return，成功才继续；联系目标代理服务并申请 transport/方向连接，建立主线程到该代理连接的控制引用。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&send->proxyConn, ncclProxyMsgSetup, &req, sizeof(req), NULL, 0));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ * 9. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_NET,"CollNet %02d : %d [send] via COLLNET/%s/%d%s", channelId, myInfo->rank, collNetName(), req.netDev, req.useGdr ? "/GDRDMA" : "");；读取已选网络后端名字；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1053
+ */
 /* 中文逐项-函数 F1053：sendSetup
  * 用途与位置：为对应方向选择设备/代理并准备本地控制资源，生成可经 bootstrap 交换的建链句柄。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -444,6 +464,21 @@ static ncclResult_t sendSetup(struct ncclComm* comm, struct ncclTopoGraph* graph
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1054：recvSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct setupReq req;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int proxyRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetNetDev(comm, myInfo->rank, graph, channelId, -1, &req.netDev, &proxyRank));；失败时可能提前return，成功才继续；按图、channel 和 peer 选择实际 NIC 与 Proxy rank，处理本地出口和 PXN 代理条件。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCheckGdr(comm->topo, myInfo->busId, req.netDev, 0, &req.useGdr));；失败时可能提前return，成功才继续；结合 NIC/GPU 能力、距离与发送读方向策略判断该路径能否使用 GPU Direct RDMA。
+ * 5. 调用 / 计算 / 写入：recv->conn.direct |= req.useGdr ? NCCL_DIRECT_NIC : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetLocalRank(comm->topo, myInfo->rank, &recv->proxyConn.localRank));；失败时可能提前return，成功才继续；把全局用户 rank 映射到当前硬件系统内的 GPU 下标/局部位置。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_COLLNET, 0, myInfo->rank, &recv->proxyConn));；失败时可能提前return，成功才继续；联系目标代理服务并申请 transport/方向连接，建立主线程到该代理连接的控制引用。
+ * 8. 准备局部状态：struct collNetRecvConnectInfo* info = (struct collNetRecvConnectInfo*) connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&recv->proxyConn, ncclProxyMsgSetup, &req, sizeof(req), &info->collNetHandle, sizeof(collNetHandle_t)));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ * 10. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_NET,"CollNet %02d : %d [receive] via COLLNET/%s/%d%s", channelId, myInfo->rank, collNetName(), req.netDev, req.useGdr ? "/GDRDMA" : "");；读取已选网络后端名字；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1054
+ */
 /* 中文逐项-函数 F1054：recvSetup
  * 用途与位置：为对应方向选择设备/代理并准备本地控制资源，生成可经 bootstrap 交换的建链句柄。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -490,6 +525,26 @@ static ncclResult_t recvSetup(struct ncclComm* comm, struct ncclTopoGraph* graph
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1055：collNetDumpMap
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：printf("Dump map\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：struct connectMapMem *mem = map->mems+NCCL_NET_MAP_HOSTMEM;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：printf("Mem 0: Host mem (%x B) CPU %p GPU %p\n", mem->size, mem->cpuPtr, mem->gpuPtr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 调用 / 计算 / 写入：mem = map->mems+NCCL_NET_MAP_DEVMEM;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：printf("Mem 1: Vid mem CPU (%x B) %p GPU %p\n", mem->size, mem->cpuPtr, mem->gpuPtr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 调用 / 计算 / 写入：mem = map->mems+NCCL_NET_MAP_SHARED_HOSTMEM;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：printf("Mem 2: Shared Host mem (%x B) CPU %p GPU %p\n", mem->size, mem->cpuPtr, mem->gpuPtr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 调用 / 计算 / 写入：mem = map->mems+NCCL_NET_MAP_SHARED_DEVMEM;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：printf("Mem 3: Shared Vid (%x B) mem CPU %p GPU %p\n", mem->size, mem->cpuPtr, mem->gpuPtr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 调用 / 计算 / 写入：printf("SendMem -> Used %d Bank %d Offset %x, cpu %p gpu %p\n", map->offsets.sendMem & NCCL_NET_MAP_MASK_USED ? 1 : 0, NCCL_NET_MAP_OFFSET_BANK(map, sendMem), map->offsets.sendMem & NCCL_NET_MAP_MASK_ …（完整代码见函数体）；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 11. 调用 / 计算 / 写入：printf("RecvMem -> Used %d Bank %d Offset %x, cpu %p gpu %p\n", map->offsets.recvMem & NCCL_NET_MAP_MASK_USED ? 1 : 0, NCCL_NET_MAP_OFFSET_BANK(map, recvMem), map->offsets.recvMem & NCCL_NET_MAP_MASK_ …（完整代码见函数体）；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 12. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   13. 调用 / 计算 / 写入：printf("Proto %d -> Used %d Bank %d Offset %x, cpu %p, gpu %p\n", p, map->offsets.buffs[p] & NCCL_NET_MAP_MASK_USED ? 1 : 0, NCCL_NET_MAP_OFFSET_BANK(map, buffs[p]), map->offsets.buffs[p] & NCCL_NET_M …（完整代码见函数体）；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 15. 调用 / 计算 / 写入：printf("End of dump\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1055
+ */
 /* 中文逐项-函数 F1055：collNetDumpMap
  * 用途与位置：打印后端各内存 bank 的 CPU/GPU 地址、大小和映射偏移，辅助检查跨进程地址视图。
  * 参数 map（struct connectMap* map）：网络传输内存映射描述，按不同主机/GPU/共享bank定位各控制区和协议缓冲。
@@ -553,6 +608,30 @@ struct collNetConnectArgs {
   struct ncclConnect* connectInfos;
 };
 
+/* 中文内部逻辑 F1056：sendConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct collNetConnectArgs args = { rank, nranks, connectInfos };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct connectMap* map;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&send->proxyConn, ncclProxyMsgConnect, &args, sizeof(struct collNetConnectArgs), &map, sizeof(struct connectMap*)));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ * 4. 条件判断：(map == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 准备局部状态：struct ncclSendMem *sendMem = (struct ncclSendMem*) NCCL_NET_MAP_GET_POINTER(map, gpu, sendMem);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 准备局部状态：void* gdcMem = map->mems[NCCL_NET_MAP_GDCMEM].gpuPtr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 调用 / 计算 / 写入：send->conn.head = gdcMem ? (uint64_t*)gdcMem : &sendMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 10. 准备局部状态：struct ncclRecvMem *recvMem = (struct ncclRecvMem*) NCCL_NET_MAP_GET_POINTER(map, gpu, recvMem);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 调用 / 计算 / 写入：send->conn.tail = &recvMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 12. 调用 / 计算 / 写入：send->conn.sizesFifo = recvMem->sizesFifo;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 循环：初始 int i=0;；继续条件 i<NCCL_STEPS；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   14. 调用 / 计算 / 写入：send->conn.sizesFifo[i] = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 16. 调用 / 计算 / 写入：send->conn.offsFifo = recvMem->offsFifo;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   18. 调用 / 计算 / 写入：send->conn.buffs[p] = NCCL_NET_MAP_GET_POINTER(map, gpu, buffs[p]);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 20. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1056
+ */
 /* 中文逐项-函数 F1056：sendConnect
  * 用途与位置：消费远端句柄完成对应方向的连接和地址映射，把协议缓冲/进度指针填写到设备连接视图。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -622,6 +701,26 @@ static ncclResult_t sendConnect(struct ncclComm* comm, struct ncclConnect* conne
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1057：recvConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct collNetConnectArgs args = { rank, nranks, connectInfos };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct connectMap* map;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&recv->proxyConn, ncclProxyMsgConnect, &args, sizeof(struct collNetConnectArgs), &map, sizeof(struct connectMap*)));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ * 4. 条件判断：(map == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 准备局部状态：struct ncclSendMem *sendMem = (struct ncclSendMem*) NCCL_NET_MAP_GET_POINTER(map, gpu, sendMem);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：recv->conn.head = &sendMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 9. 准备局部状态：struct ncclRecvMem *recvMem = (struct ncclRecvMem*) NCCL_NET_MAP_GET_POINTER(map, gpu, recvMem);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 准备局部状态：void* gdcMem = map->mems[NCCL_NET_MAP_GDCMEM].gpuPtr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 调用 / 计算 / 写入：recv->conn.tail = gdcMem ? (uint64_t*)gdcMem : &recvMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 12. 调用 / 计算 / 写入：recv->conn.offsFifo = recvMem->offsFifo;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   14. 调用 / 计算 / 写入：recv->conn.buffs[p] = NCCL_NET_MAP_GET_POINTER(map, gpu, buffs[p]);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1057
+ */
 /* 中文逐项-函数 F1057：recvConnect
  * 用途与位置：消费远端句柄完成对应方向的连接和地址映射，把协议缓冲/进度指针填写到设备连接视图。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -686,6 +785,11 @@ static ncclResult_t recvConnect(struct ncclComm* comm, struct ncclConnect* conne
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1058：sendFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1058
+ */
 /* 中文逐项-函数 F1058：sendFree
  * 用途与位置：释放对应逻辑连接持有的本地资源/映射，并按代理与共享计数规则释放后台对象。
  * 参数 send（struct ncclConnector* send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
@@ -697,6 +801,11 @@ static ncclResult_t sendFree(struct ncclConnector* send) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1059：recvFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1059
+ */
 /* 中文逐项-函数 F1059：recvFree
  * 用途与位置：释放对应逻辑连接持有的本地资源/映射，并按代理与共享计数规则释放后台对象。
  * 参数 recv（struct ncclConnector* recv）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
@@ -708,6 +817,21 @@ static ncclResult_t recvFree(struct ncclConnector* recv) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1060：sendProxySetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct setupReq* req = (struct setupReq*)reqBuff;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(reqSize != sizeof(struct setupReq))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：struct sendResources* resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&resources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 7. 调用 / 计算 / 写入：connection->transportResources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：connection->shared = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：resources->netDev = req->netDev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 调用 / 计算 / 写入：resources->useGdr = req->useGdr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1060
+ */
 /* 中文逐项-函数 F1060：sendProxySetup
  * 用途与位置：在实际代理进程中准备对应方向网络设备与连接资源；接收方向通常还要 listen 生成句柄。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -763,6 +887,19 @@ struct sharedResources {
   int commRefCount[NCCL_MAX_NETDEVS];
 };
 
+/* 中文内部逻辑 F1061：sharedListen
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct sharedResources* resources = (struct sharedResources*)comm->proxyState.progressState.collNet.resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(resources == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&resources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     5. 调用 / 计算 / 写入：comm->proxyState.progressState.collNet.resources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 条件判断：(resources->collNetComms[netDev] == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 调用 / 计算 / 写入：NCCLCHECK(collNetListen(netDev, collNetHandle, resources->collNetListenComms+netDev));；失败时可能提前return，成功才继续；创建接收监听并导出连接句柄；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1061
+ */
 /* 中文逐项-函数 F1061：sharedListen
  * 用途与位置：按网络设备复用 CollNet 监听对象并返回可交换网络句柄。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -794,6 +931,31 @@ ncclResult_t sharedListen(struct ncclComm* comm, int netDev, void* collNetHandle
  * 首次建立时用参与者句柄数组和 rank 信息调用插件 connect；后续路径只增加引用。
  * 最后一个使用者释放时才 closeColl，避免某条逻辑连接释放后破坏仍在使用的共享对象。
  * 这里的共享是 NCCL/插件对象生命周期，内部有多少 QP/MR 必须继续看具体插件。
+ */
+/* 中文内部逻辑 F1062：sharedConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct sharedResources* resources = (struct sharedResources*)comm->proxyState.progressState.collNet.resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(resources->collNetComms[netDev] == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 准备局部状态：collNetHandle_t** handlePtrs = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&handlePtrs, nranks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     6. 循环：初始 int i = 0;；继续条件 i < nranks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       7. 准备局部状态：struct collNetRecvConnectInfo* info = (struct collNetRecvConnectInfo*)(connectInfos+i);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       8. 调用 / 计算 / 写入：handlePtrs[i] = &(info->collNetHandle);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     10. 准备局部状态：ncclResult_t ret = collNetConnect((void**)handlePtrs, nranks, rank, resources->collNetListenComms[netDev], resources->collNetComms+netDev);；推进发送端连接建立；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *     11. 调用 / 计算 / 写入：free(handlePtrs);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     12. 条件判断：(ret == ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       13. 真分支：；仅条件为真执行以下子项。
+ *         14. 调用 / 计算 / 写入：NCCLCHECK(collNetCloseListen(resources->collNetListenComms[netDev]));；失败时可能提前return，成功才继续；关闭监听对象；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *       15. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         16. 调用 / 计算 / 写入：resources->collNetListenComms[netDev] = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：*collNetComm = resources->collNetComms[netDev];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 条件判断：(*collNetComm)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   19. 真分支：；仅条件为真执行以下子项。
+ *     20. 调用 / 计算 / 写入：resources->commRefCount[netDev]++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1062
  */
 /* 中文逐项-函数 F1062：sharedConnect
  * 用途与位置：按设备引用计数复用 CollNet 集合连接，用完整网络参与句柄数组完成首次连接。
@@ -856,6 +1018,23 @@ static ncclResult_t sharedConnect(struct ncclComm* comm, int netDev, struct nccl
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1063：sharedFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct sharedResources* resources = (struct sharedResources*)comm->proxyState.progressState.collNet.resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：resources->commRefCount[netDev]--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 条件判断：(resources->commRefCount[netDev] == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(collNetCloseColl(resources->collNetComms[netDev]));；失败时可能提前return，成功才继续；关闭集合网络连接；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 6. 循环：初始 int n=0;；继续条件 n<NCCL_MAX_NETDEVS；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 条件判断：(resources->commRefCount[n])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     8. 真分支：；仅条件为真执行以下子项。
+ *       9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 10. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 11. 调用 / 计算 / 写入：comm->proxyState.progressState.collNet.resources = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 调用 / 计算 / 写入：free(resources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1063
+ */
 /* 中文逐项-函数 F1063：sharedFree
  * 用途与位置：减小共享 CollNet 连接引用，最后一个用户释放时才关闭网络集合对象。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -886,6 +1065,23 @@ static ncclResult_t sharedFree(struct ncclComm* comm, int netDev) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1064：sharedBuffersInit
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxySharedCollNet* state = &comm->proxyState.progressState.collNet;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->size == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：state->size = 2*comm->nChannels*comm->buffSizes[NCCL_PROTO_SIMPLE];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：*size = state->size;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 条件判断：(cuda && state->cudaBuff == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaCalloc(&state->cudaBuff, *size));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 9. 条件判断：(!cuda && state->hostBuff == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaHostCalloc(&state->hostBuff, *size));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 12. 调用 / 计算 / 写入：*gpuPtr = *cpuPtr = cuda ? state->cudaBuff : state->hostBuff;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1064
+ */
 /* 中文逐项-函数 F1064：sharedBuffersInit
  * 用途与位置：按本地 rank、方向和 CUDA/主机内存类型创建或复用共享协议数据池，引用计数管理生命周期。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -920,6 +1116,14 @@ static ncclResult_t sharedBuffersInit(struct ncclComm* comm, int cuda, char** gp
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1065：sharedBuffersGet
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int slotSize = comm->buffSizes[NCCL_PROTO_SIMPLE]/NCCL_STEPS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int globalSlot = (type*NCCL_STEPS+slot)*comm->nChannels+channel;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：*offset = slotSize * globalSlot;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1065
+ */
 /* 中文逐项-函数 F1065：sharedBuffersGet
  * 用途与位置：按 channel 和在途槽索引计算共享池字节偏移，后续通过 offsFifo 把该位置交给 GPU。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -947,6 +1151,18 @@ static ncclResult_t sharedBuffersGet(struct ncclComm* comm, int type, int slot, 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1066：sharedBuffersDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxySharedCollNet* state = &comm->proxyState.progressState.collNet;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->size == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：CUDACHECK(cudaFree(state->cudaBuff));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaHostFree(state->hostBuff));；失败时可能提前return，成功才继续；回收 cudaHostAlloc 对应的主机固定内存，不能用普通 free 替代。
+ * 7. 调用 / 计算 / 写入：state->size = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1066
+ */
 /* 中文逐项-函数 F1066：sharedBuffersDestroy
  * 用途与位置：降低共享数据池引用数，最后使用者退出时回收显存/主机映射与导出句柄。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -969,6 +1185,26 @@ static ncclResult_t sharedBuffersDestroy(struct ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1067：recvProxySetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct setupReq* req = (struct setupReq*)reqBuff;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(reqSize != sizeof (struct setupReq))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：struct recvResources* resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&resources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 7. 调用 / 计算 / 写入：connection->transportResources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：connection->shared = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：resources->netDev = req->netDev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 调用 / 计算 / 写入：resources->useGdr = req->useGdr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 准备局部状态：collNetHandle_t* netHandle = (collNetHandle_t*) respBuff;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 条件判断：(respSize != sizeof(collNetHandle_t))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 15. 调用 / 计算 / 写入：NCCLCHECK(sharedListen(comm, req->netDev, netHandle));；失败时可能提前return，成功才继续；按网络设备复用 CollNet 监听对象并返回可交换网络句柄。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1067
+ */
 /* 中文逐项-函数 F1067：recvProxySetup
  * 用途与位置：在实际代理进程中准备对应方向网络设备与连接资源；接收方向通常还要 listen 生成句柄。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -1014,6 +1250,56 @@ static ncclResult_t recvProxySetup(struct ncclProxyConnection* connection, struc
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1068：sendProxyConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(reqSize != sizeof(struct collNetConnectArgs))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("sendProxyConnect: reqSize is %d != %ld\n", reqSize, sizeof(struct collNetConnectArgs));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：struct collNetConnectArgs* args = (struct collNetConnectArgs*)reqBuff;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：struct collNetSendConnectInfo* info = (struct collNetSendConnectInfo*)(args->connectInfos+args->rank);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：struct sendResources* resources = (struct sendResources*)(connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：resources->collNetRank = args->rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：resources->reqFifo = (struct reqSlot (*)[NCCL_STEPS])(info->reqFifo);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   11. 调用 / 计算 / 写入：resources->recvMhandles[p] = info->mhandles[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(sharedConnect(comm, resources->netDev, args->connectInfos, args->nranks, args->rank, &resources->collNetComm));；失败时可能提前return，成功才继续；按设备引用计数复用 CollNet 集合连接，用完整网络参与句柄数组完成首次连接。
+ * 14. 条件判断：(respSize != sizeof(struct connectMap*))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 调用 / 计算 / 写入：WARN("sendProxyConnect: respSize is %d != %ld\n", respSize, sizeof(void*));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 18. 条件判断：(resources->collNetComm == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   19. 真分支：；仅条件为真执行以下子项。
+ *     20. 调用 / 计算 / 写入：*((struct connectMap**)respBuff) = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     21. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 22. 调用 / 计算 / 写入：connection->proxyAppendPtr = comm->proxyState.progressState.collNet.proxyAppend+2*resources->netDev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 23. 准备局部状态：struct connectMap* map = &resources->map;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 24. 调用 / 计算 / 写入：NCCL_NET_MAP_ADD_POINTER(map, 0, 0, sizeof(struct ncclSendMem), sendMem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 25. 调用 / 计算 / 写入：NCCL_NET_MAP_ADD_POINTER(map, 0, 0, sizeof(struct ncclRecvMem), recvMem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 26. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaHostCalloc(&map->mems[NCCL_NET_MAP_HOSTMEM].cpuPtr, map->mems[NCCL_NET_MAP_HOSTMEM].size));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 27. 调用 / 计算 / 写入：map->mems[NCCL_NET_MAP_HOSTMEM].gpuPtr = map->mems[NCCL_NET_MAP_HOSTMEM].cpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 28. 条件判断：(ncclGdrCopy && ncclParamGdrCopySyncEnable())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   29. 真分支：；仅条件为真执行以下子项。
+ *     30. 准备局部状态：uint64_t *cpuPtr, *gpuPtr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     31. 调用 / 计算 / 写入：NCCLCHECK(ncclGdrCudaCalloc(&cpuPtr, &gpuPtr, 1, &resources->gdrDesc));；失败时可能提前return，成功才继续；分配显存并建立 GDRCopy 的 CPU 映射，返回 CUDA 地址、CPU 可写映射与释放所需描述符。
+ *     32. 调用 / 计算 / 写入：resources->gdcSync = cpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     33. 准备局部状态：struct connectMapMem* gdcMem = map->mems+NCCL_NET_MAP_GDCMEM;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     34. 调用 / 计算 / 写入：gdcMem->cpuPtr = (char*)cpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     35. 调用 / 计算 / 写入：gdcMem->gpuPtr = (char*)gpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     36. 调用 / 计算 / 写入：gdcMem->size = sizeof(uint64_t);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 37. 调用 / 计算 / 写入：resources->sendMem = (struct ncclSendMem*) NCCL_NET_MAP_GET_POINTER(map, cpu, sendMem);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 38. 调用 / 计算 / 写入：resources->recvMem = (struct ncclRecvMem*) NCCL_NET_MAP_GET_POINTER(map, cpu, recvMem);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 39. 调用 / 计算 / 写入：resources->sendMem->head = -NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 40. 准备局部状态：int bank = resources->useGdr ? NCCL_NET_MAP_SHARED_DEVMEM : NCCL_NET_MAP_SHARED_HOSTMEM;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 41. 准备局部状态：struct connectMapMem* mapMem = map->mems+bank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 42. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersInit(comm, resources->useGdr, &mapMem->gpuPtr, &mapMem->cpuPtr, &mapMem->size));；失败时可能提前return，成功才继续；按本地 rank、方向和 CUDA/主机内存类型创建或复用共享协议数据池，引用计数管理生命周期。
+ * 43. 调用 / 计算 / 写入：NCCL_NET_MAP_ADD_POINTER(map, 1, resources->useGdr, mapMem->size, buffs[NCCL_PROTO_SIMPLE]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 44. 调用 / 计算 / 写入：NCCLCHECK(collNetRegMr(resources->collNetComm, mapMem->cpuPtr, mapMem->size, resources->useGdr ? NCCL_PTR_CUDA : NCCL_PTR_HOST, &resources->sendMhandles[NCCL_PROTO_SIMPLE]));；失败时可能提前return，成功才继续；注册后续网络要访问的内存并返回后端句柄；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 45. 调用 / 计算 / 写入：*((struct connectMap**)respBuff) = &resources->map;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 46. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1068
+ */
 /* 中文逐项-函数 F1068：sendProxyConnect
  * 用途与位置：在代理侧异步完成后端 connect/accept、协议缓冲分配/共享/注册，并返回主线程需要的映射信息。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -1129,6 +1415,64 @@ static ncclResult_t sendProxyConnect(struct ncclProxyConnection* connection, str
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1069：recvProxyConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(reqSize != sizeof(struct collNetConnectArgs))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("recvProxyConnect: reqSize is %d != %ld\n", reqSize, sizeof(struct collNetConnectArgs));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：struct collNetConnectArgs* args = (struct collNetConnectArgs*)reqBuff;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：struct recvResources* resources = (struct recvResources*)(connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：struct collNetSendConnectInfo* info = (struct collNetSendConnectInfo*)(args->connectInfos+args->rank);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：resources->collNetRank = args->rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(sharedConnect(comm, resources->netDev, args->connectInfos, args->nranks, args->rank, &resources->collNetComm));；失败时可能提前return，成功才继续；按设备引用计数复用 CollNet 集合连接，用完整网络参与句柄数组完成首次连接。
+ * 10. 条件判断：(respSize != sizeof(struct connectMap*))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：WARN("sendProxyConnect: respSize is %d != %ld\n", respSize, sizeof(void*));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 14. 条件判断：(resources->collNetComm == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 调用 / 计算 / 写入：*((struct connectMap**)respBuff) = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 18. 调用 / 计算 / 写入：connection->proxyAppendPtr = comm->proxyState.progressState.collNet.proxyAppend+2*resources->netDev+1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 准备局部状态：struct connectMap* map = &resources->map;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 20. 调用 / 计算 / 写入：NCCL_NET_MAP_ADD_POINTER(map, 0, 0, sizeof(struct ncclSendMem), sendMem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 21. 调用 / 计算 / 写入：NCCL_NET_MAP_ADD_POINTER(map, 0, 0, sizeof(struct ncclRecvMem), recvMem);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 22. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaHostCalloc(&map->mems[NCCL_NET_MAP_HOSTMEM].cpuPtr, map->mems[NCCL_NET_MAP_HOSTMEM].size));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 23. 调用 / 计算 / 写入：map->mems[NCCL_NET_MAP_HOSTMEM].gpuPtr = map->mems[NCCL_NET_MAP_HOSTMEM].cpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 24. 条件判断：(ncclGdrCopy)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   25. 真分支：；仅条件为真执行以下子项。
+ *     26. 准备局部状态：uint64_t *cpuPtr, *gpuPtr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     27. 调用 / 计算 / 写入：NCCLCHECK(ncclGdrCudaCalloc(&cpuPtr, &gpuPtr, 2, &resources->gdrDesc));；失败时可能提前return，成功才继续；分配显存并建立 GDRCopy 的 CPU 映射，返回 CUDA 地址、CPU 可写映射与释放所需描述符。
+ *     28. 条件判断：(ncclParamGdrCopySyncEnable())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       29. 真分支：；仅条件为真执行以下子项。
+ *         30. 调用 / 计算 / 写入：resources->gdcSync = cpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         31. 准备局部状态：struct connectMapMem* gdcMem = map->mems+NCCL_NET_MAP_GDCMEM;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         32. 调用 / 计算 / 写入：gdcMem->cpuPtr = (char*)cpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         33. 调用 / 计算 / 写入：gdcMem->gpuPtr = (char*)gpuPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         34. 调用 / 计算 / 写入：gdcMem->size = sizeof(uint64_t);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     35. 条件判断：(ncclParamGdrCopyFlushEnable())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       36. 真分支：；仅条件为真执行以下子项。
+ *         37. 调用 / 计算 / 写入：resources->gdcFlush = cpuPtr + 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 38. 调用 / 计算 / 写入：resources->sendMem = (struct ncclSendMem*) NCCL_NET_MAP_GET_POINTER(map, cpu, sendMem);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 39. 调用 / 计算 / 写入：resources->recvMem = (struct ncclRecvMem*) NCCL_NET_MAP_GET_POINTER(map, cpu, recvMem);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 40. 准备局部状态：int bank = resources->useGdr ? NCCL_NET_MAP_SHARED_DEVMEM : NCCL_NET_MAP_SHARED_HOSTMEM;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 41. 准备局部状态：struct connectMapMem* mapMem = map->mems+bank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 42. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersInit(comm, resources->useGdr, &mapMem->gpuPtr, &mapMem->cpuPtr, &mapMem->size));；失败时可能提前return，成功才继续；按本地 rank、方向和 CUDA/主机内存类型创建或复用共享协议数据池，引用计数管理生命周期。
+ * 43. 调用 / 计算 / 写入：NCCL_NET_MAP_ADD_POINTER(map, 1, resources->useGdr, mapMem->size, buffs[NCCL_PROTO_SIMPLE]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 44. 调用 / 计算 / 写入：NCCLCHECK(collNetRegMr(resources->collNetComm, mapMem->cpuPtr, mapMem->size, resources->useGdr ? NCCL_PTR_CUDA : NCCL_PTR_HOST, &resources->mhandles[NCCL_PROTO_SIMPLE]));；失败时可能提前return，成功才继续；注册后续网络要访问的内存并返回后端句柄；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 45. 调用 / 计算 / 写入：info->reqFifo = resources->reqFifo;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 46. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   47. 调用 / 计算 / 写入：info->mhandles[p] = resources->mhandles[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 48. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 49. 条件判断：(respSize != sizeof(struct connectMap*))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   50. 真分支：；仅条件为真执行以下子项。
+ *     51. 调用 / 计算 / 写入：WARN("recvProxyConnect: respSize is %d != %ld\n", respSize, sizeof(void*));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     52. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 53. 调用 / 计算 / 写入：*((struct connectMap**)respBuff) = &resources->map;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 54. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1069
+ */
 /* 中文逐项-函数 F1069：recvProxyConnect
  * 用途与位置：在代理侧异步完成后端 connect/accept、协议缓冲分配/共享/注册，并返回主线程需要的映射信息。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -1245,6 +1589,26 @@ static ncclResult_t recvProxyConnect(struct ncclProxyConnection* connection, str
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1070：sendProxyFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct sendResources* resources = (struct sendResources*)(connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(resources->sendMhandles[p])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：NCCLCHECK(collNetDeregMr(resources->collNetComm, resources->sendMhandles[p]));；失败时可能提前return，成功才继续；解除对应后端内存注册引用；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 6. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 7. 准备局部状态：struct connectMapMem* mems = resources->map.mems;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaHostFree(mems[NCCL_NET_MAP_HOSTMEM].cpuPtr));；失败时可能提前return，成功才继续；回收 cudaHostAlloc 对应的主机固定内存，不能用普通 free 替代。
+ * 9. 调用 / 计算 / 写入：CUDACHECK(cudaFree(mems[NCCL_NET_MAP_DEVMEM].cpuPtr));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 10. 条件判断：(mems[NCCL_NET_MAP_GDCMEM].cpuPtr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：NCCLCHECK(ncclGdrCudaFree(resources->gdrDesc));；失败时可能提前return，成功才继续；按映射、pin、显存分配的依赖顺序撤销 GDRCopy 资源。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersDestroy(comm));；失败时可能提前return，成功才继续；降低共享数据池引用数，最后使用者退出时回收显存/主机映射与导出句柄。
+ * 14. 调用 / 计算 / 写入：NCCLCHECK(sharedFree(comm, resources->netDev));；失败时可能提前return，成功才继续；减小共享 CollNet 连接引用，最后一个用户释放时才关闭网络集合对象。
+ * 15. 调用 / 计算 / 写入：free(connection->transportResources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1070
+ */
 /* 中文逐项-函数 F1070：sendProxyFree
  * 用途与位置：在拥有网络对象的代理侧注销内存、释放映射并按引用计数关闭 backend connection。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -1283,6 +1647,26 @@ static ncclResult_t sendProxyFree(struct ncclProxyConnection* connection, struct
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1071：recvProxyFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct recvResources* resources = (struct recvResources*)(connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 条件判断：(resources->mhandles[p])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：NCCLCHECK(collNetDeregMr(resources->collNetComm, resources->mhandles[p]));；失败时可能提前return，成功才继续；解除对应后端内存注册引用；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ * 6. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 7. 准备局部状态：struct connectMapMem* mems = resources->map.mems;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaHostFree(mems[NCCL_NET_MAP_HOSTMEM].cpuPtr));；失败时可能提前return，成功才继续；回收 cudaHostAlloc 对应的主机固定内存，不能用普通 free 替代。
+ * 9. 调用 / 计算 / 写入：CUDACHECK(cudaFree(mems[NCCL_NET_MAP_DEVMEM].cpuPtr));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 10. 条件判断：(mems[NCCL_NET_MAP_GDCMEM].cpuPtr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：NCCLCHECK(ncclGdrCudaFree(resources->gdrDesc));；失败时可能提前return，成功才继续；按映射、pin、显存分配的依赖顺序撤销 GDRCopy 资源。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersDestroy(comm));；失败时可能提前return，成功才继续；降低共享数据池引用数，最后使用者退出时回收显存/主机映射与导出句柄。
+ * 14. 调用 / 计算 / 写入：NCCLCHECK(sharedFree(comm, resources->netDev));；失败时可能提前return，成功才继续；减小共享 CollNet 连接引用，最后一个用户释放时才关闭网络集合对象。
+ * 15. 调用 / 计算 / 写入：free(connection->transportResources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1071
+ */
 /* 中文逐项-函数 F1071：recvProxyFree
  * 用途与位置：在拥有网络对象的代理侧注销内存、释放映射并按引用计数关闭 backend connection。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -1334,6 +1718,120 @@ static ncclResult_t recvProxyFree(struct ncclProxyConnection* connection, struct
  * recv 侧协同请求 FIFO、完成检查和 flush，再把结果可读进度发布给 GPU。
  * 它需要插件承诺相同数据类型/归约操作语义；不是把任意一组 IB QP 自动变成硬件归约。
  * 资源由 sharedConnect/sharedBuffers 等机制管理，不能把普通 net_ib 的每连接公式直接套过来。
+ */
+/* 中文内部逻辑 F1072：sendProxyProgress
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(args->protocol != NCCL_PROTO_SIMPLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("CollNet does not support LL/LL128");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 条件判断：(args->state == ncclProxyOpReady)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 循环：初始 int s=0;；继续条件 s<args->nsubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       8. 准备局部状态：struct ncclProxySubArgs* sub = args->subs+s;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       9. 准备局部状态：struct sendResources* resources = (struct sendResources*) (sub->connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       10. 调用 / 计算 / 写入：sub->base = ROUNDUP(resources->step, args->chunkSteps);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       11. 调用 / 计算 / 写入：sub->posted = sub->received = sub->transmitted = sub->done = 0;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       12. 调用 / 计算 / 写入：resources->step = sub->base + sub->nsteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     14. 调用 / 计算 / 写入：args->state = ncclProxyOpProgress;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 调用 / 计算 / 写入：args->idle = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 条件判断：(args->state == ncclProxyOpProgress)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   17. 真分支：；仅条件为真执行以下子项。
+ *     18. 准备局部状态：int p = args->protocol;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     19. 准备局部状态：int nGroups = DIVUP(args->nsubs, COLLNET_GROUP_NSUBS);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     20. 准备局部状态：int perGroupSteps = NCCL_STEPS / nGroups;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     21. 循环：初始 int s=0;；继续条件 s<args->nsubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       22. 准备局部状态：struct ncclProxySubArgs* sub = args->subs+s;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       23. 准备局部状态：struct sendResources* resources = (struct sendResources*) (sub->connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       24. 准备局部状态：void* sendMhandle = resources->sendMhandles[p];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       25. 准备局部状态：void* recvMhandle = resources->recvMhandles[p];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       26. 准备局部状态：auto reqFifo = resources->reqFifo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       27. 条件判断：(sub->posted < sub->nsteps && sub->posted < sub->done + NCCL_STEPS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         28. 真分支：；仅条件为真执行以下子项。
+ *           29. 准备局部状态：int buffSlot = (sub->base+sub->posted)%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           30. 准备局部状态：int sharedBuffSlot = sub->posted%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           31. 准备局部状态：int offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           32. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersGet(comm, 0, sharedBuffSlot, 0, &offset));；失败时可能提前return，成功才继续；按 channel 和在途槽索引计算共享池字节偏移，后续通过 offsFifo 把该位置交给 GPU。
+ *           33. 调用 / 计算 / 写入：resources->recvMem->offsFifo[buffSlot] = offset + s*args->chunkSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           34. 调用 / 计算 / 写入：__sync_synchronize();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           35. 准备局部状态：volatile uint64_t* sendHead = resources->gdcSync ? resources->gdcSync : &resources->sendMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           36. 调用 / 计算 / 写入：sub->posted += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           37. 调用 / 计算 / 写入：*sendHead = sub->base + sub->posted - NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           38. 条件判断：(resources->gdcSync)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             39. 真分支：；仅条件为真执行以下子项。
+ *               40. 调用 / 计算 / 写入：wc_store_fence();；按 CPU 架构执行写合并内存的 store fence，确保映射显存控制写的发布顺序；无该支持时走相应实现。
+ *       41. 准备局部状态：bool groupSync = (((s == 0) && ((sub+args->nsubs-1)->received == sub->received)) || (s && (sub-1)->received > sub->received));；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       42. 条件判断：(groupSync && sub->received < sub->posted && sub->received < sub->done + perGroupSteps)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         43. 真分支：；仅条件为真执行以下子项。
+ *           44. 准备局部状态：int buffSlot = (sub->base+sub->received)%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           45. 准备局部状态：int sharedBuffSlot = sub->received%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           46. 准备局部状态：volatile int* sizesFifo = resources->recvMem->sizesFifo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           47. 准备局部状态：volatile uint64_t* recvTail = &resources->recvMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           48. 准备局部状态：char* localBuff = NCCL_NET_MAP_GET_POINTER(&resources->map, gpu, buffs[p]);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           49. 条件判断：(sizesFifo[buffSlot] != -1 && ((*recvTail > (sub->base+sub->received))))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             50. 真分支：；仅条件为真执行以下子项。
+ *               51. 准备局部状态：int ready = 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               52. 条件判断：(s == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 53. 真分支：；仅条件为真执行以下子项。
+ *                   54. 准备局部状态：int offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                   55. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersGet(comm, 0, sharedBuffSlot, 0, &offset));；失败时可能提前return，成功才继续；按 channel 和在途槽索引计算共享池字节偏移，后续通过 offsFifo 把该位置交给 GPU。
+ *                   56. 调用 / 计算 / 写入：args->sharedBuff[sharedBuffSlot] = localBuff + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   57. 调用 / 计算 / 写入：args->sharedSize[sharedBuffSlot] = args->chunkSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               58. 条件判断：(ready)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 59. 真分支：；仅条件为真执行以下子项。
+ *                   60. 调用 / 计算 / 写入：sizesFifo[buffSlot] = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   61. 调用 / 计算 / 写入：sub->received += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *                   62. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       63. 条件判断：(LAST_OF_GROUP(s) && (sub->transmitted < sub->received))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         64. 真分支：；仅条件为真执行以下子项。
+ *           65. 准备局部状态：int group = s / COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           66. 准备局部状态：int buffSlot = (sub->base+sub->transmitted)%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           67. 准备局部状态：int sharedBuffSlot = sub->transmitted%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           68. 条件判断：(reqFifo[group][buffSlot].recvBuff != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             69. 真分支：；仅条件为真执行以下子项。
+ *               70. 准备局部状态：int totalSize = (s-group*COLLNET_GROUP_NSUBS+1) * args->sharedSize[sharedBuffSlot];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               71. 准备局部状态：int count = totalSize / ncclTypeSize(args->dtype);；把 NCCL 数据类型枚举映射到每元素字节数，用于尺寸换算；未知类型返回 -1。
+ *               72. 调用 / 计算 / 写入：reqFifo[group][buffSlot].size = args->sharedSize[sharedBuffSlot];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               73. 准备局部状态：char* sendAddress = (char*)args->sharedBuff[sharedBuffSlot] + group*COLLNET_GROUP_NSUBS*args->sharedSize[sharedBuffSlot];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               74. 调用 / 计算 / 写入：NCCLCHECK(collNetIallreduce(resources->collNetComm, sendAddress, (void*)(reqFifo[group][buffSlot].recvBuff), count, args->dtype, args->redOp, sendMhandle, recvMhandle, sub->requests+buffSlot));；失败时可能提前return，成功才继续；提交网络集合归约请求；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *               75. 条件判断：(sub->requests[buffSlot] == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 76. 真分支：；仅条件为真执行以下子项。
+ *                   77. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *               78. 调用 / 计算 / 写入：TRACE(NCCL_NET, "sendProxy [%d/%d/%d] Iallreduce posted, size %d req %p", sub->transmitted, group, buffSlot, totalSize, sub->requests[buffSlot]);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *               79. 调用 / 计算 / 写入：__sync_synchronize();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *               80. 调用 / 计算 / 写入：sub->transmitted += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *               81. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               82. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       83. 条件判断：(LAST_OF_GROUP(s) && sub->done < sub->transmitted)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         84. 真分支：；仅条件为真执行以下子项。
+ *           85. 准备局部状态：int done, size;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           86. 准备局部状态：int group = s / COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           87. 准备局部状态：int buffSlot = (sub->base+sub->done)%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           88. 调用 / 计算 / 写入：NCCLCHECK(collNetTest((void*)(sub->requests[buffSlot]), &done, &size));；失败时可能提前return，成功才继续；查询并推进异步请求完成；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *           89. 条件判断：(done)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             90. 真分支：；仅条件为真执行以下子项。
+ *               91. 调用 / 计算 / 写入：TRACE(NCCL_NET, "sendProxy [%d/%d/%d] request %p done, size %d", sub->done, group, buffSlot, sub->requests[buffSlot], size);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *               92. 调用 / 计算 / 写入：__sync_synchronize();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *               93. 调用 / 计算 / 写入：reqFifo[group][buffSlot].recvBuff = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               94. 循环：初始 int i=group*COLLNET_GROUP_NSUBS;；继续条件 i<=s；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                 95. 调用 / 计算 / 写入：args->subs[i].done += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *               96. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *               97. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               98. 准备局部状态：int allDone = 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               99. 循环：初始 int i=0;；继续条件 i<args->nsubs；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                 100. 条件判断：(args->subs[i].done < args->subs[i].nsteps)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   101. 真分支：；仅条件为真执行以下子项。
+ *                     102. 调用 / 计算 / 写入：allDone = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                     103. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *               104. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *               105. 条件判断：(allDone)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 106. 真分支：；仅条件为真执行以下子项。
+ *                   107. 调用 / 计算 / 写入：args->state = ncclProxyOpNone;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   108. 调用 / 计算 / 写入：TRACE(NCCL_NET, "sendProxy [%d/%d] stopped", sub->done, s);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     109. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 110. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1072
  */
 /* 中文逐项-函数 F1072：sendProxyProgress
  * 用途与位置：对应后端发送状态机：准备槽位、等 GPU 数据就绪、提交网络请求、检测完成后回收；CollNet 分支提交网络归约。
@@ -1608,6 +2106,128 @@ static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArg
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1073：recvProxyProgress
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(args->protocol != NCCL_PROTO_SIMPLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("CollNet does not support LL/LL128");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 条件判断：(args->state == ncclProxyOpReady)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 循环：初始 int s=0;；继续条件 s<args->nsubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       8. 准备局部状态：struct ncclProxySubArgs* sub = args->subs+s;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       9. 准备局部状态：struct recvResources* resources = (struct recvResources*) (sub->connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       10. 调用 / 计算 / 写入：sub->base = ROUNDUP(resources->step, args->chunkSteps);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       11. 调用 / 计算 / 写入：sub->posted = sub->received = sub->flushed = sub->transmitted = sub->done = 0;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       12. 调用 / 计算 / 写入：resources->step = sub->base + sub->nsteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     14. 调用 / 计算 / 写入：args->state = ncclProxyOpProgress;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 调用 / 计算 / 写入：args->idle = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 条件判断：(args->state == ncclProxyOpProgress)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   17. 真分支：；仅条件为真执行以下子项。
+ *     18. 准备局部状态：int p = args->protocol;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     19. 准备局部状态：int nGroups = DIVUP(args->nsubs, COLLNET_GROUP_NSUBS);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     20. 准备局部状态：int perGroupSteps = NCCL_STEPS / nGroups;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     21. 循环：初始 int s=0;；继续条件 s<args->nsubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       22. 准备局部状态：struct ncclProxySubArgs* sub = args->subs+s;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       23. 准备局部状态：struct recvResources* resources = (struct recvResources*) (sub->connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       24. 准备局部状态：void* mhandle = resources->mhandles[p];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       25. 准备局部状态：auto reqFifo = resources->reqFifo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       26. 准备局部状态：char* localBuff = NCCL_NET_MAP_GET_POINTER(&resources->map, cpu, buffs[p]);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       27. 条件判断：(LAST_OF_GROUP(s) && (sub->posted < sub->done + perGroupSteps) && (sub->posted < sub->nsteps))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         28. 真分支：；仅条件为真执行以下子项。
+ *           29. 准备局部状态：int group = s / COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           30. 准备局部状态：int buffSlot = (sub->base+sub->posted)%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           31. 准备局部状态：int sharedBuffSlot = sub->posted%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           32. 准备局部状态：int startChannel = group*COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           33. 准备局部状态：int offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           34. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersGet(comm, 1, sharedBuffSlot, startChannel, &offset));；失败时可能提前return，成功才继续；按 channel 和在途槽索引计算共享池字节偏移，后续通过 offsFifo 把该位置交给 GPU。
+ *           35. 调用 / 计算 / 写入：reqFifo[group][buffSlot].recvBuff = localBuff + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           36. 调用 / 计算 / 写入：TRACE(NCCL_NET, "recvProxy [%d/%d/%d] posted buffer %p", sub->posted, group, buffSlot, reqFifo[group][buffSlot].recvBuff);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           37. 调用 / 计算 / 写入：sub->posted += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           38. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           39. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       40. 条件判断：(LAST_OF_GROUP(s) && (sub->posted > sub->received))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         41. 真分支：；仅条件为真执行以下子项。
+ *           42. 准备局部状态：int group = s / COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           43. 准备局部状态：int buffSlot = (sub->base+sub->received)%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           44. 准备局部状态：int sharedBuffSlot = sub->received%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           45. 条件判断：(reqFifo[group][buffSlot].recvBuff == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             46. 真分支：；仅条件为真执行以下子项。
+ *               47. 调用 / 计算 / 写入：args->sharedSize[sharedBuffSlot] = reqFifo[group][buffSlot].size;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               48. 准备局部状态：int totalSize = args->sharedSize[sharedBuffSlot]*(s-group*COLLNET_GROUP_NSUBS+1);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               49. 调用 / 计算 / 写入：TRACE(NCCL_NET, "recvProxy [%d/%d/%d] received, size %d", sub->received, group, buffSlot, totalSize);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *               50. 调用 / 计算 / 写入：sub->received += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *               51. 调用 / 计算 / 写入：sub->requests[buffSlot] = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               52. 条件判断：(reqFifo[group][buffSlot].size > 0 && resources->useGdr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 53. 真分支：；仅条件为真执行以下子项。
+ *                   54. 条件判断：(resources->gdcFlush)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                     55. 真分支：；仅条件为真执行以下子项。
+ *                       56. 编译期分支/指令：#if defined (__x86_64__)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *                         57. 调用 / 计算 / 写入：asm volatile ("mov (%0), %%eax" :: "l"(resources->gdcFlush) : "%eax");；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *                         58. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *                           59. 调用 / 计算 / 写入：WARN("NET: GDR Flush only supported on x86_64");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                           60. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *                       61. 调用 / 计算 / 写入：sub->requests[buffSlot] = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                     62. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                       63. 准备局部状态：int startChannel = group*COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                       64. 准备局部状态：int offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                       65. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersGet(comm, 1, sharedBuffSlot, startChannel, &offset));；失败时可能提前return，成功才继续；按 channel 和在途槽索引计算共享池字节偏移，后续通过 offsFifo 把该位置交给 GPU。
+ *                       66. 调用 / 计算 / 写入：NCCLCHECK(collNetIflush(resources->collNetComm, localBuff + offset, totalSize, mhandle, sub->requests+buffSlot));；失败时可能提前return，成功才继续；提交接收缓冲可见性刷新请求；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *                 67. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                   68. 循环：初始 int i=group*COLLNET_GROUP_NSUBS;；继续条件 i<=s；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                     69. 调用 / 计算 / 写入：args->subs[i].flushed += args->sliceSteps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   70. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *               71. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               72. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       73. 条件判断：(LAST_OF_GROUP(s) && (sub->received > sub->flushed))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         74. 真分支：；仅条件为真执行以下子项。
+ *           75. 准备局部状态：int group = s / COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           76. 准备局部状态：int buffSlot = (sub->base + sub->flushed)%NCCL_STEPS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           77. 准备局部状态：int done = 1;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           78. 条件判断：(sub->requests[buffSlot])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             79. 真分支：；仅条件为真执行以下子项。
+ *               80. 调用 / 计算 / 写入：NCCLCHECK(collNetTest(sub->requests[buffSlot], &done, NULL));；失败时可能提前return，成功才继续；查询并推进异步请求完成；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *           81. 条件判断：(done)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             82. 真分支：；仅条件为真执行以下子项。
+ *               83. 调用 / 计算 / 写入：TRACE(NCCL_NET, "recvProxy [%d/%d/%d] flushed", sub->flushed, group, buffSlot);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *               84. 循环：初始 int i=group*COLLNET_GROUP_NSUBS;；继续条件 i<=s；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                 85. 调用 / 计算 / 写入：args->subs[i].flushed += args->sliceSteps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               86. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *               87. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       88. 条件判断：(sub->flushed > sub->transmitted)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         89. 真分支：；仅条件为真执行以下子项。
+ *           90. 准备局部状态：int group = s / COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           91. 准备局部状态：int buffSlot = (sub->base + sub->transmitted)%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           92. 准备局部状态：int sharedBuffSlot = sub->transmitted%NCCL_STEPS;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           93. 准备局部状态：int startChannel = group*COLLNET_GROUP_NSUBS;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           94. 准备局部状态：int offset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           95. 调用 / 计算 / 写入：NCCLCHECK(sharedBuffersGet(comm, 1, sharedBuffSlot, startChannel, &offset));；失败时可能提前return，成功才继续；按 channel 和在途槽索引计算共享池字节偏移，后续通过 offsFifo 把该位置交给 GPU。
+ *           96. 准备局部状态：volatile int* offsFifo = (volatile int*)resources->recvMem->offsFifo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           97. 调用 / 计算 / 写入：offsFifo[buffSlot] = offset + (s%COLLNET_GROUP_NSUBS)*args->chunkSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           98. 调用 / 计算 / 写入：__sync_synchronize();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           99. 准备局部状态：volatile uint64_t* recvTail = resources->gdcSync ? resources->gdcSync : &resources->recvMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           100. 调用 / 计算 / 写入：*recvTail = sub->base + sub->flushed;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           101. 条件判断：(resources->gdcSync)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             102. 真分支：；仅条件为真执行以下子项。
+ *               103. 调用 / 计算 / 写入：wc_store_fence();；按 CPU 架构执行写合并内存的 store fence，确保映射显存控制写的发布顺序；无该支持时走相应实现。
+ *           104. 调用 / 计算 / 写入：sub->transmitted += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           105. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           106. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       107. 准备局部状态：bool groupSync = (((s == 0) && ((sub+args->nsubs-1)->done == sub->done)) || (s && (sub-1)->done > sub->done));；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       108. 准备局部状态：volatile uint64_t* sendHead = &resources->sendMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       109. 条件判断：(groupSync && sub->done < sub->transmitted && (sub->base+sub->done) < *sendHead)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         110. 真分支：；仅条件为真执行以下子项。
+ *           111. 调用 / 计算 / 写入：sub->done += args->sliceSteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           112. 调用 / 计算 / 写入：args->idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           113. 条件判断：(sub->done == sub->nsteps && s == args->nsubs-1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             114. 真分支：；仅条件为真执行以下子项。
+ *               115. 调用 / 计算 / 写入：args->state = ncclProxyOpNone;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               116. 调用 / 计算 / 写入：TRACE(NCCL_NET, "recvProxy [%d/%d] stopped", sub->done, s);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     117. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 118. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__coll_net_cc.md#f1073
+ */
 /* 中文逐项-函数 F1073：recvProxyProgress
  * 用途与位置：对应后端接收状态机：挂接收、检查网络完成、必要时 flush、发布给 GPU 并等待消费回收。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。

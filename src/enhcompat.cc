@@ -23,6 +23,11 @@ extern "C" {
  * __attribute((weak));
  */
 cudaError_t cudaStreamGetCaptureInfo_v2(...)         __attribute__((visibility("hidden"))) __attribute((weak));
+/* 中文内部逻辑 F0384：cudaStreamGetCaptureInfo_v2
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return cudaErrorStubLibrary;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__enhcompat_cc.md#f0384
+ */
 /* 中文逐项-函数 F0384：cudaStreamGetCaptureInfo_v2
  * 用途与位置：提供旧版静态 CUDA runtime 缺少新符号时的 weak stub；调用即返回 cudaErrorStubLibrary，不实现真正 CUDA 功能。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -38,6 +43,11 @@ cudaError_t cudaStreamGetCaptureInfo_v2(...)         { return cudaErrorStubLibra
  * __attribute((weak));
  */
 cudaError_t cudaUserObjectCreate(...)                __attribute__((visibility("hidden"))) __attribute((weak));
+/* 中文内部逻辑 F0385：cudaUserObjectCreate
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return cudaErrorStubLibrary;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__enhcompat_cc.md#f0385
+ */
 /* 中文逐项-函数 F0385：cudaUserObjectCreate
  * 用途与位置：提供旧版静态 CUDA runtime 缺少新符号时的 weak stub；调用即返回 cudaErrorStubLibrary，不实现真正 CUDA 功能。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -53,6 +63,11 @@ cudaError_t cudaUserObjectCreate(...)                { return cudaErrorStubLibra
  * __attribute((weak));
  */
 cudaError_t cudaGraphRetainUserObject(...)           __attribute__((visibility("hidden"))) __attribute((weak));
+/* 中文内部逻辑 F0386：cudaGraphRetainUserObject
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return cudaErrorStubLibrary;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__enhcompat_cc.md#f0386
+ */
 /* 中文逐项-函数 F0386：cudaGraphRetainUserObject
  * 用途与位置：提供旧版静态 CUDA runtime 缺少新符号时的 weak stub；调用即返回 cudaErrorStubLibrary，不实现真正 CUDA 功能。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -68,6 +83,11 @@ cudaError_t cudaGraphRetainUserObject(...)           { return cudaErrorStubLibra
  * __attribute__((visibility("hidden"))) __attribute((weak));
  */
 cudaError_t cudaStreamUpdateCaptureDependencies(...) __attribute__((visibility("hidden"))) __attribute((weak));
+/* 中文内部逻辑 F0387：cudaStreamUpdateCaptureDependencies
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return cudaErrorStubLibrary;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__enhcompat_cc.md#f0387
+ */
 /* 中文逐项-函数 F0387：cudaStreamUpdateCaptureDependencies
  * 用途与位置：提供旧版静态 CUDA runtime 缺少新符号时的 weak stub；调用即返回 cudaErrorStubLibrary，不实现真正 CUDA 功能。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -83,6 +103,11 @@ cudaError_t cudaStreamUpdateCaptureDependencies(...) { return cudaErrorStubLibra
  * __attribute((weak));
  */
 cudaError_t cudaGetDriverEntryPoint(...)             __attribute__((visibility("hidden"))) __attribute((weak));
+/* 中文内部逻辑 F0388：cudaGetDriverEntryPoint
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return cudaErrorStubLibrary;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__enhcompat_cc.md#f0388
+ */
 /* 中文逐项-函数 F0388：cudaGetDriverEntryPoint
  * 用途与位置：提供旧版静态 CUDA runtime 缺少新符号时的 weak stub；调用即返回 cudaErrorStubLibrary，不实现真正 CUDA 功能。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。

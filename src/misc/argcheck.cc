@@ -7,6 +7,15 @@
 #include "argcheck.h"
 #include "comm.h"
 
+/* 中文内部逻辑 F0909：CudaPtrCheck
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 查询属性：cudaPointerGetAttributes(&attr, pointer)；先获取地址的CUDA属性；调用失败或devicePointer为空均不可继续使用该用户地址。
+ * 2. 条件判断：err != cudaSuccess || attr.devicePointer == NULL；满足时报告具体API/参数名并return ncclInvalidArgument。
+ * 3. 编译期类型字段：CUDART_VERSION >= 10000 ? attr.type : attr.memoryType；这里是两种CUDA头文件布局的条件编译选择，不是运行时同时执行两条if。
+ * 4. 设备匹配：内存是Device且attr.device != comm->cudaDev；设备分配不属于本comm时报告不匹配并return ncclInvalidArgument。
+ * 5. 正常出口：return ncclSuccess；地址属性与设备所属检查均通过后成功返回。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__argcheck_cc.md#f0909
+ */
 /* 中文逐项-函数 F0909：CudaPtrCheck
  * 用途与位置：用 CUDA 指针属性验证用户缓冲有效性以及所属设备是否符合 communicator 契约。
  * 参数 pointer（const void* pointer）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -45,6 +54,15 @@ static ncclResult_t CudaPtrCheck(const void* pointer, struct ncclComm* comm, con
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0910：PtrCheck
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ptr == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("%s : %s argument is NULL", opname, ptrname);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__argcheck_cc.md#f0910
+ */
 /* 中文逐项-函数 F0910：PtrCheck
  * 用途与位置：检查必要的指针参数非空，失败时报告具体 API/参数名称。
  * 参数 ptr（void* ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -67,6 +85,50 @@ ncclResult_t PtrCheck(void* ptr, const char* opname, const char* ptrname) {
  * 除参数检查外还统一计量：先计算 count*datatypeSize，将 AllGather/Broadcast 转成字节类型。
  * AllGather/ReduceScatter 的 nBytes 再乘 nRanks，因为公开 count 是单 rank 的贡献/输出规模。
  * 因此 nBytes、内部 count 与公开 API count 不能跨不同 collective 直接套同一解释。
+ */
+/* 中文内部逻辑 F0911：ArgsCheck
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(info->root < 0 || info->root >= info->comm->nRanks)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("%s : invalid root %d (root should be in the 0..%d range)", info->opName, info->root, info->comm->nRanks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 条件判断：(info->datatype < 0 || info->datatype >= ncclNumTypes)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：WARN("%s : invalid type %d", info->opName, info->datatype);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     8. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 9. 调用 / 计算 / 写入：info->nBytes = info->count * ncclTypeSize(info->datatype);；把 NCCL 数据类型枚举映射到每元素字节数，用于尺寸换算；未知类型返回 -1。
+ * 10. 条件判断：(info->coll == ncclFuncAllGather || info->coll == ncclFuncBroadcast)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：info->count = info->nBytes;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 调用 / 计算 / 写入：info->datatype = ncclInt8;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 条件判断：(info->coll == ncclFuncAllGather || info->coll == ncclFuncReduceScatter)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 调用 / 计算 / 写入：info->nBytes *= info->comm->nRanks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 条件判断：(info->op < 0 || ncclMaxRedOp < info->op)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   18. 真分支：；仅条件为真执行以下子项。
+ *     19. 调用 / 计算 / 写入：WARN("%s : invalid reduction operation %d", info->opName, info->op);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     20. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 21. 准备局部状态：int opIx = int(ncclUserRedOpMangle(info->comm, info->op)) - int(ncclNumOps);；用 communicator 地址导出的可逆异或扰动用户操作句柄，减少把别的 comm 句柄误用于本 comm 的风险。
+ * 22. 条件判断：(ncclNumOps <= info->op && (info->comm->userRedOpCapacity <= opIx || info->comm->userRedOps[opIx].freeNext != -1))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   23. 真分支：；仅条件为真执行以下子项。
+ *     24. 调用 / 计算 / 写入：WARN("%s : reduction operation %d unknown to this communicator", info->opName, info->op);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     25. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 26. 条件判断：(info->comm->checkPointers)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   27. 真分支：；仅条件为真执行以下子项。
+ *     28. 条件判断：((info->coll == ncclFuncSend || info->coll == ncclFuncRecv))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       29. 真分支：；仅条件为真执行以下子项。
+ *         30. 条件判断：(info->count >0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           31. 真分支：；仅条件为真执行以下子项。
+ *             32. 调用 / 计算 / 写入：NCCLCHECK(CudaPtrCheck(info->recvbuff, info->comm, "buff", info->opName));；失败时可能提前return，成功才继续；用 CUDA 指针属性验证用户缓冲有效性以及所属设备是否符合 communicator 契约。
+ *       33. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         34. 条件判断：(info->coll != ncclFuncBroadcast || info->comm->rank == info->root)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           35. 真分支：；仅条件为真执行以下子项。
+ *             36. 调用 / 计算 / 写入：NCCLCHECK(CudaPtrCheck(info->sendbuff, info->comm, "sendbuff", info->opName));；失败时可能提前return，成功才继续；用 CUDA 指针属性验证用户缓冲有效性以及所属设备是否符合 communicator 契约。
+ *         37. 条件判断：(info->coll != ncclFuncReduce || info->comm->rank == info->root)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           38. 真分支：；仅条件为真执行以下子项。
+ *             39. 调用 / 计算 / 写入：NCCLCHECK(CudaPtrCheck(info->recvbuff, info->comm, "recvbuff", info->opName));；失败时可能提前return，成功才继续；用 CUDA 指针属性验证用户缓冲有效性以及所属设备是否符合 communicator 契约。
+ * 40. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__argcheck_cc.md#f0911
  */
 /* 中文逐项-函数 F0911：ArgsCheck
  * 用途与位置：验证 root/peer、类型、归约句柄及可选缓冲指针，并归一化复制型操作尺寸和总字节数。

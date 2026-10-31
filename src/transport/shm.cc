@@ -97,6 +97,24 @@ NCCL_PARAM(ShmDisable, "SHM_DISABLE", 0);
  * 在同主机且共享内存条件满足时允许 SHM transport，作为本地 GPU P2P 不可用时的候选路径。
  * SHM 使用主机共享区和 GPU 可访问映射，不会因此创建跨机 RDMA QP。
  */
+/* 中文内部逻辑 F1165：shmCanConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*ret = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 条件判断：(ncclParamShmDisable() == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：TRACE(NCCL_INIT|NCCL_SHM, "peer1 hostHash %lx peer2 hostHash %lx", info1->hostHash, info2->hostHash);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 条件判断：(info1->hostHash != info2->hostHash)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 9. 调用 / 计算 / 写入：TRACE(NCCL_INIT|NCCL_SHM, "peer1 shmDev %lx peer2 shmDev %lx", info1->shmDev, info2->shmDev);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 条件判断：(info1->shmDev != info2->shmDev)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 调用 / 计算 / 写入：*ret = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__shm_cc.md#f1165
+ */
 /* 中文逐项-函数 F1165：shmCanConnect
  * 用途与位置：检查同机与同 /dev/shm 设备且 SHM 未禁用，决定共享主机缓冲是否可作回退 transport。
  * 参数 ret（int* ret）：调用/线程的返回值或错误码；须依据其类型区分NCCL、CUDA、errno或系统状态。
@@ -135,6 +153,23 @@ ncclResult_t shmCanConnect(int* ret, struct ncclTopoSystem* topo, struct ncclTop
 #define MAX_SHM_NAME_LEN 1024
 
 /* Create and return connect structures for this peer to connect to me */
+/* 中文内部逻辑 F1166：shmSendSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct shmSendResources* resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&resources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：send->transportResources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 源码语法片段：static_assert(sizeof(struct shmConnectInfo) <= sizeof(struct ncclConnect), "shm Connect Info is too big");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 5. 准备局部状态：struct shmConnectInfo* info = (struct shmConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：char shmPath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：shmPath[0] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：info->shmSize = resources->shmSize = sizeof(struct ncclSendMem);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(ncclShmOpen(shmPath, resources->shmSize, (void**)&resources->hostMem, (void**)&resources->devHostMem, 1));；失败时可能提前return，成功才继续；在共享 mmap 基础上可选 cudaHostRegisterMapped 并取得设备侧地址，建立 CPU/GPU 双视图。
+ * 10. 调用 / 计算 / 写入：TRACE(NCCL_SHM,"Opened shmName %s shmSize %d", shmPath, info->shmSize);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 11. 调用 / 计算 / 写入：memcpy(info->shmName, shmPath+sizeof("/dev/shm/nccl-")-1, sizeof(info->shmName));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 12. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_SHM,"Channel %02d : %d[%lx] -> %d[%lx] via direct shared memory", channelId, myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__shm_cc.md#f1166
+ */
 /* 中文逐项-函数 F1166：shmSendSetup
  * 用途与位置：分别创建发送控制区或接收控制加协议数据区，并把可导入共享文件信息放入建链句柄。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -185,6 +220,26 @@ ncclResult_t shmSendSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, st
  * 发送者通过共享文件名导入同一主机页，并取得 GPU 可访问映射后把 conn.buffs 指向对应区间。
  * GPU 原语可以按同一接口读写这块主机共享内存，代价和本地显存 P2P 不同。
  * 文件名/句柄通过 bootstrap 交换；用户张量本身不通过 bootstrap socket 传输。
+ */
+/* 中文内部逻辑 F1167：shmRecvSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct shmRecvResources* resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&resources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：recv->transportResources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 源码语法片段：static_assert(sizeof(struct shmConnectInfo) <= sizeof(struct ncclConnect), "shm Connect Info is too big");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 5. 准备局部状态：struct shmConnectInfo* info = (struct shmConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：char shmPath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：shmPath[0] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 准备局部状态：int shmSize = sizeof(struct ncclRecvMem);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   10. 调用 / 计算 / 写入：shmSize += recv->comm->buffSizes[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 12. 调用 / 计算 / 写入：info->shmSize = resources->shmSize = shmSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(ncclShmOpen(shmPath, resources->shmSize, (void**)&resources->hostMem, (void**)&resources->devHostMem, 1));；失败时可能提前return，成功才继续；在共享 mmap 基础上可选 cudaHostRegisterMapped 并取得设备侧地址，建立 CPU/GPU 双视图。
+ * 14. 调用 / 计算 / 写入：TRACE(NCCL_SHM,"Opened shmName %s shmSize %d", shmPath, info->shmSize);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 15. 调用 / 计算 / 写入：memcpy(info->shmName, shmPath+sizeof("/dev/shm/nccl-")-1, sizeof(info->shmName));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__shm_cc.md#f1167
  */
 /* 中文逐项-函数 F1167：shmRecvSetup
  * 用途与位置：分别创建发送控制区或接收控制加协议数据区，并把可导入共享文件信息放入建链句柄。
@@ -242,6 +297,27 @@ ncclResult_t shmRecvSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, st
 }
 
 /* Connect to this peer */
+/* 中文内部逻辑 F1168：shmSendConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct shmConnectInfo* info = (struct shmConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct shmSendResources* resources = (struct shmSendResources*)send->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：char shmPath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：sprintf(shmPath, "/dev/shm/nccl-%s", info->shmName);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 调用 / 计算 / 写入：resources->remShmSize = info->shmSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：TRACE(NCCL_SHM,"Open shmName %s shmSize %d", shmPath, info->shmSize);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(ncclShmOpen(shmPath, resources->remShmSize, (void**)&resources->remHostMem, (void**)&resources->devRemHostMem, 0));；失败时可能提前return，成功才继续；在共享 mmap 基础上可选 cudaHostRegisterMapped 并取得设备侧地址，建立 CPU/GPU 双视图。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclShmUnlink(shmPath));；失败时可能提前return，成功才继续；删除共享内存文件名，已打开的映射仍由各进程按生命周期单独解除。
+ * 9. 调用 / 计算 / 写入：send->transportResources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 准备局部状态：int offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   12. 调用 / 计算 / 写入：send->conn.buffs[p] = (char*)(resources->devRemHostMem+1) + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   13. 调用 / 计算 / 写入：offset += send->comm->buffSizes[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 15. 调用 / 计算 / 写入：send->conn.tail = &resources->devRemHostMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 16. 调用 / 计算 / 写入：send->conn.head = &resources->devHostMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 17. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__shm_cc.md#f1168
+ */
 /* 中文逐项-函数 F1168：shmSendConnect
  * 用途与位置：打开对端共享文件，取得 CPU/GPU 映射地址并按各协议区偏移填写连接视图。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -299,6 +375,26 @@ ncclResult_t shmSendConnect(struct ncclComm* comm, struct ncclConnect* connectIn
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1169：shmRecvConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct shmRecvResources* resources = (struct shmRecvResources*)recv->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct shmConnectInfo* info = (struct shmConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：char shmPath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：sprintf(shmPath, "/dev/shm/nccl-%s", info->shmName);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 调用 / 计算 / 写入：resources->remShmSize = info->shmSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：TRACE(NCCL_SHM,"Open shmName %s shmSize %d", shmPath, info->shmSize);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(ncclShmOpen(shmPath, resources->remShmSize, (void**)&resources->remHostMem, (void**)&resources->devRemHostMem, 0));；失败时可能提前return，成功才继续；在共享 mmap 基础上可选 cudaHostRegisterMapped 并取得设备侧地址，建立 CPU/GPU 双视图。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclShmUnlink(shmPath));；失败时可能提前return，成功才继续；删除共享内存文件名，已打开的映射仍由各进程按生命周期单独解除。
+ * 9. 调用 / 计算 / 写入：recv->conn.head = &resources->devRemHostMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 10. 准备局部状态：int offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   12. 调用 / 计算 / 写入：recv->conn.buffs[p] = (char*)(resources->devHostMem+1) + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   13. 调用 / 计算 / 写入：offset += recv->comm->buffSizes[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 15. 调用 / 计算 / 写入：recv->conn.tail = &resources->devHostMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__shm_cc.md#f1169
+ */
 /* 中文逐项-函数 F1169：shmRecvConnect
  * 用途与位置：打开对端共享文件，取得 CPU/GPU 映射地址并按各协议区偏移填写连接视图。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -353,6 +449,15 @@ ncclResult_t shmRecvConnect(struct ncclComm* comm, struct ncclConnect* connectIn
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1170：shmSendFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct shmRecvResources* resources = (struct shmRecvResources*)send->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclShmClose(resources->hostMem, resources->devHostMem, resources->shmSize));；失败时可能提前return，成功才继续；先撤销可选 CUDA 主机内存注册，再 munmap 当前进程映射。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclShmClose(resources->remHostMem, resources->devRemHostMem, resources->remShmSize));；失败时可能提前return，成功才继续；先撤销可选 CUDA 主机内存注册，再 munmap 当前进程映射。
+ * 4. 调用 / 计算 / 写入：free(resources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__shm_cc.md#f1170
+ */
 /* 中文逐项-函数 F1170：shmSendFree
  * 用途与位置：解除对端与本地共享主机映射及 CUDA 注册，按拥有关系删除共享对象名字。
  * 参数 send（struct ncclConnector* send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
@@ -372,6 +477,15 @@ ncclResult_t shmSendFree(struct ncclConnector* send) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1171：shmRecvFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct shmRecvResources* resources = (struct shmRecvResources*)recv->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclShmClose(resources->hostMem, resources->devHostMem, resources->shmSize));；失败时可能提前return，成功才继续；先撤销可选 CUDA 主机内存注册，再 munmap 当前进程映射。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclShmClose(resources->remHostMem, resources->devRemHostMem, resources->remShmSize));；失败时可能提前return，成功才继续；先撤销可选 CUDA 主机内存注册，再 munmap 当前进程映射。
+ * 4. 调用 / 计算 / 写入：free(resources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__shm_cc.md#f1171
+ */
 /* 中文逐项-函数 F1171：shmRecvFree
  * 用途与位置：解除对端与本地共享主机映射及 CUDA 注册，按拥有关系删除共享对象名字。
  * 参数 recv（struct ncclConnector* recv）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。

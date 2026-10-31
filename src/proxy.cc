@@ -29,6 +29,17 @@ enum { /* 中文逐项-枚举项 X1236：proxyRecv
  * 显式值：1
  */proxySend=1 };
 
+/* 中文内部逻辑 F1014：NeedProxy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(pattern == ncclPatternRing || pattern == ncclPatternRingTwice)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return true;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：const int myrank = 0, nextrank = 1, prevrank = nranks-1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：int index = pattern == ncclPatternPipelineFrom ? (type == proxyRecv ? myrank : nextrank ): (type == proxyRecv ? prevrank : myrank );；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int rank = ring->userRanks[index];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 函数返回：return (root != rank);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1014
+ */
 /* 中文逐项-函数 F1014：NeedProxy
  * 用途与位置：按通信模式、root 与环邻居判断此方向是否真的需要代理，root 流水线端点可省掉无效边。
  * 参数 type（int type）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -93,6 +104,29 @@ struct ncclProxyPool {
   struct ncclProxyArgs elems[PROXYARGS_ALLOCATE_SIZE];
 };
 
+/* 中文内部逻辑 F1015：allocateArgs
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyArgs* elem;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->pool == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 准备局部状态：struct ncclProxyPool* newPool;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&newPool, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     6. 准备局部状态：struct ncclProxyArgs* newElems = newPool->elems;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 循环：初始 int i=0;；继续条件 i<PROXYARGS_ALLOCATE_SIZE；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       8. 条件判断：(i+1 < PROXYARGS_ALLOCATE_SIZE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         9. 真分支：；仅条件为真执行以下子项。
+ *           10. 调用 / 计算 / 写入：newElems[i].next = newElems+i+1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     12. 调用 / 计算 / 写入：state->pool = newElems;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 调用 / 计算 / 写入：newPool->next = state->pools;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     14. 调用 / 计算 / 写入：state->pools = newPool;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 调用 / 计算 / 写入：elem = state->pool;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 调用 / 计算 / 写入：state->pool = state->pool->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：elem->next = elem->nextPeer = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 调用 / 计算 / 写入：*argsptr = elem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1015
+ */
 /* 中文逐项-函数 F1015：allocateArgs
  * 用途与位置：从可复用参数池分配运行态 ProxyArgs，容量不足时扩展池块而不逐请求零散分配。
  * 参数 state（struct ncclProxyProgressState* state）：当前状态机或资源池的持久上下文，下次调用依赖其已保存阶段继续推进。
@@ -170,6 +204,24 @@ static ncclResult_t allocateArgs(struct ncclProxyProgressState* state, struct nc
  */
 #define OP_SEEN 0x100000
 
+/* 中文内部逻辑 F1016：getOpIndex
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyPool* pool = state->pools;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int p = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 循环：初始 ；继续条件 (pool)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 准备局部状态：uint64_t o = op-pool->elems;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   5. 条件判断：(o < PROXYARGS_ALLOCATE_SIZE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     6. 真分支：；仅条件为真执行以下子项。
+ *       7. 调用 / 计算 / 写入：*opIndex = o;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       8. 调用 / 计算 / 写入：*poolIndex = p;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   10. 调用 / 计算 / 写入：pool = pool->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   11. 调用 / 计算 / 写入：p++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 调用 / 计算 / 写入：WARN("Could not find pool of op %p\n", op);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1016
+ */
 /* 中文逐项-函数 F1016：getOpIndex
  * 用途与位置：计算一个 ProxyArgs 位于哪个参数池与槽位，主要供诊断日志定位对象。
  * 参数 op（struct ncclProxyArgs* op）：用户归约操作句柄或代理/系统调用方向枚举；查看类型和所属函数辨认。
@@ -210,6 +262,61 @@ ncclResult_t getOpIndex(struct ncclProxyArgs* op, struct ncclProxyProgressState*
   return ncclInternalError;
 }
 
+/* 中文内部逻辑 F1017：printProxyOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：printf("[%d-%d|%ld| %s", poolIndex, opIndex, op->opCount, op->pattern == ncclPatternSend ? "Send" : op->pattern == ncclPatternRecv ? "Recv" : "Coll");；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 循环：初始 int s=0;；继续条件 s<op->nsubs；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 准备局部状态：struct ncclProxySubArgs* sub = op->subs+s;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   4. 条件判断：(op->state == ncclProxyOpProgress)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 准备局部状态：char status = ' ';；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       7. 条件判断：(op->pattern == ncclPatternRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         8. 真分支：；仅条件为真执行以下子项。
+ *           9. 条件判断：(sub->posted < sub->nsteps && sub->posted < sub->done + NCCL_STEPS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             10. 真分支：；仅条件为真执行以下子项。
+ *               11. 调用 / 计算 / 写入：status = 'I';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             12. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *               13. 条件判断：(sub->received < sub->posted)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 14. 真分支：；仅条件为真执行以下子项。
+ *                   15. 调用 / 计算 / 写入：status = 'R';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                 16. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                   17. 条件判断：(sub->received < sub->transmitted)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                     18. 真分支：；仅条件为真执行以下子项。
+ *                       19. 调用 / 计算 / 写入：status = 'R';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                     20. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                       21. 条件判断：(sub->transmitted < sub->received)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                         22. 真分支：；仅条件为真执行以下子项。
+ *                           23. 调用 / 计算 / 写入：status = 'F';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                         24. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                           25. 条件判断：(sub->done < sub->transmitted)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                             26. 真分支：；仅条件为真执行以下子项。
+ *                               27. 调用 / 计算 / 写入：status = 'G';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                             28. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                               29. 调用 / 计算 / 写入：status = 'D';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         30. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           31. 条件判断：(op->pattern == ncclPatternSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             32. 真分支：；仅条件为真执行以下子项。
+ *               33. 条件判断：(sub->posted < sub->nsteps && sub->posted < sub->done + NCCL_STEPS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 34. 真分支：；仅条件为真执行以下子项。
+ *                   35. 调用 / 计算 / 写入：status = 'I';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                 36. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                   37. 条件判断：(sub->transmitted < sub->posted)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                     38. 真分支：；仅条件为真执行以下子项。
+ *                       39. 调用 / 计算 / 写入：status = 'G';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                     40. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                       41. 条件判断：(sub->done < sub->transmitted)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                         42. 真分支：；仅条件为真执行以下子项。
+ *                           43. 调用 / 计算 / 写入：status = 'S';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                         44. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                           45. 调用 / 计算 / 写入：status = 'D';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       46. 调用 / 计算 / 写入：printf(" %d%c/%d", sub->peer, status, sub->channelId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     47. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       48. 调用 / 计算 / 写入：printf(" %d/%d", sub->peer, sub->channelId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 49. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 50. 调用 / 计算 / 写入：printf("]");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 51. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1017
+ */
 /* 中文逐项-函数 F1017：printProxyOp
  * 用途与位置：打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
  * 参数 op（struct ncclProxyArgs* op）：用户归约操作句柄或代理/系统调用方向枚举；查看类型和所属函数辨认。
@@ -260,6 +367,84 @@ ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex) 
   printf("]");
   return ncclSuccess;
 }
+/* 中文内部逻辑 F1018：dumpProxyState
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyArgs* op = state->active;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int poolIndex, opIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：printf("ACTIVE OPS\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 循环：初始 ；继续条件 (op)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   5. 调用 / 计算 / 写入：NCCLCHECK(getOpIndex(op, state, &poolIndex, &opIndex));；失败时可能提前return，成功才继续；计算一个 ProxyArgs 位于哪个参数池与槽位，主要供诊断日志定位对象。
+ *   6. 条件判断：(op->state & OP_SEEN)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     7. 真分支：；仅条件为真执行以下子项。
+ *       8. 调用 / 计算 / 写入：WARN("List loop at element %d-%d", poolIndex, opIndex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   9. 调用 / 计算 / 写入：NCCLCHECK(printProxyOp(op, poolIndex, opIndex));；失败时可能提前return，成功才继续；打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
+ *   10. 调用 / 计算 / 写入：op->state |= OP_SEEN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   11. 调用 / 计算 / 写入：printf("\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   12. 准备局部状态：struct ncclProxyArgs* nextOp = op->nextPeer;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   13. 循环：初始 ；继续条件 (nextOp)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     14. 调用 / 计算 / 写入：NCCLCHECK(getOpIndex(nextOp, state, &poolIndex, &opIndex));；失败时可能提前return，成功才继续；计算一个 ProxyArgs 位于哪个参数池与槽位，主要供诊断日志定位对象。
+ *     15. 条件判断：(nextOp->state & OP_SEEN)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       16. 真分支：；仅条件为真执行以下子项。
+ *         17. 调用 / 计算 / 写入：WARN("List loop at element %d-%d", poolIndex, opIndex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     18. 调用 / 计算 / 写入：printf("| `-> ");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     19. 调用 / 计算 / 写入：NCCLCHECK(printProxyOp(nextOp, poolIndex, opIndex));；失败时可能提前return，成功才继续；打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
+ *     20. 调用 / 计算 / 写入：nextOp->state |= OP_SEEN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     21. 调用 / 计算 / 写入：printf("\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     22. 条件判断：(nextOp->next)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       23. 真分支：；仅条件为真执行以下子项。
+ *         24. 调用 / 计算 / 写入：WARN("Inactive op has next set!\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     25. 调用 / 计算 / 写入：nextOp = nextOp->nextPeer;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   26. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   27. 条件判断：(op->nextPeer == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     28. 真分支：；仅条件为真执行以下子项。
+ *       29. 调用 / 计算 / 写入：printf("|\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   30. 调用 / 计算 / 写入：op = op->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   31. 调用 / 计算 / 写入：printf("v\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 32. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 33. 调用 / 计算 / 写入：printf("[X]\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 34. 编译期分支/指令：# if 0；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   35. 调用 / 计算 / 写入：printf("FREE OPS\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   36. 调用 / 计算 / 写入：op = state->pool;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   37. 循环：初始 ；继续条件 (op)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     38. 调用 / 计算 / 写入：NCCLCHECK(getOpIndex(op, state, &poolIndex, &opIndex));；失败时可能提前return，成功才继续；计算一个 ProxyArgs 位于哪个参数池与槽位，主要供诊断日志定位对象。
+ *     39. 条件判断：(op->state & OP_SEEN)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       40. 真分支：；仅条件为真执行以下子项。
+ *         41. 调用 / 计算 / 写入：WARN("List loop at element %d-%d", poolIndex, opIndex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     42. 调用 / 计算 / 写入：NCCLCHECK(printProxyOp(op, poolIndex, opIndex));；失败时可能提前return，成功才继续；打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
+ *     43. 调用 / 计算 / 写入：op->state |= OP_SEEN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     44. 调用 / 计算 / 写入：printf("->");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     45. 调用 / 计算 / 写入：op = op->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   46. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   47. 调用 / 计算 / 写入：printf("[X]\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   48. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     49. 调用 / 计算 / 写入：op = state->pool;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     50. 循环：初始 ；继续条件 (op)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       51. 调用 / 计算 / 写入：NCCLCHECK(getOpIndex(op, state, &poolIndex, &opIndex));；失败时可能提前return，成功才继续；计算一个 ProxyArgs 位于哪个参数池与槽位，主要供诊断日志定位对象。
+ *       52. 条件判断：(op->state & OP_SEEN)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         53. 真分支：；仅条件为真执行以下子项。
+ *           54. 调用 / 计算 / 写入：WARN("List loop at element %d-%d", poolIndex, opIndex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       55. 调用 / 计算 / 写入：op->state |= OP_SEEN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       56. 调用 / 计算 / 写入：op = op->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     57. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 58. 准备局部状态：struct ncclProxyPool* pool = state->pools;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 59. 调用 / 计算 / 写入：poolIndex = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 60. 循环：初始 ；继续条件 (pool)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   61. 准备局部状态：struct ncclProxyArgs* elem = pool->elems;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   62. 循环：初始 int e=0;；继续条件 e<PROXYARGS_ALLOCATE_SIZE；每轮更新 e++, elem++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     63. 条件判断：((elem->state & OP_SEEN) == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       64. 真分支：；仅条件为真执行以下子项。
+ *         65. 调用 / 计算 / 写入：printf("Elem %d-%d is not in any list:\n", poolIndex, e);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         66. 调用 / 计算 / 写入：NCCLCHECK(printProxyOp(elem, poolIndex, e));；失败时可能提前return，成功才继续；打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
+ *         67. 调用 / 计算 / 写入：printf("\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       68. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         69. 调用 / 计算 / 写入：elem->state -= OP_SEEN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   70. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   71. 调用 / 计算 / 写入：pool = pool->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   72. 调用 / 计算 / 写入：poolIndex++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 73. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 74. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1018
+ */
 /* 中文逐项-函数 F1018：dumpProxyState
  * 用途与位置：打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
  * 参数 state（struct ncclProxyProgressState* state）：当前状态机或资源池的持久上下文，下次调用依赖其已保存阶段继续推进。
@@ -372,6 +557,45 @@ ncclResult_t dumpProxyState(struct ncclProxyProgressState* state) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1019：ncclProxyOpToArgs
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxySubArgs* sub = args->subs+subIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(subIndex >= NCCL_PROXY_MAX_SUBS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("Proxy append out of bounds");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 调用 / 计算 / 写入：sub->connection = op->connection;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：sub->channelId = op->channelId;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：sub->nsteps = op->nsteps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：sub->nbytes = op->nbytes;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 调用 / 计算 / 写入：sub->peer = op->root;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 调用 / 计算 / 写入：args->nsubs = subIndex+1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 条件判断：(subIndex)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 条件判断：((args->sliceSteps != op->sliceSteps) || (args->chunkSteps != op->chunkSteps) || (args->protocol != op->protocol) || (args->dtype != op->dtype) || (args->redOp != op->redOp))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       15. 真分支：；仅条件为真执行以下子项。
+ *         16. 调用 / 计算 / 写入：WARN("Proxy append mismatch");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         17. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     18. 条件判断：(args->state != ncclProxyOpReady)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       19. 真分支：；仅条件为真执行以下子项。
+ *         20. 调用 / 计算 / 写入：WARN("Proxy append on running operation");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         21. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     22. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 23. 调用 / 计算 / 写入：args->done = 0;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 24. 调用 / 计算 / 写入：args->opCount = op->opCount;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 25. 调用 / 计算 / 写入：args->sliceSteps = op->sliceSteps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 26. 调用 / 计算 / 写入：args->chunkSteps = op->chunkSteps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 27. 调用 / 计算 / 写入：args->chunkSize = op->chunkSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 28. 调用 / 计算 / 写入：args->dtype = op->dtype;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 29. 调用 / 计算 / 写入：args->redOp = op->redOp;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 30. 调用 / 计算 / 写入：args->pattern = op->pattern;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 调用 / 计算 / 写入：args->protocol = op->protocol;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 32. 调用 / 计算 / 写入：args->state = ncclProxyOpReady;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 33. 调用 / 计算 / 写入：args->progress = op->connection->tcomm->proxyProgress;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 34. 调用 / 计算 / 写入：args->proxyAppendPtr = op->connection->proxyAppendPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 35. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1019
+ */
 /* 中文逐项-函数 F1019：ncclProxyOpToArgs
  * 用途与位置：把紧凑提交描述展开到运行态 args/sub，保留协议、步数、连接和操作编号。
  * 参数 op（struct ncclProxyOp* op）：用户归约操作句柄或代理/系统调用方向枚举；查看类型和所属函数辨认。
@@ -433,6 +657,42 @@ static ncclResult_t ncclProxyOpToArgs(struct ncclProxyOp* op, struct ncclProxyAr
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1020：ProxyAppend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyConnection* connection = op->connection;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int shared = connection->shared;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct ncclProxyArgs* args = *connection->proxyAppendPtr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 条件判断：(args)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 条件判断：(shared && args->opCount == op->opCount)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyOpToArgs(op, args, args->nsubs));；失败时可能提前return，成功才继续；把紧凑提交描述展开到运行态 args/sub，保留协议、步数、连接和操作编号。
+ *         9. 调用 / 计算 / 写入：DEBUG_PROXY_PRINT("Insert (%d/%5ld/%5ld) as group with %5ld\n", shared, args->opCount, op->opCount, OP_INDEX(args));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       10. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         11. 准备局部状态：struct ncclProxyArgs* prevArgs = args;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         12. 调用 / 计算 / 写入：NCCLCHECK(allocateArgs(state, &args));；失败时可能提前return，成功才继续；从可复用参数池分配运行态 ProxyArgs，容量不足时扩展池块而不逐请求零散分配。
+ *         13. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyOpToArgs(op, args, 0));；失败时可能提前return，成功才继续；把紧凑提交描述展开到运行态 args/sub，保留协议、步数、连接和操作编号。
+ *         14. 调用 / 计算 / 写入：prevArgs->nextPeer = args;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         15. 调用 / 计算 / 写入：DEBUG_PROXY_PRINT("Insert %5ld (%d/%5ld/%5ld) as nextPeer of %5ld\n", OP_INDEX(args), shared, prevArgs->opCount, args->opCount, OP_INDEX(prevArgs));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         16. 调用 / 计算 / 写入：*(args->proxyAppendPtr) = args;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   17. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     18. 调用 / 计算 / 写入：NCCLCHECK(allocateArgs(state, &args));；失败时可能提前return，成功才继续；从可复用参数池分配运行态 ProxyArgs，容量不足时扩展池块而不逐请求零散分配。
+ *     19. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyOpToArgs(op, args, 0));；失败时可能提前return，成功才继续；把紧凑提交描述展开到运行态 args/sub，保留协议、步数、连接和操作编号。
+ *     20. 条件判断：(state->active == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       21. 真分支：；仅条件为真执行以下子项。
+ *         22. 调用 / 计算 / 写入：DEBUG_PROXY_PRINT("Insert %5ld (%d/%5ld) as first element\n", OP_INDEX(args), shared, args->opCount);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         23. 调用 / 计算 / 写入：state->active = args;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       24. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         25. 准备局部状态：struct ncclProxyArgs* last = state->active;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         26. 循环：初始 ；继续条件 (last->next)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           27. 调用 / 计算 / 写入：last = last->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         28. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *         29. 调用 / 计算 / 写入：last->next = args;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         30. 调用 / 计算 / 写入：DEBUG_PROXY_PRINT("Insert %5ld (%d/%5ld) as last element\n", OP_INDEX(args), shared, args->opCount);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     31. 调用 / 计算 / 写入：*(args->proxyAppendPtr) = args;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 32. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1020
+ */
 /* 中文逐项-函数 F1020：ProxyAppend
  * 用途与位置：把提交操作追加/聚合到活跃链或同连接后继链，维持共享连接上的先后顺序。
  * 参数 state（struct ncclProxyProgressState* state）：当前状态机或资源池的持久上下文，下次调用依赖其已保存阶段继续推进。
@@ -505,6 +765,22 @@ static ncclResult_t ProxyAppend(struct ncclProxyProgressState* state, struct ncc
  * progress 线程活跃时会继续轮询网络请求与 GPU 进度，无任务时才在条件变量上睡眠。
  * 任务发布的锁保护与数据缓冲的 head/tail/flag 协议不同，不能只保留其中一种同步。
  */
+/* 中文内部逻辑 F1021：ncclProxyPost
+ * 精读：加锁后追加任务索引链，只有由空转为非空时需要signal唤醒等待线程。
+ * 精读：锁保护的是CPU任务链元数据；真实数据仍按head/tail/flag协议与GPU协作。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：pthread_mutex_lock(&pool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 条件判断：(pool->nextOps == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：pool->nextOps = nextOps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     5. 调用 / 计算 / 写入：pthread_cond_signal(&pool->cond);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   6. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     7. 调用 / 计算 / 写入：pool->ops[pool->nextOpsEnd].next = nextOps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：pool->nextOpsEnd = nextOpsEnd;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：pthread_mutex_unlock(&pool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1021
+ */
 /* 中文逐项-函数 F1021：ncclProxyPost
  * 用途与位置：在锁内发布任务索引链，队列从空转为非空时通过条件变量唤醒 Progress 线程。
  * 参数 pool（struct ncclProxyOpsPool* pool）：代理待发布任务或可复用参数池，存元数据和索引，不装整个用户张量。
@@ -529,6 +805,71 @@ ncclResult_t ncclProxyPost(struct ncclProxyOpsPool* pool, int nextOps, int nextO
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1022：ncclLocalOpAppend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyOps* proxyOps = proxyConn->comm->proxyState.proxyOps;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(proxyOps == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：proxyOps += proxyConn->localRank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 准备局部状态：struct ncclProxyOpsPool* pool = proxyOps->pool;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：TIME_START(0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 准备局部状态：int opIndex = proxyOps->freeOp;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：struct ncclProxyOp* op;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 条件判断：(opIndex != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 调用 / 计算 / 写入：op = pool->ops+opIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 调用 / 计算 / 写入：proxyOps->freeOp = op->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   14. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     15. 准备局部状态：int freeOp;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     16. 循环：初始 ；继续条件 ((freeOp = pool->freeOps[comm->localRank]) == -1)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       17. 调用 / 计算 / 写入：sched_yield();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     19. 准备局部状态：int freeOpNew;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     20. 循环：初始 ；继续条件 ((freeOpNew = __sync_val_compare_and_swap(pool->freeOps+comm->localRank, freeOp, -1)) != freeOp)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       21. 调用 / 计算 / 写入：freeOp = freeOpNew;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     22. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     23. 调用 / 计算 / 写入：opIndex = freeOp;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     24. 调用 / 计算 / 写入：op = pool->ops+opIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     25. 调用 / 计算 / 写入：proxyOps->freeOp = op->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 26. 条件判断：(op->next != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   27. 真分支：；仅条件为真执行以下子项。
+ *     28. 调用 / 计算 / 写入：__builtin_prefetch(pool->ops+op->next);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 29. 调用 / 计算 / 写入：memcpy(op, proxyOp, sizeof(struct ncclProxyOp));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 30. 调用 / 计算 / 写入：op->next = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 调用 / 计算 / 写入：op->connection = proxyConn->connection;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 32. 条件判断：(proxyOps->nextOps == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   33. 真分支：；仅条件为真执行以下子项。
+ *     34. 调用 / 计算 / 写入：proxyOps->nextOps = proxyOps->nextOpsEnd = opIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   35. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     36. 调用 / 计算 / 写入：pool->ops[proxyOps->nextOpsEnd].next = opIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     37. 调用 / 计算 / 写入：proxyOps->nextOpsEnd = opIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 38. 条件判断：(++proxyOps->count == MAX_OPS_PER_PEER)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   39. 真分支：；仅条件为真执行以下子项。
+ *     40. 准备局部状态：uint64_t lastOpCount = pool->ops[proxyOps->nextOpsEnd].opCount;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     41. 准备局部状态：int lastOp = -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     42. 准备局部状态：int toSend = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     43. 准备局部状态：int ops = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     44. 循环：初始 int op= proxyOps->nextOps;；继续条件 op != proxyOps->nextOpsEnd；每轮更新 op=pool->ops[op].next；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       45. 调用 / 计算 / 写入：ops++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       46. 条件判断：(pool->ops[op].opCount != lastOpCount)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         47. 真分支：；仅条件为真执行以下子项。
+ *           48. 调用 / 计算 / 写入：lastOp = op;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           49. 调用 / 计算 / 写入：toSend = ops;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     50. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     51. 条件判断：(lastOp == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       52. 真分支：；仅条件为真执行以下子项。
+ *         53. 调用 / 计算 / 写入：WARN("Unable to post incomplete proxy op chain %d..%d (opCount %ld)\n", proxyOps->nextOps, proxyOps->nextOpsEnd, lastOpCount);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         54. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     55. 准备局部状态：int nextOps = proxyOps->nextOps;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     56. 调用 / 计算 / 写入：proxyOps->nextOps = pool->ops[lastOp].next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     57. 调用 / 计算 / 写入：pool->ops[lastOp].next = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     58. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyPost(proxyOps->pool, nextOps, lastOp));；失败时可能提前return，成功才继续；在锁内发布任务索引链，队列从空转为非空时通过条件变量唤醒 Progress 线程。
+ *     59. 调用 / 计算 / 写入：proxyOps->count -= toSend;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 60. 调用 / 计算 / 写入：TIME_STOP(0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 61. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1022
+ */
 /* 中文逐项-函数 F1022：ncclLocalOpAppend
  * 用途与位置：从本地代理共享池取空闲项复制 ProxyOp，追加待发布链并在容量紧张时发布完整批次。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -656,6 +997,24 @@ ncclResult_t ncclLocalOpAppend(struct ncclComm* comm, struct ncclProxyConnector*
  * 因此 API 即使调用 ProxySaveColl，也不意味着每个 channel 的每条边都启动 IB 传输。
  * 实际追加的是连接上的元数据，数据仍由 GPU/协议缓冲/网络后端共同搬运。
  */
+/* 中文内部逻辑 F1023：SaveProxy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(peer < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：struct ncclPeer* peerComm = channel->peers+peer;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：struct ncclConnector* connector = type == proxyRecv ? peerComm->recv+connIndex : peerComm->send+connIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 条件判断：(connector->transportComm == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 调用 / 计算 / 写入：WARN("Rank %d has no transport for %s peer %d on channel %d/%d", connector->comm->rank, type == proxyRecv ? "recv" : "send", peer, channel->id, connIndex);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 10. 条件判断：(connector->transportComm->proxyProgress == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(ncclLocalOpAppend(connector->comm, &connector->proxyConn, op));；失败时可能提前return，成功才继续；从本地代理共享池取空闲项复制 ProxyOp，追加待发布链并在容量紧张时发布完整批次。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1023
+ */
 /* 中文逐项-函数 F1023：SaveProxy
  * 用途与位置：找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
  * 参数 channel（struct ncclChannel* channel）：当前逻辑通信流水线对象，包含邻居、连接表和工作 FIFO。
@@ -694,6 +1053,40 @@ static ncclResult_t SaveProxy(struct ncclChannel* channel, int type, int peer, s
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1024：ncclProxySaveColl
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclChannel* channel = comm->channels+op->channelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int pattern = op->pattern;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 条件判断：(pattern == ncclPatternRing || pattern == ncclPatternRingTwice || pattern == ncclPatternPipelineFrom || pattern == ncclPatternPipelineTo)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 准备局部状态：struct ncclRing* ring = &channel->ring;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 条件判断：(NeedProxy(proxyRecv, pattern, op->root, ring, nranks))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxyRecv, ring->prev, op, 0));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ *     9. 条件判断：(NeedProxy(proxySend, pattern, op->root, ring, nranks))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       10. 真分支：；仅条件为真执行以下子项。
+ *         11. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxySend, ring->next, op, 0));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ * 12. 条件判断：(pattern == ncclPatternTreeUp || pattern == ncclPatternTreeUpDown)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 准备局部状态：struct ncclTree* tree = &channel->tree;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     15. 循环：初始 int i=0;；继续条件 i<NCCL_MAX_TREE_ARITY；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       16. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxyRecv, tree->down[i], op, 0));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ *     17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     18. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxySend, tree->up, op, 0));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ * 19. 条件判断：(pattern == ncclPatternTreeDown || pattern == ncclPatternTreeUpDown)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 准备局部状态：struct ncclTree* tree = &channel->tree;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     22. 循环：初始 int i=0;；继续条件 i< NCCL_MAX_TREE_ARITY；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       23. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxySend, tree->down[i], op, 0));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ *     24. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     25. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxyRecv, tree->up, op, 0));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ * 26. 条件判断：(pattern == ncclPatternCollTreeUpDown)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   27. 真分支：；仅条件为真执行以下子项。
+ *     28. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxySend, channel->collTree.out, op, 1));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ *     29. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxyRecv, channel->collTree.out, op, 0));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ * 30. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1024
+ */
 /* 中文逐项-函数 F1024：ncclProxySaveColl
  * 用途与位置：按 Ring/Tree/Pipeline/CollNet 模式展开必要邻居与方向，给相应连接保存代理工作。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -770,6 +1163,56 @@ ncclResult_t ncclProxySaveColl(struct ncclComm* comm, struct ncclProxyOp* op, in
  */
 NCCL_PARAM(ChunkSize, "CHUNK_SIZE", 0);
 
+/* 中文内部逻辑 F1025：ncclProxyComputeP2p
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：memset(op, 0, sizeof(struct ncclProxyOp));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：int channelId = info->channelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct ncclChannel* channel = info->comm->channels+channelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：op->channelId = channelId;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：op->sliceSteps = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：op->chunkSteps = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：op->protocol = NCCL_PROTO_SIMPLE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：op->dtype = info->datatype;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 准备局部状态：int stepSize = info->comm->buffSizes[NCCL_PROTO_SIMPLE]/NCCL_STEPS/SENDRECV_SLICEFACTOR;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 调用 / 计算 / 写入：info->chunkSize = stepSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 调用 / 计算 / 写入：op->root = info->root;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 调用 / 计算 / 写入：op->nbytes = info->count;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 准备局部状态：struct ncclPeer* peer = channel->peers + op->root;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 条件判断：(info->coll == ncclFuncSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 调用 / 计算 / 写入：op->pattern = ncclPatternSend;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 条件判断：(op->root != info->comm->rank && peer->send[1].transportComm && peer->send[1].transportComm->proxyProgress)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       18. 真分支：；仅条件为真执行以下子项。
+ *         19. 条件判断：(info->count < stepSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           20. 真分支：；仅条件为真执行以下子项。
+ *             21. 调用 / 计算 / 写入：info->chunkSize /= 4;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           22. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             23. 条件判断：(info->count < 8*stepSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               24. 真分支：；仅条件为真执行以下子项。
+ *                 25. 调用 / 计算 / 写入：info->chunkSize /= 2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   26. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     27. 条件判断：(info->coll == ncclFuncRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       28. 真分支：；仅条件为真执行以下子项。
+ *         29. 调用 / 计算 / 写入：op->pattern = ncclPatternRecv;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         30. 条件判断：(op->root != info->comm->rank && peer->recv[1].transportComm && peer->recv[1].transportComm->proxyProgress)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           31. 真分支：；仅条件为真执行以下子项。
+ *             32. 条件判断：(info->count < stepSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               33. 真分支：；仅条件为真执行以下子项。
+ *                 34. 调用 / 计算 / 写入：info->chunkSize /= 4;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               35. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                 36. 条件判断：(info->count < 8*stepSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   37. 真分支：；仅条件为真执行以下子项。
+ *                     38. 调用 / 计算 / 写入：info->chunkSize /= 2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       39. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         40. 调用 / 计算 / 写入：WARN("P2p operation is neither send or recv");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         41. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 42. 条件判断：(ncclParamChunkSize() != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   43. 真分支：；仅条件为真执行以下子项。
+ *     44. 调用 / 计算 / 写入：info->chunkSize = ncclParamChunkSize();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 45. 调用 / 计算 / 写入：op->chunkSize = info->chunkSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 46. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1025
+ */
 /* 中文逐项-函数 F1025：ncclProxyComputeP2p
  * 用途与位置：根据已切好的 P2P 块计算协议尺寸、step 数和 channel/peer 标签，使 CPU/GPU 计划一致。
  * 参数 info（struct ncclInfo* info）：本次API的主机中间表示；先保存原始用户参数，再由检查/选型/分片填充为GPU与Proxy双计划。
@@ -838,6 +1281,31 @@ ncclResult_t ncclProxyComputeP2p(struct ncclInfo* info, struct ncclProxyOp* op) 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1026：ncclProxySaveP2p
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclChannel* channel = comm->channels+op->channelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：op->opCount = channel->workFifoTail-1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 条件判断：(op->root == comm->rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 条件判断：(op->pattern == ncclPatternRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 调用 / 计算 / 写入：op->nsteps = DIVUP(op->nbytes, op->chunkSize);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 条件判断：(op->nsteps == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       10. 真分支：；仅条件为真执行以下子项。
+ *         11. 调用 / 计算 / 写入：op->nsteps = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     12. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxyRecv, op->root, op, 1));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ *   13. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     14. 条件判断：(op->pattern == ncclPatternSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       15. 真分支：；仅条件为真执行以下子项。
+ *         16. 调用 / 计算 / 写入：op->nsteps = DIVUP(op->nbytes, op->chunkSize);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         17. 条件判断：(op->nsteps == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           18. 真分支：；仅条件为真执行以下子项。
+ *             19. 调用 / 计算 / 写入：op->nsteps = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         20. 调用 / 计算 / 写入：NCCLCHECK(SaveProxy(channel, proxySend, op->root, op, 1));；失败时可能提前return，成功才继续；找到 channel/peer/方向/索引的连接，仅当 transport 有 proxyProgress 回调时记录代理工作。
+ * 21. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1026
+ */
 /* 中文逐项-函数 F1026：ncclProxySaveP2p
  * 用途与位置：按 P2P 任务方向和连接索引1保存代理需求，跳过 self 或无代理的本地路径。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -868,6 +1336,37 @@ ncclResult_t ncclProxySaveP2p(struct ncclComm* comm, struct ncclProxyOp* op) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1027：removeOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyArgs* freeOp = *opPtr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclProxyArgs* next = freeOp->next;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：DEBUG_PROXY_PRINT("Remove %ld -> %ld -> %ld\n", OP_INDEX(*prevOpPtr), OP_INDEX(freeOp), OP_INDEX(next));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 调用 / 计算 / 写入：*opPtr = next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 条件判断：(freeOp->nextPeer)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 准备局部状态：struct ncclProxyArgs* nextPeer = freeOp->nextPeer;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     8. 条件判断：(*prevOpPtr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       9. 真分支：；仅条件为真执行以下子项。
+ *         10. 调用 / 计算 / 写入：(*prevOpPtr)->next = nextPeer;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       11. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         12. 调用 / 计算 / 写入：state->active = nextPeer;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 调用 / 计算 / 写入：nextPeer->next = next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     14. 调用 / 计算 / 写入：*(prevOpPtr) = nextPeer;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   15. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     16. 调用 / 计算 / 写入：*(freeOp->proxyAppendPtr) = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 条件判断：(*prevOpPtr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       18. 真分支：；仅条件为真执行以下子项。
+ *         19. 调用 / 计算 / 写入：(*prevOpPtr)->next = next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       20. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         21. 调用 / 计算 / 写入：state->active = next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 22. 调用 / 计算 / 写入：freeOp->next = state->pool;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 23. 调用 / 计算 / 写入：state->pool = freeOp;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 24. 调用 / 计算 / 写入：DEBUG_PROXY_PRINT("Removed %5ld (%5ld) : ", OP_INDEX(freeOp), OP_INDEX(*freeOp->proxyAppendPtr));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 25. 编译期分支/指令：#ifdef DEBUG_PROXY；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   26. 调用 / 计算 / 写入：NCCLCHECK(dumpProxyState(state));；失败时可能提前return，成功才继续；打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
+ * 27. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1027
+ */
 /* 中文逐项-函数 F1027：removeOp
  * 用途与位置：从活跃 Proxy 链移除完成项，提升同连接后继项并归还可复用参数对象。
  * 参数 state（struct ncclProxyProgressState* state）：当前状态机或资源池的持久上下文，下次调用依赖其已保存阶段继续推进。
@@ -928,6 +1427,39 @@ static ncclResult_t removeOp(struct ncclProxyProgressState* state, struct ncclPr
  * 操作进入 None 后从活跃链移除，并推进同连接后继任务，维护连接上的顺序。
  * 这种结构让一个线程交错服务多个 channel/peer，隐藏网络与 GPU 的等待时间。
  */
+/* 中文内部逻辑 F1028：progressOps
+ * 精读：遍历活跃链，调用每个transport提供的非阻塞progress回调。
+ * 精读：未完成项保留，完成项从链中摘除并按同连接先后规则提升下一项；一次回调不要求等整个张量完成。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyArgs* prevOp = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclProxyArgs* op = opStart;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 循环：初始 ；继续条件 (op)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 条件判断：(op->state == ncclProxyOpNone)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     5. 真分支：；仅条件为真执行以下子项。
+ *       6. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   7. 调用 / 计算 / 写入：TIME_START(0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   8. 调用 / 计算 / 写入：TIME_START(1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   9. 调用 / 计算 / 写入：NCCLCHECK(op->progress(comm, op));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   10. 条件判断：(op->idle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     11. 真分支：；仅条件为真执行以下子项。
+ *       12. 调用 / 计算 / 写入：TIME_STOP(1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       13. 调用 / 计算 / 写入：TIME_CANCEL(0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     14. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       15. 调用 / 计算 / 写入：TIME_CANCEL(1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       16. 调用 / 计算 / 写入：TIME_STOP(0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   17. 调用 / 计算 / 写入：*idle &= op->idle;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   18. 条件判断：(op->state == ncclProxyOpNone)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     19. 真分支：；仅条件为真执行以下子项。
+ *       20. 调用 / 计算 / 写入：TIME_START(2);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       21. 调用 / 计算 / 写入：NCCLCHECK(removeOp(state, &op, &prevOp));；失败时可能提前return，成功才继续；从活跃 Proxy 链移除完成项，提升同连接后继项并归还可复用参数对象。
+ *       22. 调用 / 计算 / 写入：TIME_STOP(2);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     23. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       24. 调用 / 计算 / 写入：prevOp = op;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       25. 调用 / 计算 / 写入：op = op->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 26. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 27. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1028
+ */
 /* 中文逐项-函数 F1028：progressOps
  * 用途与位置：遍历活跃操作并调用各 transport 的非阻塞进度函数，完成后摘链，未完成保留下一轮。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -968,6 +1500,94 @@ static ncclResult_t progressOps(struct ncclComm* comm, struct ncclProxyProgressS
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1029：ncclProxyGetPostedOps
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->opsPool == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：struct ncclProxyOpsPool* pool = state->opsPool;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：struct ncclProxyArgs profArgs;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 条件判断：(state->nextOps != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 控制转移：goto process_nextops;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 10. 条件判断：(state->active != NULL && (pool->nextOps == -1 || pthread_mutex_trylock(&pool->mutex) != 0))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 条件判断：(state->active == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 调用 / 计算 / 写入：pthread_mutex_lock(&pool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     16. 循环：初始 ；继续条件 (pool->nextOps == -1 && !state->stop)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       17. 准备局部状态：struct ncclProxyArgs profArgs;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       18. 调用 / 计算 / 写入：ncclProfilingRecord(&profArgs, 0, 0, ncclProxyProfileSleep);；若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
+ *       19. 调用 / 计算 / 写入：pthread_cond_wait(&pool->cond, &pool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       20. 调用 / 计算 / 写入：ncclProfilingRecord(&profArgs, 0, 0, ncclProxyProfileWakeup);；若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
+ *     21. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     22. 条件判断：(state->stop)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       23. 真分支：；仅条件为真执行以下子项。
+ *         24. 调用 / 计算 / 写入：pthread_mutex_unlock(&pool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         25. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 26. 调用 / 计算 / 写入：state->nextOps = pool->nextOps;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 27. 调用 / 计算 / 写入：pool->nextOps = pool->nextOpsEnd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 28. 调用 / 计算 / 写入：pthread_mutex_unlock(&pool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 29. 条件判断：(state->nextOps == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   30. 真分支：；仅条件为真执行以下子项。
+ *     31. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 32. 跳转标签：process_nextops；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   33. 调用 / 计算 / 写入：ncclProfilingRecord(&profArgs, 0, 0, ncclProxyProfileAppend);；若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
+ * 34. 调用 / 计算 / 写入：TIME_START(2);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 35. 准备局部状态：int freeOp[NCCL_MAX_LOCAL_RANKS];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 36. 准备局部状态：int freeOpEnd[NCCL_MAX_LOCAL_RANKS];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 37. 循环：初始 int i=0;；继续条件 i<comm->localRanks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   38. 调用 / 计算 / 写入：freeOp[i] = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 39. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 40. 循环：初始 int opIndex = state->nextOps;；继续条件 opIndex != -1；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   41. 准备局部状态：struct ncclProxyOp* peerOp = pool->ops+opIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   42. 准备局部状态：int peer = opIndex / MAX_OPS_PER_PEER;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   43. 条件判断：(peerOp->connection == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     44. 真分支：；仅条件为真执行以下子项。
+ *       45. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   46. 条件判断：(peerOp->next != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     47. 真分支：；仅条件为真执行以下子项。
+ *       48. 调用 / 计算 / 写入：__builtin_prefetch(pool->ops+peerOp->next);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   49. 调用 / 计算 / 写入：NCCLCHECK(ProxyAppend(state, peerOp));；失败时可能提前return，成功才继续；把提交操作追加/聚合到活跃链或同连接后继链，维持共享连接上的先后顺序。
+ *   50. 调用 / 计算 / 写入：(*added)++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   51. 准备局部状态：int lastOpIndex = opIndex;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   52. 调用 / 计算 / 写入：opIndex = peerOp->next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   53. 条件判断：(freeOp[peer] == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     54. 真分支：；仅条件为真执行以下子项。
+ *       55. 调用 / 计算 / 写入：freeOpEnd[peer] = lastOpIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     56. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       57. 调用 / 计算 / 写入：peerOp->next = freeOp[peer];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   58. 调用 / 计算 / 写入：freeOp[peer] = lastOpIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   59. 调用 / 计算 / 写入：state->nextOps = opIndex;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 60. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 61. 循环：初始 int i=0;；继续条件 i<comm->localRanks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   62. 条件判断：(freeOp[i] == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     63. 真分支：；仅条件为真执行以下子项。
+ *       64. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   65. 准备局部状态：int newFree = freeOp[i];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   66. 准备局部状态：int oldFree = pool->freeOps[i];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   67. 调用 / 计算 / 写入：pool->ops[freeOpEnd[i]].next = oldFree;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   68. 条件判断：(oldFree == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     69. 真分支：；仅条件为真执行以下子项。
+ *       70. 调用 / 计算 / 写入：pool->freeOps[i] = newFree;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     71. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       72. 准备局部状态：int swap = __sync_val_compare_and_swap(pool->freeOps+i, oldFree, newFree);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       73. 条件判断：(swap != oldFree)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         74. 真分支：；仅条件为真执行以下子项。
+ *           75. 条件判断：(swap != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             76. 真分支：；仅条件为真执行以下子项。
+ *               77. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *           78. 调用 / 计算 / 写入：pool->ops[freeOpEnd[i]].next = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           79. 调用 / 计算 / 写入：pool->freeOps[i] = newFree;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 80. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 81. 调用 / 计算 / 写入：profArgs.opCount = *added;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 82. 调用 / 计算 / 写入：ncclProfilingRecord(&profArgs, 0, 0, ncclProxyProfileAppendEnd);；若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
+ * 83. 调用 / 计算 / 写入：TIME_STOP(2);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 84. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1029
+ */
 /* 中文逐项-函数 F1029：ncclProxyGetPostedOps
  * 用途与位置：从共享池取走已发布工作，转换/聚合成运行态队列；无任务时可在条件变量上等待。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1127,6 +1747,11 @@ process_nextops:
  * 此处未显式给初值；后续首个文本使用点：dumpProxyState(ncclLastProxyState);。若由输出参数填入，必须先检查填充调用成功再读值。
  */
 static ncclProxyProgressState* ncclLastProxyState;
+/* 中文内部逻辑 F1030：ncclDumpProxyState
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：dumpProxyState(ncclLastProxyState);；打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1030
+ */
 /* 中文逐项-函数 F1030：ncclDumpProxyState
  * 用途与位置：打印代理活跃队列和各 sub 的 posted/transmitted/done 等进度，辅助定位等待阶段。
  * 参数 signal（int signal）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1140,6 +1765,54 @@ void ncclDumpProxyState(int signal) {
 /* 中文导读：
  * 数据面后台推进循环：从共享任务池取得 ProxyOp，转成运行参数并轮询 active 操作的 progress 回调。
  * 网络传输尚未完成时继续推进；空闲时让出 CPU。它不负责执行 GPU 上的逐元素归约。
+ */
+/* 中文内部逻辑 F1031：ncclProxyProgress
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclComm* comm = (struct ncclComm*)comm_;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：state->nextOps = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：signal(SIGUSR1, ncclDumpProxyState);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 调用 / 计算 / 写入：ncclLastProxyState = state;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 准备局部状态：char threadName[NCCL_THREAD_NAMELEN];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：snprintf(threadName, NCCL_THREAD_NAMELEN, "NCCL Progress%2d", comm->cudaDev);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 调用 / 计算 / 写入：nvtxNameOsThreadA(syscall(SYS_gettid), threadName);；为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
+ * 9. 准备局部状态：int lastIdle = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 准备局部状态：struct ncclProxyArgs profArgs;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 循环：初始 ；继续条件 (state->stop == 0 && *comm->abortFlag == 0)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   12. 准备局部状态：int idle = 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   13. 准备局部状态：ncclResult_t ret = progressOps(comm, state, state->active, &idle);；遍历活跃操作并调用各 transport 的非阻塞进度函数，完成后摘链，未完成保留下一轮。
+ *   14. 条件判断：(ret != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     15. 真分支：；仅条件为真执行以下子项。
+ *       16. 调用 / 计算 / 写入：comm->fatalError = ret;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       17. 调用 / 计算 / 写入：INFO(NCCL_ALL,"%s:%d -> %d [Proxy Thread]", __FILE__, __LINE__, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       18. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   19. 条件判断：(lastIdle == 0 && idle == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     20. 真分支：；仅条件为真执行以下子项。
+ *       21. 调用 / 计算 / 写入：ncclProfilingRecord(&profArgs, 0, 0, ncclProxyProfileIdle);；若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
+ *   22. 条件判断：(lastIdle == 1 && idle == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     23. 真分支：；仅条件为真执行以下子项。
+ *       24. 调用 / 计算 / 写入：ncclProfilingRecord(&profArgs, 0, 0, ncclProxyProfileActive);；若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
+ *   25. 条件判断：(idle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     26. 真分支：；仅条件为真执行以下子项。
+ *       27. 准备局部状态：int added = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       28. 调用 / 计算 / 写入：TIME_START(3);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       29. 调用 / 计算 / 写入：ret = ncclProxyGetPostedOps(comm, &added);；从共享池取走已发布工作，转换/聚合成运行态队列；无任务时可在条件变量上等待。
+ *       30. 条件判断：(added)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         31. 真分支：；仅条件为真执行以下子项。
+ *           32. 调用 / 计算 / 写入：TIME_STOP(3);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         33. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           34. 调用 / 计算 / 写入：TIME_CANCEL(3);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       35. 条件判断：(ret != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         36. 真分支：；仅条件为真执行以下子项。
+ *           37. 调用 / 计算 / 写入：comm->fatalError = ret;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           38. 调用 / 计算 / 写入：INFO(NCCL_ALL,"%s:%d -> %d [Proxy Thread]", __FILE__, __LINE__, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       39. 条件判断：(added == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         40. 真分支：；仅条件为真执行以下子项。
+ *           41. 调用 / 计算 / 写入：sched_yield();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   42. 调用 / 计算 / 写入：lastIdle = idle;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 43. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 44. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1031
  */
 /* 中文逐项-函数 F1031：ncclProxyProgress
  * 用途与位置：代理数据面后台循环，交错推进多个 channel/peer 的网络请求并处理退出/异步错误。
@@ -1228,6 +1901,27 @@ void* ncclProxyProgress(void *comm_) {
  * 将本批已记录的 Proxy 工作发布到对应代理的任务池，让 progress 线程能够开始推进。
  * 它与 GPU FIFO 发布配合；Proxy 工作必须与 GPU 工作使用相同连接、协议和步数。
  */
+/* 中文内部逻辑 F1032：ncclProxyStart
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyOps* proxyOps = comm->proxyState.proxyOps;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(proxyOps == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：TIME_START(1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 循环：初始 int r=0;；继续条件 r<comm->localRanks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 准备局部状态：struct ncclProxyOps* ops = proxyOps+r;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   8. 条件判断：(ops->pool == NULL || ops->nextOps == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     9. 真分支：；仅条件为真执行以下子项。
+ *       10. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   11. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyPost(ops->pool, ops->nextOps, ops->nextOpsEnd));；失败时可能提前return，成功才继续；在锁内发布任务索引链，队列从空转为非空时通过条件变量唤醒 Progress 线程。
+ *   12. 调用 / 计算 / 写入：ops->nextOps = ops->nextOpsEnd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   13. 调用 / 计算 / 写入：ops->count = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 15. 调用 / 计算 / 写入：comm->opCount++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 调用 / 计算 / 写入：TIME_STOP(1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 17. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1032
+ */
 /* 中文逐项-函数 F1032：ncclProxyStart
  * 用途与位置：发布本批累积代理工作到相关本地代理的池，递增操作编号而不新建每消息线程。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1264,6 +1958,16 @@ ncclResult_t ncclProxyStart(struct ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1033：ncclProxyProgressCreate
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(!state->thread)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：pthread_create(&state->thread, NULL, ncclProxyProgress, comm);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 调用 / 计算 / 写入：ncclSetThreadName(state->thread, "NCCL Progress%2d", comm->cudaDev);；为后台线程设置便于系统工具识别的名称，方便区分 Proxy 服务与数据推进线程。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1033
+ */
 /* 中文逐项-函数 F1033：ncclProxyProgressCreate
  * 用途与位置：按需要创建并命名代理后台线程，线程生命周期覆盖多次通信调用。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1285,6 +1989,26 @@ ncclResult_t ncclProxyProgressCreate(struct ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1034：ncclProxyProgressDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->opsPool)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：pthread_mutex_lock(&state->opsPool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 调用 / 计算 / 写入：state->stop = true;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：pthread_cond_signal(&state->opsPool->cond);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：pthread_mutex_unlock(&state->opsPool->mutex);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     8. 调用 / 计算 / 写入：pthread_join(state->thread, NULL);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 循环：初始 ；继续条件 (state->pools != NULL)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   10. 准备局部状态：struct ncclProxyPool *next = state->pools->next;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   11. 调用 / 计算 / 写入：free(state->pools);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   12. 调用 / 计算 / 写入：state->pools = next;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 14. 调用 / 计算 / 写入：ncclProfilingDump();；导出代理阶段耗时记录，帮助区分 GPU 等待、网络等待和 flush；禁用分支无操作。
+ * 15. 调用 / 计算 / 写入：TIME_PRINT("Proxy");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1034
+ */
 /* 中文逐项-函数 F1034：ncclProxyProgressDestroy
  * 用途与位置：通知数据面线程停止并唤醒等待者，join 后回收共享任务和运行状态。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1408,6 +2132,19 @@ struct ncclProxyConnectionPool {
   struct ncclProxyAsyncOp* ops;
 };
 
+/* 中文内部逻辑 F1035：ncclProxyNewConnection
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(pool->offset == NCCL_PROXY_CONN_POOL_SIZE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：NCCLCHECK(ncclRealloc(&pool->pools, pool->banks, pool->banks+1));；失败时可能提前return，成功才继续；分配更大且尾部清零的 CPU 数组，复制旧元素后释放旧内存，不支持缩小。
+ *     4. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(pool->pools+pool->banks, NCCL_PROXY_CONN_POOL_SIZE));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     5. 调用 / 计算 / 写入：pool->banks++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：pool->offset = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：*id = ((pool->banks-1) << NCCL_PROXY_CONN_POOL_SIZE_POW2) + pool->offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：pool->offset++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1035
+ */
 /* 中文逐项-函数 F1035：ncclProxyNewConnection
  * 用途与位置：在分块连接池分配一个空连接槽，返回可用于控制消息索引的连接编号。
  * 参数 pool（struct ncclProxyConnectionPool* pool）：代理待发布任务或可复用参数池，存元数据和索引，不装整个用户张量。
@@ -1429,6 +2166,17 @@ static ncclResult_t ncclProxyNewConnection(struct ncclProxyConnectionPool* pool,
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1036：ncclProxyGetConnection
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int bank = id>>NCCL_PROXY_CONN_POOL_SIZE_POW2;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int offset = id&NCCL_PROXY_CONN_POOL_MASK;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 条件判断：((pool->pools == NULL) || (bank > pool->banks) || (pool->pools[bank] == NULL))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 调用 / 计算 / 写入：*conn = pool->pools[bank]+offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1036
+ */
 /* 中文逐项-函数 F1036：ncclProxyGetConnection
  * 用途与位置：按池编号定位已存在代理连接对象，校验池/索引后返回其地址。
  * 参数 pool（struct ncclProxyConnectionPool* pool）：代理待发布任务或可复用参数池，存元数据和索引，不装整个用户张量。
@@ -1455,6 +2203,16 @@ static ncclResult_t ncclProxyGetConnection(struct ncclProxyConnectionPool* pool,
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1037：proxyFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(connection->send)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：NCCLCHECK(ncclTransports[connection->transport].send.proxyFree(connection, comm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(ncclTransports[connection->transport].recv.proxyFree(connection, comm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1037
+ */
 /* 中文逐项-函数 F1037：proxyFree
  * 用途与位置：调用连接 transport 的代理资源释放回调，按具体后端回收连接持有的对象。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -1473,6 +2231,19 @@ static ncclResult_t proxyFree(struct ncclProxyConnection* connection, struct ncc
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1038：ncclProxyFreeConnections
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int b=0;；继续条件 b<pool->banks；每轮更新 b++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 准备局部状态：int max = b == pool->banks-1 ? pool->offset : NCCL_PROXY_CONN_POOL_SIZE;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 循环：初始 int i=0;；继续条件 i<max；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     4. 调用 / 计算 / 写入：NCCLCHECK(proxyFree(pool->pools[b]+i, comm));；失败时可能提前return，成功才继续；调用连接 transport 的代理资源释放回调，按具体后端回收连接持有的对象。
+ *   5. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   6. 调用 / 计算 / 写入：free(pool->pools[b]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 8. 调用 / 计算 / 写入：free(pool->pools);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1038
+ */
 /* 中文逐项-函数 F1038：ncclProxyFreeConnections
  * 用途与位置：遍历代理连接池释放全部已分配连接及池块，避免退出后残留后台资源。
  * 参数 pool（struct ncclProxyConnectionPool* pool）：代理待发布任务或可复用参数池，存元数据和索引，不装整个用户张量。
@@ -1508,6 +2279,46 @@ static ncclResult_t ncclProxyFreeConnections(struct ncclProxyConnectionPool* poo
 
 #include "transport.h"
 
+/* 中文内部逻辑 F1039：ncclProxyConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：proxyConn->connection = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：proxyConn->rank = rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 条件判断：(comm->proxyState.peerSocks == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->proxyState.peerSocks, comm->localRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     6. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->proxyState.proxyOps, comm->localRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     7. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->proxyState.sharedDevMems, comm->localRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     8. 循环：初始 int r=0;；继续条件 r<comm->localRanks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       9. 调用 / 计算 / 写入：comm->proxyState.peerSocks[r].fd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       10. 调用 / 计算 / 写入：comm->proxyState.peerSocks[r].abortFlag = comm->abortFlag;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 12. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetLocalRank(comm->topo, rank, &proxyConn->localRank));；失败时可能提前return，成功才继续；把全局用户 rank 映射到当前硬件系统内的 GPU 下标/局部位置。
+ * 13. 准备局部状态：struct ncclSocket* sock = comm->proxyState.peerSocks+proxyConn->localRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 条件判断：(sock->fd == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 调用 / 计算 / 写入：memcpy(&sock->addr, comm->proxyState.peerAddresses+rank, sizeof(union ncclSocketAddress));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     17. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketConnect(sock));；失败时可能提前return，成功才继续；按该函数所属文件推进基础 socket 连接或 TCP 多 socket 后端握手，支持异步未就绪返回。
+ * 18. 准备局部状态：int type = ncclProxyMsgInit;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 19. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(sock, &type, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 20. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(sock, &transport, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 21. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(sock, &send, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 22. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(sock, &comm->localRank, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 23. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &proxyConn->connection, sizeof(void*)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 24. 准备局部状态：struct ncclTransportComm* tcomm = send ? &ncclTransports[transport].send : &ncclTransports[transport].recv;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 25. 条件判断：(tcomm->proxyProgress)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   26. 真分支：；仅条件为真执行以下子项。
+ *     27. 准备局部状态：char poolPath[] = "/dev/shm/nccl-XXXXXX";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     28. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, poolPath+sizeof("/dev/shm/nccl-")-1, sizeof("XXXXXX")-1));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ *     29. 准备局部状态：struct ncclProxyOps* proxyOps = comm->proxyState.proxyOps+proxyConn->localRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     30. 条件判断：(proxyOps->pool == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       31. 真分支：；仅条件为真执行以下子项。
+ *         32. 调用 / 计算 / 写入：NCCLCHECK(ncclShmOpen(poolPath, sizeof(struct ncclProxyOpsPool), (void**)(&proxyOps->pool), NULL, 0));；失败时可能提前return，成功才继续；在共享 mmap 基础上可选 cudaHostRegisterMapped 并取得设备侧地址，建立 CPU/GPU 双视图。
+ *         33. 调用 / 计算 / 写入：proxyOps->nextOps = proxyOps->nextOpsEnd = proxyOps->freeOp = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 34. 调用 / 计算 / 写入：INFO(NCCL_NET, "Connection to proxy localRank %d -> connection %p", proxyConn->localRank, proxyConn->connection);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 35. 调用 / 计算 / 写入：proxyConn->comm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 36. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1039
+ */
 /* 中文逐项-函数 F1039：ncclProxyConnect
  * 用途与位置：联系目标代理服务并申请 transport/方向连接，建立主线程到该代理连接的控制引用。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1593,6 +2404,33 @@ ncclResult_t ncclProxyConnect(struct ncclComm* comm, int transport, int send, in
  * "Stop" }；聚合初始化按结构/数组成员顺序填入；对照该类型的字段声明理解每一项，未显式项遵守语言的初始化规则。
  */
 const char* ncclProxyMsgTypeStr[] = { "Unknown", "Init", "SharedInit", "Setup", "Connect", "Start", "Close", "Abort", "Stop" };
+/* 中文内部逻辑 F1040：ncclProxyCall
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(proxyConn->comm->proxyState.peerSocks == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：struct ncclSocket* sock = proxyConn->comm->proxyState.peerSocks+proxyConn->localRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：(sock->fd == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 准备局部状态：ncclResult_t ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclSocketSend(sock, &type, sizeof(int)), ret, error);；失败时保存错误并跳到清理标签，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 10. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclSocketSend(sock, &proxyConn->connection, sizeof(void*)), ret, error);；失败时保存错误并跳到清理标签，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 11. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclSocketSend(sock, &reqSize, sizeof(int)), ret, error);；失败时保存错误并跳到清理标签，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 12. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclSocketSend(sock, &respSize, sizeof(int)), ret, error);；失败时保存错误并跳到清理标签，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 13. 条件判断：(reqSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclSocketSend(sock, reqBuff, reqSize), ret, error);；失败时保存错误并跳到清理标签，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 16. 条件判断：(respSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   17. 真分支：；仅条件为真执行以下子项。
+ *     18. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclSocketRecv(sock, respBuff, respSize), ret, error);；失败时保存错误并跳到清理标签，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 20. 跳转标签：error；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   21. 调用 / 计算 / 写入：WARN("Proxy Call to rank %d failed (%s)", proxyConn->comm->localRankToRank[proxyConn->localRank], ncclProxyMsgTypeStr[type]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 22. 调用 / 计算 / 写入：sock->fd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 23. 函数返回：return ret;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1040
+ */
 /* 中文逐项-函数 F1040：ncclProxyCall
  * 用途与位置：通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
  * 参数 proxyConn（struct ncclProxyConnector* proxyConn）：逻辑连接到代理服务的引用，记录代理 rank 和实际后台连接。
@@ -1633,6 +2471,40 @@ error:
   return ret;
 }
 
+/* 中文内部逻辑 F1041：proxyProgressInit
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->opsPool == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 准备局部状态：int size = sizeof(struct ncclProxyOpsPool);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 准备局部状态：struct ncclProxyOpsPool* pool = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 准备局部状态：char shmPath[sizeof("/dev/shm/nccl-XXXXXX")];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 调用 / 计算 / 写入：shmPath[0] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：NCCLCHECK(ncclShmOpen(shmPath, size, (void**)&pool, NULL, 1));；失败时可能提前return，成功才继续；在共享 mmap 基础上可选 cudaHostRegisterMapped 并取得设备侧地址，建立 CPU/GPU 双视图。
+ *     9. 调用 / 计算 / 写入：pool->nextOps = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 循环：初始 ；继续条件 (comm->localRanks == 0)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       11. 调用 / 计算 / 写入：sched_yield();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     13. 循环：初始 int r=0;；继续条件 r<comm->localRanks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       14. 调用 / 计算 / 写入：pool->freeOps[r] = r*MAX_OPS_PER_PEER;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       15. 循环：初始 int i=0;；继续条件 i<MAX_OPS_PER_PEER-1；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         16. 调用 / 计算 / 写入：pool->ops[r*MAX_OPS_PER_PEER+i].next = r*MAX_OPS_PER_PEER+i+1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       18. 调用 / 计算 / 写入：pool->ops[(r+1)*MAX_OPS_PER_PEER-1].next = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     19. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     20. 准备局部状态：pthread_mutexattr_t mutexAttr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     21. 调用 / 计算 / 写入：pthread_mutexattr_init(&mutexAttr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     22. 调用 / 计算 / 写入：pthread_mutexattr_setpshared(&mutexAttr, PTHREAD_PROCESS_SHARED);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     23. 调用 / 计算 / 写入：pthread_mutex_init(&pool->mutex, &mutexAttr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     24. 准备局部状态：pthread_condattr_t condAttr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     25. 调用 / 计算 / 写入：pthread_condattr_setpshared(&condAttr, PTHREAD_PROCESS_SHARED);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     26. 调用 / 计算 / 写入：pthread_cond_init(&pool->cond, &condAttr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     27. 调用 / 计算 / 写入：state->opsPool = pool;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     28. 调用 / 计算 / 写入：memcpy(state->opsPoolShmSuffix, shmPath+sizeof("/dev/shm/nccl-")-1, sizeof("XXXXXX")-1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     29. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyProgressCreate(comm));；失败时可能提前return，成功才继续；按需要创建并命名代理后台线程，线程生命周期覆盖多次通信调用。
+ * 30. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1041
+ */
 /* 中文逐项-函数 F1041：proxyProgressInit
  * 用途与位置：创建/映射共享代理任务池并初始化跨进程锁、条件变量和空闲链，为数据提交准备接口。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1714,6 +2586,14 @@ static ncclResult_t proxyProgressInit(struct ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1042：proxyOpsFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(ncclShmClose(state->opsPool, NULL, sizeof(struct ncclProxyOpsPool)) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("[Service thread] shm close failed");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1042
+ */
 /* 中文逐项-函数 F1042：proxyOpsFree
  * 用途与位置：回收当前 communicator 映射/分配的代理任务池视图，不混同于单条数据请求完成。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1732,6 +2612,20 @@ static void proxyOpsFree(struct ncclComm* comm) {
   }
 }
 
+/* 中文内部逻辑 F1043：ncclProxyShmUnlink
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->opsPool == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：char shmPath[] = "/dev/shm/nccl-XXXXXX";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：memcpy(shmPath+sizeof("/dev/shm/nccl-")-1, state->opsPoolShmSuffix, sizeof("XXXXXX")-1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ncclShmUnlink(shmPath) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("[Service thread] shm unlink failed");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1043
+ */
 /* 中文逐项-函数 F1043：ncclProxyShmUnlink
  * 用途与位置：移除代理共享内存对象名字，已有映射仍按各自引用和退出流程释放。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1760,6 +2654,29 @@ ncclResult_t ncclProxyShmUnlink(struct ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1044：proxyConnInit
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocket* sock = &peer->sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int id;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct ncclProxyConnection* connection;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyNewConnection(connectionPool, &id));；失败时可能提前return，成功才继续；在分块连接池分配一个空连接槽，返回可用于控制消息索引的连接编号。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyGetConnection(connectionPool, id, &connection));；失败时可能提前return，成功才继续；按池编号定位已存在代理连接对象，校验池/索引后返回其地址。
+ * 6. 调用 / 计算 / 写入：connection->sock = sock;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &connection->transport, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &connection->send, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &peer->localRank, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 10. 调用 / 计算 / 写入：connection->localRank = peer->localRank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(sock, &connection, sizeof(void*)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 12. 调用 / 计算 / 写入：connection->tcomm = connection->send ? &ncclTransports[connection->transport].send : &ncclTransports[connection->transport].recv;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 条件判断：(connection->tcomm->proxyProgress)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 调用 / 计算 / 写入：NCCLCHECK(proxyProgressInit(comm));；失败时可能提前return，成功才继续；创建/映射共享代理任务池并初始化跨进程锁、条件变量和空闲链，为数据提交准备接口。
+ *     16. 准备局部状态：struct ncclProxyProgressState* state = &comm->proxyState.progressState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     17. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(sock, state->opsPoolShmSuffix, sizeof("XXXXXX")-1));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 18. 调用 / 计算 / 写入：INFO(NCCL_NET, "New proxy %s connection %d from local rank %d, transport %d", connection->send ? "send":"recv", id, connection->localRank, connection->transport);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1044
+ */
 /* 中文逐项-函数 F1044：proxyConnInit
  * 用途与位置：处理服务端初始化消息，建立 peer 到连接池中 transport 对象的关联。
  * 参数 peer（struct ncclProxyLocalPeer* peer）：通信对端的用户 rank，决定在 channel.peers 中选择哪个连接槽。
@@ -1809,6 +2726,25 @@ static ncclResult_t proxyConnInit(struct ncclProxyLocalPeer* peer, struct ncclPr
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1045：proxyConnSharedInit
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocket* sock = &peer->sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclProxyConnection* connection;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &connection, sizeof(void*)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 4. 准备局部状态：int reqSize, respSize;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &reqSize, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &respSize, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 7. 条件判断：(reqSize != sizeof(int) || respSize != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 10. 准备局部状态：int nChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &nChannels, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 12. 条件判断：(connection->tcomm->proxySharedInit)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 调用 / 计算 / 写入：NCCLCHECK(connection->tcomm->proxySharedInit(connection, comm, nChannels));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 15. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1045
+ */
 /* 中文逐项-函数 F1045：proxyConnSharedInit
  * 用途与位置：处理共享资源初始化请求，为该代理和 peer 的 P2P 共享缓冲/队列建立基础容量。
  * 参数 peer（struct ncclProxyLocalPeer* peer）：通信对端的用户 rank，决定在 channel.peers 中选择哪个连接槽。
@@ -1851,6 +2787,36 @@ static ncclResult_t proxyConnSharedInit(struct ncclProxyLocalPeer* peer, struct 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1046：proxyProgressAsync
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int done = 1;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 2. 条件判断：(op->type == ncclProxyMsgSetup)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：NCCLCHECK(op->connection->tcomm->proxySetup(op->connection, comm, op->reqBuff, op->reqSize, op->respBuff, op->respSize, &done));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   5. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     6. 条件判断：(op->type == ncclProxyMsgConnect)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 调用 / 计算 / 写入：NCCLCHECK(op->connection->tcomm->proxyConnect(op->connection, comm, op->reqBuff, op->reqSize, op->respBuff, op->respSize, &done));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *       9. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         10. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 条件判断：(done)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   12. 真分支：；仅条件为真执行以下子项。
+ *     13. 条件判断：(op->respSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       14. 真分支：；仅条件为真执行以下子项。
+ *         15. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(op->connection->sock, op->respBuff, op->respSize));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ *     16. 条件判断：(op->reqBuff)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       17. 真分支：；仅条件为真执行以下子项。
+ *         18. 调用 / 计算 / 写入：free(op->reqBuff);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     19. 条件判断：(op->respBuff)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       20. 真分支：；仅条件为真执行以下子项。
+ *         21. 调用 / 计算 / 写入：free(op->respBuff);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     22. 调用 / 计算 / 写入：op->reqBuff = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     23. 调用 / 计算 / 写入：op->respBuff = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     24. 调用 / 计算 / 写入：op->type = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     25. 调用 / 计算 / 写入：(*asyncOpCount)--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 26. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1046
+ */
 /* 中文逐项-函数 F1046：proxyProgressAsync
  * 用途与位置：推进一个尚未完成的代理控制请求，transport 声明 done 后才组织回复并移出待完成集合。
  * 参数 op（struct ncclProxyAsyncOp* op）：用户归约操作句柄或代理/系统调用方向枚举；查看类型和所属函数辨认。
@@ -1884,6 +2850,26 @@ static ncclResult_t proxyProgressAsync(struct ncclProxyAsyncOp* op, struct ncclC
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1047：proxyConnSetupConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocket* sock = &peer->sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclProxyAsyncOp* asyncOp = &peer->asyncOps;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：asyncOp->type = type;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &asyncOp->connection, sizeof(void*)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &asyncOp->reqSize, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, &asyncOp->respSize, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 7. 条件判断：(asyncOp->reqSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&asyncOp->reqBuff, asyncOp->reqSize));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     10. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketRecv(sock, asyncOp->reqBuff, asyncOp->reqSize));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ * 11. 条件判断：(asyncOp->respSize)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   12. 真分支：；仅条件为真执行以下子项。
+ *     13. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&asyncOp->respBuff, asyncOp->respSize));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 14. 调用 / 计算 / 写入：(*asyncOpCount)++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 调用 / 计算 / 写入：NCCLCHECK(proxyProgressAsync(asyncOp, comm, asyncOpCount));；失败时可能提前return，成功才继续；推进一个尚未完成的代理控制请求，transport 声明 done 后才组织回复并移出待完成集合。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1047
+ */
 /* 中文逐项-函数 F1047：proxyConnSetupConnect
  * 用途与位置：接收 setup/connect 请求参数并开始执行对应 transport 回调，支持回调异步多轮完成。
  * 参数 type（int type）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -1933,6 +2919,144 @@ static ncclResult_t proxyConnSetupConnect(int type, struct ncclProxyLocalPeer* p
  * Progress 轮询已建立连接上的数据传输；它在需要时创建，不是由每次 API 创建。
  * PXN 等路径可让 GPU 使用同机另一 rank 的代理，因此 ProxyConnector 记录代理 rank/localRank。
  * 排查卡住应分清是在建链控制请求阶段，还是已建链后的数据进度阶段。
+ */
+/* 中文内部逻辑 F1048：ncclProxyService
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclComm* comm = (struct ncclComm *) _args;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(cudaSetDevice(comm->cudaDev) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("[Proxy Service] Failed to set CUDA device %d", comm->cudaDev);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 条件判断：(CPU_COUNT(&comm->cpuAffinity))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：sched_setaffinity(0, sizeof(cpu_set_t), &comm->cpuAffinity);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 准备局部状态：struct ncclProxyConnectionPool connectionPool;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 调用 / 计算 / 写入：connectionPool.pools = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 调用 / 计算 / 写入：connectionPool.banks = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 调用 / 计算 / 写入：connectionPool.offset = NCCL_PROXY_CONN_POOL_SIZE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 准备局部状态：struct pollfd pollfds[NCCL_MAX_LOCAL_RANKS+1];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 13. 准备局部状态：struct ncclProxyLocalPeer peers[NCCL_MAX_LOCAL_RANKS];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 调用 / 计算 / 写入：memset(&peers, 0, sizeof(struct ncclProxyLocalPeer)*NCCL_MAX_LOCAL_RANKS);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 15. 循环：初始 int s=0;；继续条件 s<NCCL_MAX_LOCAL_RANKS；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   16. 调用 / 计算 / 写入：peers[s].sock.fd = pollfds[s].fd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   17. 调用 / 计算 / 写入：pollfds[s].events = POLLHUP|POLLIN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 19. 调用 / 计算 / 写入：pollfds[NCCL_MAX_LOCAL_RANKS].fd = comm->proxyState.listenSock->fd;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 20. 调用 / 计算 / 写入：pollfds[NCCL_MAX_LOCAL_RANKS].events = POLLIN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 准备局部状态：int maxnpeers = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 22. 准备局部状态：int npeers = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 23. 准备局部状态：int stop = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 24. 准备局部状态：int asyncOpCount = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 25. 循环：初始 ；继续条件 (stop == 0 || (stop == 1 && npeers > 0))；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   26. 条件判断：(int error = poll(pollfds, NCCL_MAX_LOCAL_RANKS+1, asyncOpCount ? 0 : -1) < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     27. 真分支：；仅条件为真执行以下子项。
+ *       28. 调用 / 计算 / 写入：WARN("[Proxy Service] Poll failed with error %d", error);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       29. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   30. 条件判断：(pollfds[NCCL_MAX_LOCAL_RANKS].revents)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     31. 真分支：；仅条件为真执行以下子项。
+ *       32. 准备局部状态：int s = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       33. 循环：初始 ；继续条件 (s < NCCL_MAX_LOCAL_RANKS && peers[s].sock.fd != -1)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         34. 调用 / 计算 / 写入：s++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       35. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       36. 条件判断：(s == NCCL_MAX_LOCAL_RANKS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         37. 真分支：；仅条件为真执行以下子项。
+ *           38. 调用 / 计算 / 写入：WARN("[Proxy service] Too many connections (%d max)", NCCL_MAX_LOCAL_RANKS);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           39. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *       40. 条件判断：(maxnpeers < s+1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         41. 真分支：；仅条件为真执行以下子项。
+ *           42. 调用 / 计算 / 写入：maxnpeers = s+1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       43. 准备局部状态：struct ncclSocket* sock = &peers[s].sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       44. 条件判断：(ncclSocketAccept(sock, comm->proxyState.listenSock) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         45. 真分支：；仅条件为真执行以下子项。
+ *           46. 调用 / 计算 / 写入：WARN("[Service thread] Accept failed %s", strerror(errno));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         47. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           48. 调用 / 计算 / 写入：pollfds[s].fd = sock->fd;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           49. 调用 / 计算 / 写入：npeers++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           50. 调用 / 计算 / 写入：peers[s].localRank = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   51. 循环：初始 int s=0;；继续条件 s<maxnpeers；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     52. 准备局部状态：struct ncclProxyLocalPeer* peer = peers+s;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     53. 准备局部状态：struct ncclSocket* sock = &peer->sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     54. 准备局部状态：struct ncclProxyAsyncOp* op = &peer->asyncOps;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     55. 准备局部状态：int closeConn = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     56. 准备局部状态：int type = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     57. 准备局部状态：ncclResult_t res = ncclSuccess;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     58. 条件判断：(op->type != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       59. 真分支：；仅条件为真执行以下子项。
+ *         60. 调用 / 计算 / 写入：res = proxyProgressAsync(op, comm, &asyncOpCount);；推进一个尚未完成的代理控制请求，transport 声明 done 后才组织回复并移出待完成集合。
+ *         61. 调用 / 计算 / 写入：type = op->type;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         62. 条件判断：(res != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           63. 真分支：；仅条件为真执行以下子项。
+ *             64. 调用 / 计算 / 写入：op->type = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       65. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         66. 条件判断：(pollfds[s].revents & POLLIN)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           67. 真分支：；仅条件为真执行以下子项。
+ *             68. 准备局部状态：int closed;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             69. 条件判断：(ncclSocketTryRecv(sock, &type, sizeof(int), &closed) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               70. 真分支：；仅条件为真执行以下子项。
+ *                 71. 调用 / 计算 / 写入：WARN("[Service thread] Could not receive type from localRank %d", peer->localRank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                 72. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               73. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                 74. 条件判断：(closed)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   75. 真分支：；仅条件为真执行以下子项。
+ *                     76. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_NET, "[Service thread] Connection closed by localRank %d", peer->localRank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                     77. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   78. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                     79. 条件判断：(type == ncclProxyMsgAbort)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                       80. 真分支：；仅条件为真执行以下子项。
+ *                         81. 调用 / 计算 / 写入：stop = 2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                         82. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                       83. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                         84. 条件判断：(type == ncclProxyMsgStop)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                           85. 真分支：；仅条件为真执行以下子项。
+ *                             86. 调用 / 计算 / 写入：stop = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                             87. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                           88. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                             89. 条件判断：(type == ncclProxyMsgClose)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                               90. 真分支：；仅条件为真执行以下子项。
+ *                                 91. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                               92. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                                 93. 条件判断：(type == ncclProxyMsgInit)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                                   94. 真分支：；仅条件为真执行以下子项。
+ *                                     95. 调用 / 计算 / 写入：res = proxyConnInit(peers+s, &connectionPool, comm);；处理服务端初始化消息，建立 peer 到连接池中 transport 对象的关联。
+ *                                   96. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                                     97. 条件判断：(type == ncclProxyMsgSharedInit)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                                       98. 真分支：；仅条件为真执行以下子项。
+ *                                         99. 调用 / 计算 / 写入：res = proxyConnSharedInit(peers+s, &connectionPool, comm);；处理共享资源初始化请求，为该代理和 peer 的 P2P 共享缓冲/队列建立基础容量。
+ *                                       100. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                                         101. 条件判断：(type == ncclProxyMsgSetup || type == ncclProxyMsgConnect)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                                           102. 真分支：；仅条件为真执行以下子项。
+ *                                             103. 调用 / 计算 / 写入：res = proxyConnSetupConnect(type, peers+s, &connectionPool, comm, &asyncOpCount);；接收 setup/connect 请求参数并开始执行对应 transport 回调，支持回调异步多轮完成。
+ *                                           104. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                                             105. 调用 / 计算 / 写入：WARN("[Service thread] Unknown command %d from localRank %d\n", type, peer->localRank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                                             106. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           107. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             108. 条件判断：(pollfds[s].revents & POLLHUP)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               109. 真分支：；仅条件为真执行以下子项。
+ *                 110. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     111. 条件判断：(res != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       112. 真分支：；仅条件为真执行以下子项。
+ *         113. 调用 / 计算 / 写入：WARN("[Proxy Service %d] Failed to execute operation %s from rank %d, retcode %d", comm->rank, ncclProxyMsgTypeStr[type], comm->localRankToRank[peer->localRank], res);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         114. 调用 / 计算 / 写入：closeConn = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     115. 条件判断：(closeConn)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       116. 真分支：；仅条件为真执行以下子项。
+ *         117. 调用 / 计算 / 写入：close(sock->fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         118. 调用 / 计算 / 写入：sock->fd = pollfds[s].fd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         119. 调用 / 计算 / 写入：npeers--;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   120. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 121. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 122. 条件判断：(ncclProxyProgressDestroy(comm) != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   123. 真分支：；仅条件为真执行以下子项。
+ *     124. 调用 / 计算 / 写入：WARN("[Proxy Service] proxyDestroy failed");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 125. 循环：初始 int s=0;；继续条件 s<maxnpeers；每轮更新 s++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   126. 条件判断：(peers[s].sock.fd != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     127. 真分支：；仅条件为真执行以下子项。
+ *       128. 调用 / 计算 / 写入：close(peers[s].sock.fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 129. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 130. 调用 / 计算 / 写入：ncclProxyFreeConnections(&connectionPool, comm);；遍历代理连接池释放全部已分配连接及池块，避免退出后残留后台资源。
+ * 131. 调用 / 计算 / 写入：close(comm->proxyState.listenSock->fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 132. 调用 / 计算 / 写入：free(comm->proxyState.listenSock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 133. 调用 / 计算 / 写入：proxyOpsFree(comm);；回收当前 communicator 映射/分配的代理任务池视图，不混同于单条数据请求完成。
+ * 134. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1048
  */
 /* 中文逐项-函数 F1048：ncclProxyService
  * 用途与位置：监听并处理代理控制 socket 的新连接、初始化、setup/connect/free/停止请求，与数据面循环分工。
@@ -2144,6 +3268,13 @@ void* ncclProxyService(void* _args) {
   return NULL;
 }
 
+/* 中文内部逻辑 F1049：ncclProxyInit
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：comm->proxyState.listenSock = sock;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：comm->proxyState.peerAddresses = peerAddresses;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1049
+ */
 /* 中文逐项-函数 F1049：ncclProxyInit
  * 用途与位置：将 bootstrap 建立的监听 socket 和全组代理地址表接入当前 communicator 的 Proxy 状态。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -2159,6 +3290,13 @@ ncclResult_t ncclProxyInit(struct ncclComm* comm, struct ncclSocket* sock, union
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1050：ncclProxyCreate
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：pthread_create(&comm->proxyState.thread, NULL, ncclProxyService, comm);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 调用 / 计算 / 写入：ncclSetThreadName(comm->proxyState.thread, "NCCL Service %2d", comm->cudaDev);；为后台线程设置便于系统工具识别的名称，方便区分 Proxy 服务与数据推进线程。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1050
+ */
 /* 中文逐项-函数 F1050：ncclProxyCreate
  * 用途与位置：按需要创建并命名代理后台线程，线程生命周期覆盖多次通信调用。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -2173,6 +3311,43 @@ ncclResult_t ncclProxyCreate(struct ncclComm* comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1051：ncclProxyDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclProxyState* state = &comm->proxyState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(state->peerAddresses)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 准备局部状态：struct ncclSocket sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：sock.abortFlag = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：sock.asyncFlag = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：memcpy(&sock.addr, comm->proxyState.peerAddresses+comm->rank, sizeof(union ncclSocketAddress));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     8. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketConnect(&sock));；失败时可能提前return，成功才继续；按该函数所属文件推进基础 socket 连接或 TCP 多 socket 后端握手，支持异步未就绪返回。
+ *     9. 准备局部状态：int type = (*comm->abortFlag) ? ncclProxyMsgAbort : ncclProxyMsgStop;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     10. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(&sock, &type, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ *     11. 调用 / 计算 / 写入：close(sock.fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     12. 调用 / 计算 / 写入：free(state->peerAddresses);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 13. 条件判断：(state->peerSocks)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 循环：初始 int i=0;；继续条件 i<comm->localRanks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       16. 条件判断：(state->peerSocks[i].fd != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         17. 真分支：；仅条件为真执行以下子项。
+ *           18. 条件判断：(state->proxyOps[i].pool)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             19. 真分支：；仅条件为真执行以下子项。
+ *               20. 调用 / 计算 / 写入：NCCLCHECK(ncclShmClose(state->proxyOps[i].pool, NULL, sizeof(struct ncclProxyOpsPool)));；失败时可能提前return，成功才继续；先撤销可选 CUDA 主机内存注册，再 munmap 当前进程映射。
+ *           21. 条件判断：(state->sharedDevMems[i])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             22. 真分支：；仅条件为真执行以下子项。
+ *               23. 调用 / 计算 / 写入：CUDACHECK(cudaIpcCloseMemHandle(state->sharedDevMems[i]));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *           24. 准备局部状态：int type = ncclProxyMsgClose;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           25. 条件判断：(*comm->abortFlag == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             26. 真分支：；仅条件为真执行以下子项。
+ *               27. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketSend(state->peerSocks+i, &type, sizeof(int)));；失败时可能提前return，成功才继续；从 offset=0 开始发送/接收指定字节数，调用等待型基础逻辑确保该段完整。
+ *           28. 调用 / 计算 / 写入：close(state->peerSocks[i].fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     29. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     30. 调用 / 计算 / 写入：free(state->peerSocks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     31. 调用 / 计算 / 写入：free(state->proxyOps);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     32. 调用 / 计算 / 写入：free(state->sharedDevMems);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 33. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__proxy_cc.md#f1051
+ */
 /* 中文逐项-函数 F1051：ncclProxyDestroy
  * 用途与位置：向代理服务发送停止/关闭信号并等待服务线程结束，完成代理总生命周期清理。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。

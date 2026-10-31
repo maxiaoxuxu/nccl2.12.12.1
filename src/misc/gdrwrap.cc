@@ -205,6 +205,60 @@ pthread_mutex_t gdrLock = PTHREAD_MUTEX_INITIALIZER;
  * GPUDirect RDMA 则指 NIC 直接访问已注册的 GPU 内存，走网络后端的 regMr/verbs 路径。
  * 两者可以配合，但没有 GDRCopy 不自动意味着所有 GDR 网络传输不可用。
  */
+/* 中文内部逻辑 F0912：wrap_gdr_symbols
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdrState == gdrInitialized)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 条件判断：(gdrState == gdrError)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 条件判断：(__sync_bool_compare_and_swap(&gdrState, gdrUninitialized, gdrInitializing) == false)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 循环：初始 ；继续条件 (gdrState == gdrInitializing)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       10. 调用 / 计算 / 写入：pthread_yield();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     12. 函数返回：return (gdrState == gdrInitialized) ? ncclSuccess : ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 准备局部状态：static void* gdrhandle = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 准备局部状态：void* tmp;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 15. 准备局部状态：void** cast;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 16. 调用 / 计算 / 写入：gdrhandle=dlopen(GDRAPI_LIBNAME, RTLD_NOW);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 条件判断：(!gdrhandle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   18. 真分支：；仅条件为真执行以下子项。
+ *     19. 调用 / 计算 / 写入：WARN("Failed to open %s", GDRAPI_LIBNAME);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     20. 控制转移：goto teardown;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 21. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_open", gdr_internal_open);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 22. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_close", gdr_internal_close);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 23. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_pin_buffer", gdr_internal_pin_buffer);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 24. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_unpin_buffer", gdr_internal_unpin_buffer);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 25. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_get_info", gdr_internal_get_info);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 26. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_map", gdr_internal_map);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 27. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_unmap", gdr_internal_unmap);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 28. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_runtime_get_version", gdr_internal_runtime_get_version);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 29. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_driver_get_version", gdr_internal_driver_get_version);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 30. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_copy_to_mapping", gdr_internal_copy_to_mapping);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 31. 调用 / 计算 / 写入：LOAD_SYM(gdrhandle, "gdr_copy_from_mapping", gdr_internal_copy_from_mapping);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 32. 调用 / 计算 / 写入：gdrState = gdrInitialized;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 33. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 34. 跳转标签：teardown；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   35. 调用 / 计算 / 写入：gdr_internal_open = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 36. 调用 / 计算 / 写入：gdr_internal_close = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 37. 调用 / 计算 / 写入：gdr_internal_pin_buffer = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 38. 调用 / 计算 / 写入：gdr_internal_unpin_buffer = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 39. 调用 / 计算 / 写入：gdr_internal_get_info = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 40. 调用 / 计算 / 写入：gdr_internal_map = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 41. 调用 / 计算 / 写入：gdr_internal_unmap = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 42. 调用 / 计算 / 写入：gdr_internal_runtime_get_version = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 43. 调用 / 计算 / 写入：gdr_internal_driver_get_version = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 44. 调用 / 计算 / 写入：gdr_internal_copy_to_mapping = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 45. 调用 / 计算 / 写入：gdr_internal_copy_from_mapping = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 46. 条件判断：(gdrhandle != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   47. 真分支：；仅条件为真执行以下子项。
+ *     48. 调用 / 计算 / 写入：dlclose(gdrhandle);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 49. 调用 / 计算 / 写入：gdrState = gdrError;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 50. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0912
+ */
 /* 中文逐项-函数 F0912：wrap_gdr_symbols
  * 用途与位置：解析 libgdrapi 动态符号；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -282,6 +336,15 @@ teardown:
 }
 
 
+/* 中文内部逻辑 F0913：wrap_gdr_open
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_open == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 函数返回：return gdr_internal_open();；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0913
+ */
 /* 中文逐项-函数 F0913：wrap_gdr_open
  * 用途与位置：打开 GDRCopy 实例；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -298,6 +361,20 @@ gdr_t wrap_gdr_open(void) {
   return gdr_internal_open();
 }
 
+/* 中文内部逻辑 F0914：wrap_gdr_close
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_close == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret = gdr_internal_close(g);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 调用 / 计算 / 写入：WARN("gdr_close() failed: %d", ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     9. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0914
+ */
 /* 中文逐项-函数 F0914：wrap_gdr_close
  * 用途与位置：关闭 GDRCopy 实例；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 g（gdr_t g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -323,6 +400,21 @@ ncclResult_t wrap_gdr_close(gdr_t g) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0915：wrap_gdr_pin_buffer
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_pin_buffer == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：GDRLOCKCALL(gdr_internal_pin_buffer(g, addr, size, p2p_token, va_space, handle), ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("gdr_pin_buffer(addr %lx, size %zi) failed: %d", addr, size, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0915
+ */
 /* 中文逐项-函数 F0915：wrap_gdr_pin_buffer
  * 用途与位置：固定 GPU 显存以供映射；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 g（gdr_t g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -355,6 +447,21 @@ ncclResult_t wrap_gdr_pin_buffer(gdr_t g, unsigned long addr, size_t size, uint6
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0916：wrap_gdr_unpin_buffer
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_unpin_buffer == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：GDRLOCKCALL(gdr_internal_unpin_buffer(g, handle), ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("gdr_unpin_buffer(handle %lx) failed: %d", handle.h, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0916
+ */
 /* 中文逐项-函数 F0916：wrap_gdr_unpin_buffer
  * 用途与位置：解除 GPU 显存固定；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 g（gdr_t g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -382,6 +489,21 @@ ncclResult_t wrap_gdr_unpin_buffer(gdr_t g, gdr_mh_t handle) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0917：wrap_gdr_get_info
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_get_info == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：GDRLOCKCALL(gdr_internal_get_info(g, handle, info), ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("gdr_get_info(handle %lx) failed: %d", handle.h, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0917
+ */
 /* 中文逐项-函数 F0917：wrap_gdr_get_info
  * 用途与位置：读取 GPU 显存映射属性及页偏移；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 g（gdr_t g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -410,6 +532,21 @@ ncclResult_t wrap_gdr_get_info(gdr_t g, gdr_mh_t handle, gdr_info_t *info) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0918：wrap_gdr_map
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_map == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：GDRLOCKCALL(gdr_internal_map(g, handle, va, size), ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("gdr_map(handle %lx, size %zi) failed: %d", handle.h, size, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0918
+ */
 /* 中文逐项-函数 F0918：wrap_gdr_map
  * 用途与位置：把已固定 GPU 内存映射到 CPU 地址空间；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 g（gdr_t g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -439,6 +576,21 @@ ncclResult_t wrap_gdr_map(gdr_t g, gdr_mh_t handle, void **va, size_t size) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0919：wrap_gdr_unmap
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_unmap == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：GDRLOCKCALL(gdr_internal_unmap(g, handle, va, size), ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("gdr_unmap(handle %lx, va %p, size %zi) failed: %d", handle.h, va, size, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0919
+ */
 /* 中文逐项-函数 F0919：wrap_gdr_unmap
  * 用途与位置：解除 CPU 映射；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 g（gdr_t g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -468,6 +620,16 @@ ncclResult_t wrap_gdr_unmap(gdr_t g, gdr_mh_t handle, void *va, size_t size) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0920：wrap_gdr_runtime_get_version
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_runtime_get_version == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：gdr_internal_runtime_get_version(major, minor);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0920
+ */
 /* 中文逐项-函数 F0920：wrap_gdr_runtime_get_version
  * 用途与位置：查询 GDRCopy 用户库版本；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 major（int *major）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -486,6 +648,16 @@ ncclResult_t wrap_gdr_runtime_get_version(int *major, int *minor) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0921：wrap_gdr_driver_get_version
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_driver_get_version == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：gdr_internal_driver_get_version(g, major, minor);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0921
+ */
 /* 中文逐项-函数 F0921：wrap_gdr_driver_get_version
  * 用途与位置：查询 GDRCopy 驱动版本；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 g（gdr_t g）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
@@ -505,6 +677,21 @@ ncclResult_t wrap_gdr_driver_get_version(gdr_t g, int *major, int *minor) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0922：wrap_gdr_copy_to_mapping
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_copy_to_mapping == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：GDRLOCKCALL(gdr_internal_copy_to_mapping(handle, map_d_ptr, h_ptr, size), ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("gdr_copy_to_mapping(handle %lx, map_d_ptr %p, h_ptr %p, size %zi) failed: %d", handle.h, map_d_ptr, h_ptr, size, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0922
+ */
 /* 中文逐项-函数 F0922：wrap_gdr_copy_to_mapping
  * 用途与位置：向 CPU 可见的 GPU 映射复制数据；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 handle（gdr_mh_t handle）：库/内核资源句柄或可交换连接句柄，不能当作通用可直接解引用指针。
@@ -535,6 +722,21 @@ ncclResult_t wrap_gdr_copy_to_mapping(gdr_mh_t handle, void *map_d_ptr, const vo
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0923：wrap_gdr_copy_from_mapping
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(gdr_internal_copy_from_mapping == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("GDRCOPY lib wrapper not initialized.");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：GDRLOCKCALL(gdr_internal_copy_from_mapping(handle, h_ptr, map_d_ptr, size), ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：WARN("gdr_copy_from_mapping(handle %lx, h_ptr %p, map_d_ptr %p, size %zi) failed: %d", handle.h, h_ptr, map_d_ptr, size, ret);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__gdrwrap_cc.md#f0923
+ */
 /* 中文逐项-函数 F0923：wrap_gdr_copy_from_mapping
  * 用途与位置：从 CPU 可见的 GPU 映射读回数据；按编译/运行支持提供真实调用或不支持的回退，注意配对释放。
  * 参数 handle（gdr_mh_t handle）：库/内核资源句柄或可交换连接句柄，不能当作通用可直接解引用指针。

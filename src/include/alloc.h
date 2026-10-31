@@ -19,6 +19,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 中文内部逻辑 F0603：ncclCudaHostCallocDebug
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：CUDACHECK(cudaHostAlloc(ptr, nelem*sizeof(T), cudaHostAllocMapped));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 调用 / 计算 / 写入：memset(*ptr, 0, nelem*sizeof(T));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 3. 调用 / 计算 / 写入：INFO(NCCL_ALLOC, "%s:%d Cuda Host Alloc Size %ld pointer %p", filefunc, line, nelem*sizeof(T), *ptr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__alloc_h.md#f0603
+ */
 /* 中文逐项-函数 F0603：ncclCudaHostCallocDebug
  * 用途与位置：分配 GPU 可映射的固定主机页并清零，记录文件/行号用于分配诊断。
  * 参数 ptr（T** ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -48,6 +56,12 @@ static ncclResult_t ncclCudaHostCallocDebug(T** ptr, size_t nelem, const char *f
  */
 #define ncclCudaHostCalloc(...) ncclCudaHostCallocDebug(__VA_ARGS__, __FILE__, __LINE__)
 
+/* 中文内部逻辑 F0604：ncclCudaHostFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：CUDACHECK(cudaFreeHost(ptr));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__alloc_h.md#f0604
+ */
 /* 中文逐项-函数 F0604：ncclCudaHostFree
  * 用途与位置：回收 cudaHostAlloc 对应的主机固定内存，不能用普通 free 替代。
  * 参数 ptr（void* ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -60,6 +74,18 @@ static inline ncclResult_t ncclCudaHostFree(void* ptr) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0605：ncclCallocDebug
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：void* p = malloc(nelem*sizeof(T));；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(p == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：WARN("Failed to malloc %ld bytes", nelem*sizeof(T));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 调用 / 计算 / 写入：memset(p, 0, nelem*sizeof(T));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 7. 调用 / 计算 / 写入：*ptr = (T*)p;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__alloc_h.md#f0605
+ */
 /* 中文逐项-函数 F0605：ncclCallocDebug
  * 用途与位置：分配并清零普通 CPU 堆对象，模板 nelem 乘 sizeof(T) 才是实际字节数。
  * 参数 ptr（T** ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -93,6 +119,28 @@ static ncclResult_t ncclCallocDebug(T** ptr, size_t nelem, const char *filefunc,
  */
 #define ncclCalloc(...) ncclCallocDebug(__VA_ARGS__, __FILE__, __LINE__)
 
+/* 中文内部逻辑 F0606：ncclRealloc
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(nelem < oldNelem)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 条件判断：(nelem == oldNelem)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 准备局部状态：T* oldp = *ptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 准备局部状态：T* p = (T*)malloc(nelem*sizeof(T));；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 条件判断：(p == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：WARN("Failed to malloc %ld bytes", nelem*sizeof(T));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     12. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 调用 / 计算 / 写入：memcpy(p, oldp, oldNelem*sizeof(T));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 14. 调用 / 计算 / 写入：free(oldp);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 15. 调用 / 计算 / 写入：memset(p+oldNelem, 0, (nelem-oldNelem)*sizeof(T));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 16. 调用 / 计算 / 写入：*ptr = (T*)p;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：INFO(NCCL_ALLOC, "Mem Realloc old size %ld, new size %ld pointer %p", oldNelem*sizeof(T), nelem*sizeof(T), *ptr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__alloc_h.md#f0606
+ */
 /* 中文逐项-函数 F0606：ncclRealloc
  * 用途与位置：分配更大且尾部清零的 CPU 数组，复制旧元素后释放旧内存，不支持缩小。
  * 参数 ptr（T** ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -130,6 +178,18 @@ static ncclResult_t ncclRealloc(T** ptr, size_t oldNelem, size_t nelem) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0607：ncclCudaCallocDebug
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：cudaStream_t stream;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：CUDACHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：CUDACHECK(cudaMalloc(ptr, nelem*sizeof(T)));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 4. 调用 / 计算 / 写入：CUDACHECK(cudaMemsetAsync(*ptr, 0, nelem*sizeof(T), stream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 5. 调用 / 计算 / 写入：CUDACHECK(cudaStreamSynchronize(stream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 6. 调用 / 计算 / 写入：CUDACHECK(cudaStreamDestroy(stream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 7. 调用 / 计算 / 写入：INFO(NCCL_ALLOC, "%s:%d Cuda Alloc Size %ld pointer %p", filefunc, line, nelem*sizeof(T), *ptr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__alloc_h.md#f0607
+ */
 /* 中文逐项-函数 F0607：ncclCudaCallocDebug
  * 用途与位置：分配显存并在专用非阻塞 stream 清零后等待完成，避免默认流依赖影响预连接/图路径。
  * 参数 ptr（T** ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。
@@ -162,6 +222,12 @@ static ncclResult_t ncclCudaCallocDebug(T** ptr, size_t nelem, const char *filef
  */
 #define ncclCudaCalloc(...) ncclCudaCallocDebug(__VA_ARGS__, __FILE__, __LINE__)
 
+/* 中文内部逻辑 F0608：ncclCudaMemcpy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：CUDACHECK(cudaMemcpy(dst, src, nelem*sizeof(T), cudaMemcpyDefault));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__alloc_h.md#f0608
+ */
 /* 中文逐项-函数 F0608：ncclCudaMemcpy
  * 用途与位置：按模板元素数量调用 cudaMemcpyDefault，实际字节数乘 sizeof(T)。
  * 参数 dst（T* dst）：输出数据地址，必须容纳当前 API 语义所需结果；AG 是多 rank 拼接，RS 只保留本段。
@@ -185,6 +251,21 @@ static ncclResult_t ncclCudaMemcpy(T* dst, T* src, size_t nelem) {
  * 这里按系统页尺寸对齐并独占所需页，随后具体后端才调用 reg_mr。
  * 分配内存与创建 MR 是两个步骤，拥有一块缓冲不自动消耗一个 MR 注册项。
  * 页对齐也与后端 MR 缓存键相关，但不意味着不同 PD/NIC 上的注册可任意共享。
+ */
+/* 中文内部逻辑 F0609：ncclIbMallocDebug
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：size_t page_size = sysconf(_SC_PAGESIZE);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：void* p;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：int size_aligned = ROUNDUP(size, page_size);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int ret = posix_memalign(&p, page_size, size_aligned);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：(ret != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 调用 / 计算 / 写入：memset(p, 0, size);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 调用 / 计算 / 写入：*ptr = p;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 调用 / 计算 / 写入：INFO(NCCL_ALLOC, "%s:%d Ib Alloc Size %ld pointer %p", filefunc, line, size, *ptr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__alloc_h.md#f0609
  */
 /* 中文逐项-函数 F0609：ncclIbMallocDebug
  * 用途与位置：按系统页对齐为将来 verbs 注册准备独立页缓冲，避免 fork 页标记影响同页其他堆对象。

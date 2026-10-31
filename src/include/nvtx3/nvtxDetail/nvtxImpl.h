@@ -690,7 +690,47 @@ NVTX_LINKONCE_DEFINE_GLOBAL nvtxGlobals_t NVTX_VERSIONED_IDENTIFIER(nvtxGlobals)
 
 /* ---- Define implementations of export table functions ---- */
 
-NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0675：nvtxEtiGetModuleFunctionTable
+NVTX_LINKONCE_DEFINE_FUNCTION /* 中文内部逻辑 F0675：nvtxEtiGetModuleFunctionTable
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：unsigned int bytes = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：NvtxFunctionTable table = (NvtxFunctionTable)0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 多路分派：(module)；按case匹配进入；没有break/return/goto时可能贯穿下一个case。
+ *   4. case / default：NVTX_CB_MODULE_CORE；从匹配项进入，随后依源码直到break等跳转。
+ *     5. 调用 / 计算 / 写入：table = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CORE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：bytes = (unsigned int)sizeof(NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CORE);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   8. case / default：NVTX_CB_MODULE_CUDA；从匹配项进入，随后依源码直到break等跳转。
+ *     9. 调用 / 计算 / 写入：table = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CUDA;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 调用 / 计算 / 写入：bytes = (unsigned int)sizeof(NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CUDA);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   12. case / default：NVTX_CB_MODULE_OPENCL；从匹配项进入，随后依源码直到break等跳转。
+ *     13. 调用 / 计算 / 写入：table = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_OPENCL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     14. 调用 / 计算 / 写入：bytes = (unsigned int)sizeof(NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_OPENCL);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     15. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   16. case / default：NVTX_CB_MODULE_CUDART；从匹配项进入，随后依源码直到break等跳转。
+ *     17. 调用 / 计算 / 写入：table = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CUDART;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     18. 调用 / 计算 / 写入：bytes = (unsigned int)sizeof(NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CUDART);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     19. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   20. case / default：NVTX_CB_MODULE_CORE2；从匹配项进入，随后依源码直到break等跳转。
+ *     21. 调用 / 计算 / 写入：table = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CORE2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     22. 调用 / 计算 / 写入：bytes = (unsigned int)sizeof(NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_CORE2);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     23. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   24. case / default：NVTX_CB_MODULE_SYNC；从匹配项进入，随后依源码直到break等跳转。
+ *     25. 调用 / 计算 / 写入：table = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_SYNC;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     26. 调用 / 计算 / 写入：bytes = (unsigned int)sizeof(NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).functionTable_SYNC);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     27. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *   28. case / default：default；从匹配项进入，随后依源码直到break等跳转。
+ *     29. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 30. 条件判断：(out_size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   31. 真分支：；仅条件为真执行以下子项。
+ *     32. 调用 / 计算 / 写入：*out_size = (bytes / (unsigned int)sizeof(NvtxFunctionPointer*)) - 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 33. 条件判断：(out_table)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   34. 真分支：；仅条件为真执行以下子项。
+ *     35. 调用 / 计算 / 写入：*out_table = table;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 36. 函数返回：return 1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImpl_h.md#f0675
+ */
+/* 中文逐项-函数 F0675：nvtxEtiGetModuleFunctionTable
  * 用途与位置：按模块与接口版本导出NVTX回调函数表，让注入工具为对应API登记实现。
  * 参数 module（NvtxCallbackModule module）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 out_table（NvtxFunctionTable* out_table）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -753,7 +793,18 @@ NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0675：nvtxEtiGetModuleFun
     return 1;
 }
 
-NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0676：nvtxGetExportTable
+NVTX_LINKONCE_DEFINE_FUNCTION /* 中文内部逻辑 F0676：nvtxGetExportTable
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 多路分派：(exportTableId)；按case匹配进入；没有break/return/goto时可能贯穿下一个case。
+ *   2. case / default：NVTX_ETID_CALLBACKS；从匹配项进入，随后依源码直到break等跳转。
+ *     3. 函数返回：return &NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).etblCallbacks;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   4. case / default：NVTX_ETID_VERSIONINFO；从匹配项进入，随后依源码直到break等跳转。
+ *     5. 函数返回：return &NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).etblVersionInfo;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   6. case / default：default；从匹配项进入，随后依源码直到break等跳转。
+ *     7. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImpl_h.md#f0676
+ */
+/* 中文逐项-函数 F0676：nvtxGetExportTable
  * 用途与位置：根据导出表id提供版本/回调导出入口，未知id不返回任意布局对象。
  * 参数 exportTableId（uint32_t exportTableId）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -770,7 +821,12 @@ NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0676：nvtxGetExportTable
     }
 }
 
-NVTX_LINKONCE_DEFINE_FUNCTION /* 中文逐项-函数 F0677：nvtxEtiSetInjectionNvtxVersion
+NVTX_LINKONCE_DEFINE_FUNCTION /* 中文内部逻辑 F0677：nvtxEtiSetInjectionNvtxVersion
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：(void)version;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImpl_h.md#f0677
+ */
+/* 中文逐项-函数 F0677：nvtxEtiSetInjectionNvtxVersion
  * 用途与位置：记录注入工具宣告的NVTX版本信息，配合回调表协商。
  * 参数 version（uint32_t version）：外部库事件/导出结构的布局大小与版本号，接收方据此判断可安全读取哪些字段。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。

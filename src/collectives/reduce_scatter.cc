@@ -13,6 +13,13 @@ NCCL_API(ncclResult_t, ncclReduceScatter, const void* sendbuff, void* recvbuff, 
  * ReduceScatter 的 recvcount 是本 rank 最终输出的元素数，输入覆盖所有 rank 的分块。
  * 统一调度器计算通信字节数时会处理该语义，不能把 recvcount 直接当作整个输入大小。
  */
+/* 中文内部逻辑 F0378：ncclReduceScatter
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：struct ncclInfo info = { ncclFuncReduceScatter, "ReduceScatter", sendbuff, recvbuff, recvcount, datatype, op, 0, comm, stream, REDUCESCATTER_CHUNKSTEPS, REDUCESCATTER_SLICESTEPS };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 函数返回：return ncclEnqueueCheck(&info);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__reduce_scatter_cc.md#f0378
+ */
 /* 中文逐项-函数 F0378：ncclReduceScatter
  * 用途与位置：先归约各 rank 的完整输入，再只把属于当前用户 rank 的结果段保留在本地输出。
  * 参数 sendbuff（const void* sendbuff）：输入数据地址，偏移单位由实际指针元素类型和当前 API 的归一化结果决定。

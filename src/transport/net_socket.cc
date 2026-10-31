@@ -52,6 +52,14 @@ static struct ncclSocketDev ncclSocketDevs[MAX_IFS];
  */
 pthread_mutex_t ncclSocketLock = PTHREAD_MUTEX_INITIALIZER;
 
+/* 中文内部逻辑 F1130：ncclSocketGetPciPath
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：char devicePath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：snprintf(devicePath, PATH_MAX, "/sys/class/net/%s/device", devName);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 3. 调用 / 计算 / 写入：*pciPath = realpath(devicePath, NULL);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1130
+ */
 /* 中文逐项-函数 F1130：ncclSocketGetPciPath
  * 用途与位置：读取网络接口的 PCI 路径，尽量把 TCP 后端设备纳入统一硬件拓扑。
  * 参数 devName（char* devName）：实际端口、QP能力上限、设备名、PCI路径和所选后端设备编号。
@@ -72,6 +80,38 @@ static ncclResult_t ncclSocketGetPciPath(char* devName, char** pciPath) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1131：ncclSocketInit
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ncclNetIfs == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：pthread_mutex_lock(&ncclSocketLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 条件判断：(ncclNetIfs == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       5. 真分支：；仅条件为真执行以下子项。
+ *         6. 准备局部状态：char names[MAX_IF_NAME_SIZE*MAX_IFS];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         7. 准备局部状态：union ncclSocketAddress addrs[MAX_IFS];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         8. 调用 / 计算 / 写入：ncclNetIfs = ncclFindInterfaces(names, addrs, MAX_IF_NAME_SIZE, MAX_IFS);；按显式接口配置或默认优先级选择可用接口，过滤不合适的 loopback/docker 等候选。
+ *         9. 条件判断：(ncclNetIfs <= 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           10. 真分支：；仅条件为真执行以下子项。
+ *             11. 调用 / 计算 / 写入：WARN("NET/Socket : no interface found");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             12. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *           13. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             14. 编译期分支/指令：#define MAX_LINE_LEN (2047)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *             15. 准备局部状态：char line[MAX_LINE_LEN+1];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             16. 准备局部状态：char addrline[SOCKET_NAME_MAXLEN+1];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             17. 调用 / 计算 / 写入：line[0] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             18. 调用 / 计算 / 写入：addrline[SOCKET_NAME_MAXLEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             19. 循环：初始 int i=0;；继续条件 i<ncclNetIfs；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               20. 调用 / 计算 / 写入：strcpy(ncclSocketDevs[i].devName, names+i*MAX_IF_NAME_SIZE);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *               21. 调用 / 计算 / 写入：memcpy(&ncclSocketDevs[i].addr, addrs+i, sizeof(union ncclSocketAddress));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *               22. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketGetPciPath(ncclSocketDevs[i].devName, &ncclSocketDevs[i].pciPath));；失败时可能提前return，成功才继续；读取网络接口的 PCI 路径，尽量把 TCP 后端设备纳入统一硬件拓扑。
+ *               23. 调用 / 计算 / 写入：snprintf(line+strlen(line), MAX_LINE_LEN-strlen(line), " [%d]%s:%s", i, names+i*MAX_IF_NAME_SIZE, ncclSocketToString(&addrs[i], addrline));；把 IPv4/IPv6 socket 地址和端口格式化为可读文本，用于日志与错误定位。
+ *             24. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *             25. 调用 / 计算 / 写入：line[MAX_LINE_LEN] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             26. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_NET,"NET/Socket : Using%s", line);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     27. 调用 / 计算 / 写入：pthread_mutex_unlock(&ncclSocketLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 28. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1131
+ */
 /* 中文逐项-函数 F1131：ncclSocketInit
  * 用途与位置：本文件定义决定是基础 socket 对象初始化还是 TCP 后端接口枚举，请结合参数和所属文件阅读。
  * 参数 logFunction（ncclDebugLogger_t logFunction）：NCCL提供的日志回调，插件用它按统一级别/子系统报告信息与错误。
@@ -139,6 +179,12 @@ ncclResult_t ncclSocketInit(ncclDebugLogger_t logFunction) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1132：ncclSocketDevices
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*ndev = ncclNetIfs;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1132
+ */
 /* 中文逐项-函数 F1132：ncclSocketDevices
  * 用途与位置：报告 Socket 后端发现并筛选后的网络接口数量。
  * 参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
@@ -151,6 +197,26 @@ ncclResult_t ncclSocketDevices(int* ndev) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1133：ncclSocketGetSpeed
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*speed = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 准备局部状态：char speedPath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：sprintf(speedPath, "/sys/class/net/%s/speed", devName);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 准备局部状态：int fd = open(speedPath, O_RDONLY);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：(fd != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 准备局部状态：char speedStr[] = " ";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     8. 条件判断：(read(fd, speedStr, sizeof(speedStr)-1) > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       9. 真分支：；仅条件为真执行以下子项。
+ *         10. 调用 / 计算 / 写入：*speed = strtol(speedStr, NULL, 0);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 调用 / 计算 / 写入：close(fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 12. 条件判断：(*speed <= 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 调用 / 计算 / 写入：INFO(NCCL_NET, "Could not get speed from %s. Defaulting to 10 Gbps.", speedPath);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     15. 调用 / 计算 / 写入：*speed = 10000;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1133
+ */
 /* 中文逐项-函数 F1133：ncclSocketGetSpeed
  * 用途与位置：从系统接口属性读取链路速率，读取失败时按实现提供保守估计。
  * 参数 devName（char* devName）：实际端口、QP能力上限、设备名、PCI路径和所选后端设备编号。
@@ -191,6 +257,20 @@ static ncclResult_t ncclSocketGetSpeed(char* devName, int* speed) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1134：ncclSocketGetProperties
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：props->name = ncclSocketDevs[dev].devName;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：props->pciPath = ncclSocketDevs[dev].pciPath;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：props->guid = dev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：props->ptrSupport = NCCL_PTR_HOST;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketGetSpeed(props->name, &props->speed));；失败时可能提前return，成功才继续；从系统接口属性读取链路速率，读取失败时按实现提供保守估计。
+ * 6. 调用 / 计算 / 写入：props->latency = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：props->port = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：props->maxComms = 65536;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：props->maxRecvs = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1134
+ */
 /* 中文逐项-函数 F1134：ncclSocketGetProperties
  * 用途与位置：向统一网络层报告 TCP 接口名字/PCI/速度及只接受主机指针等能力。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -212,6 +292,15 @@ ncclResult_t ncclSocketGetProperties(int dev, ncclNetProperties_t* props) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1135：GetSocketAddr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(dev >= ncclNetIfs)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 调用 / 计算 / 写入：memcpy(addr, &ncclSocketDevs[dev].addr, sizeof(*addr));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1135
+ */
 /* 中文逐项-函数 F1135：GetSocketAddr
  * 用途与位置：为所选后端设备获得建链控制 socket 地址；控制握手地址与实际数据载荷通路不同。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -539,6 +628,48 @@ struct ncclSocketComm {
   struct ncclSocketThreadResources threadResources[MAX_THREADS];
 };
 
+/* 中文内部逻辑 F1136：persistentSocketThread
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocketThreadResources* resource = (struct ncclSocketThreadResources*)args_;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclSocketComm* comm = resource->comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct ncclSocketTaskQueue* myQueue = &resource->threadTaskQueue;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int nSocksPerThread = comm->nSocks / comm->nThreads;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 循环：初始 ；继续条件 (1)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   6. 准备局部状态：int idle = 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   7. 准备局部状态：int mark = myQueue->next;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   8. 循环：初始 int i=0;；继续条件 i<myQueue->len；每轮更新 i+=nSocksPerThread；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     9. 准备局部状态：int repeat;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     10. 先执行一次的循环：初始 ；继续条件 (repeat)；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *       11. 调用 / 计算 / 写入：repeat = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       12. 循环：初始 int j=0;；继续条件 j<nSocksPerThread；每轮更新 j++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         13. 准备局部状态：struct ncclSocketTask* r = myQueue->tasks+i+j;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         14. 条件判断：(r != NULL && r->used == 1 && r->offset < r->size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           15. 真分支：；仅条件为真执行以下子项。
+ *             16. 调用 / 计算 / 写入：r->result = ncclSocketProgress(r->op, r->sock, r->data, r->size, &r->offset);；调用非阻塞进度基础逻辑推进一段字节流，保留 offset 供后续调用接着传。
+ *             17. 条件判断：(r->result != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               18. 真分支：；仅条件为真执行以下子项。
+ *                 19. 调用 / 计算 / 写入：WARN("NET/Socket : socket progress error");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *                 20. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *             21. 调用 / 计算 / 写入：idle = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             22. 条件判断：(r->offset < r->size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               23. 真分支：；仅条件为真执行以下子项。
+ *                 24. 调用 / 计算 / 写入：repeat = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       25. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     26. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   27. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   28. 条件判断：(idle)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     29. 真分支：；仅条件为真执行以下子项。
+ *       30. 调用 / 计算 / 写入：pthread_mutex_lock(&resource->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       31. 循环：初始 ；继续条件 (mark == myQueue->next && resource->stop == 0)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         32. 调用 / 计算 / 写入：pthread_cond_wait(&resource->threadCond, &resource->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       33. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       34. 调用 / 计算 / 写入：pthread_mutex_unlock(&resource->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   35. 条件判断：(resource->stop)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     36. 真分支：；仅条件为真执行以下子项。
+ *       37. 函数返回：return NULL;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 38. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1136
+ */
 /* 中文逐项-函数 F1136：persistentSocketThread
  * 用途与位置：后台交错推进分配到本线程的 TCP 子任务，更新每个任务的传输 offset 直到完成或停止。
  * 参数 args_（void *args_）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -625,6 +756,61 @@ void* persistentSocketThread(void *args_) {
   }
 }
 
+/* 中文内部逻辑 F1137：ncclSocketGetNsockNthread
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int nSocksPerThread = ncclParamSocketNsocksPerThread();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int nThreads = ncclParamSocketNthreads();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 条件判断：(nThreads > MAX_THREADS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：WARN("NET/Socket : NCCL_SOCKET_NTHREADS is greater than the maximum allowed, setting to %d", MAX_THREADS);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 调用 / 计算 / 写入：nThreads = MAX_THREADS;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 条件判断：(nThreads == -2 || nSocksPerThread == -2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 准备局部状态：int autoNt=0, autoNs=1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     10. 准备局部状态：char vendorPath[PATH_MAX];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     11. 调用 / 计算 / 写入：snprintf(vendorPath, PATH_MAX, "/sys/class/net/%s/device/vendor", ncclSocketDevs[dev].devName);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     12. 准备局部状态：char* rPath = realpath(vendorPath, NULL);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     13. 准备局部状态：int fd = open(rPath, O_RDONLY);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     14. 调用 / 计算 / 写入：free(rPath);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     15. 条件判断：(fd == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       16. 真分支：；仅条件为真执行以下子项。
+ *         17. 调用 / 计算 / 写入：TRACE(NCCL_NET, "Open of %s failed : %s", vendorPath, strerror(errno));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         18. 控制转移：goto end;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ *     19. 准备局部状态：char vendor[7];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     20. 调用 / 计算 / 写入：strncpy(vendor, "0x0000", 7);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     21. 准备局部状态：int len;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     22. 调用 / 计算 / 写入：SYSCHECKVAL(read(fd, vendor, 6), "read", len);；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     23. 调用 / 计算 / 写入：SYSCHECK(close(fd), "close");；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     24. 条件判断：(strcmp(vendor, "0x1d0f") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       25. 真分支：；仅条件为真执行以下子项。
+ *         26. 调用 / 计算 / 写入：autoNt = 2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         27. 调用 / 计算 / 写入：autoNs = 8;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       28. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         29. 条件判断：(strcmp(vendor, "0x1ae0") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           30. 真分支：；仅条件为真执行以下子项。
+ *             31. 调用 / 计算 / 写入：autoNt = 4;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             32. 调用 / 计算 / 写入：autoNs = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     33. 跳转标签：end；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *       34. 条件判断：(nThreads == -2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         35. 真分支：；仅条件为真执行以下子项。
+ *           36. 调用 / 计算 / 写入：nThreads = autoNt;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     37. 条件判断：(nSocksPerThread == -2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       38. 真分支：；仅条件为真执行以下子项。
+ *         39. 调用 / 计算 / 写入：nSocksPerThread = autoNs;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 40. 准备局部状态：int nSocks = nSocksPerThread * nThreads;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 41. 条件判断：(nSocks > MAX_SOCKETS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   42. 真分支：；仅条件为真执行以下子项。
+ *     43. 调用 / 计算 / 写入：nSocksPerThread = MAX_SOCKETS/nThreads;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     44. 调用 / 计算 / 写入：WARN("NET/Socket : the total number of sockets is greater than the maximum allowed, setting NCCL_NSOCKS_PERTHREAD to %d", nSocksPerThread);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     45. 调用 / 计算 / 写入：nSocks = nSocksPerThread * nThreads;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 46. 调用 / 计算 / 写入：*ns = nSocks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 47. 调用 / 计算 / 写入：*nt = nThreads;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 48. 条件判断：(nSocks > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   49. 真分支：；仅条件为真执行以下子项。
+ *     50. 调用 / 计算 / 写入：INFO(NCCL_INIT, "NET/Socket: Using %d threads and %d sockets per thread", nThreads, nSocksPerThread);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 51. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1137
+ */
 /* 中文逐项-函数 F1137：ncclSocketGetNsockNthread
  * 用途与位置：结合参数和平台调优选择每连接 socket 数与后台线程数，平衡并发带宽和 CPU 开销。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -724,6 +910,13 @@ end:
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1138：ncclSocketNewListenComm
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(comm, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 调用 / 计算 / 写入：(*comm)->sock.fd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1138
+ */
 /* 中文逐项-函数 F1138：ncclSocketNewListenComm
  * 用途与位置：分配并清零 TCP 后端监听/通信对象，设置请求池及状态初值。
  * 参数 comm（struct ncclSocketListenComm** comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -737,6 +930,17 @@ ncclResult_t ncclSocketNewListenComm(struct ncclSocketListenComm** comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1139：ncclSocketNewComm
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(comm, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 调用 / 计算 / 写入：(*comm)->ctrlSock.fd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 循环：初始 int i=0;；继续条件 i < MAX_SOCKETS；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   4. 调用 / 计算 / 写入：(*comm)->socks[i].fd = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 6. 调用 / 计算 / 写入：(*comm)->nextSock = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1139
+ */
 /* 中文逐项-函数 F1139：ncclSocketNewComm
  * 用途与位置：分配并清零 TCP 后端监听/通信对象，设置请求池及状态初值。
  * 参数 comm（struct ncclSocketComm** comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -759,6 +963,28 @@ ncclResult_t ncclSocketNewComm(struct ncclSocketComm** comm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1140：ncclSocketListen
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(dev < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：struct ncclSocketHandle* handle = (struct ncclSocketHandle*) opaqueHandle;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：memset(handle, 0, sizeof(struct ncclSocketHandle));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 6. 源码语法片段：static_assert(sizeof(struct ncclSocketHandle) <= NCCL_NET_HANDLE_MAXSIZE, "ncclSocketHandle size too large");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 7. 准备局部状态：struct ncclSocketListenComm* comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketNewListenComm(&comm));；失败时可能提前return，成功才继续；分配并清零 TCP 后端监听/通信对象，设置请求池及状态初值。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(GetSocketAddr(dev, &comm->sock.addr));；失败时可能提前return，成功才继续；为所选后端设备获得建链控制 socket 地址；控制握手地址与实际数据载荷通路不同。
+ * 10. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketListen(&comm->sock));；失败时可能提前return，成功才继续；按该函数所属文件创建基础监听 socket 或 TCP 后端 listenComm，生成对端可连接句柄。
+ * 11. 调用 / 计算 / 写入：memcpy(&handle->connectAddr, &comm->sock.addr, sizeof(union ncclSocketAddress));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 12. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketGetNsockNthread(dev, &comm->nSocks, &comm->nThreads));；失败时可能提前return，成功才继续；结合参数和平台调优选择每连接 socket 数与后台线程数，平衡并发带宽和 CPU 开销。
+ * 13. 调用 / 计算 / 写入：handle->nSocks = comm->nSocks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 调用 / 计算 / 写入：handle->nThreads = comm->nThreads;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 调用 / 计算 / 写入：comm->sock.asyncFlag = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 调用 / 计算 / 写入：comm->dev = dev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：*listenComm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1140
+ */
 /* 中文逐项-函数 F1140：ncclSocketListen
  * 用途与位置：按该函数所属文件创建基础监听 socket 或 TCP 后端 listenComm，生成对端可连接句柄。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -798,6 +1024,58 @@ ncclResult_t ncclSocketListen(int dev, void* opaqueHandle, void** listenComm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1141：ncclSocketConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(dev < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：enum ncclSocketState conState;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：struct ncclSocketHandle* handle = (struct ncclSocketHandle*) opaqueHandle;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：struct ncclSocketCommStage* stage = &handle->stage;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 准备局部状态：struct ncclSocketComm* comm = stage->comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 准备局部状态：uint8_t i = stage->iteration;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：struct ncclSocket* sock = stage->sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 调用 / 计算 / 写入：*sendComm = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 条件判断：(stage->state == ncclSocketCommStateConnect)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   12. 真分支：；仅条件为真执行以下子项。
+ *     13. 控制转移：goto socket_connect_check;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 14. 条件判断：(stage->state == ncclSocketCommStateSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 控制转移：goto socket_send;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 17. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketNewComm(&comm));；失败时可能提前return，成功才继续；分配并清零 TCP 后端监听/通信对象，设置请求池及状态初值。
+ * 18. 调用 / 计算 / 写入：stage->comm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 调用 / 计算 / 写入：comm->nSocks = handle->nSocks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 20. 调用 / 计算 / 写入：comm->nThreads = handle->nThreads;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 调用 / 计算 / 写入：comm->dev = dev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 22. 调用 / 计算 / 写入：CUDACHECK(cudaGetDevice(&comm->cudaDev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 23. 循环：初始 ；继续条件 i<comm->nSocks+1；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   24. 调用 / 计算 / 写入：sock = i == comm->nSocks ? &comm->ctrlSock : comm->socks+i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   25. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketInit(sock, &handle->connectAddr, NULL, 1));；失败时可能提前return，成功才继续；本文件定义决定是基础 socket 对象初始化还是 TCP 后端接口枚举，请结合参数和所属文件阅读。
+ *   26. 调用 / 计算 / 写入：stage->sock = sock;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   27. 调用 / 计算 / 写入：stage->state = ncclSocketCommStateConnect;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   28. 调用 / 计算 / 写入：stage->iteration = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   29. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketConnect(sock));；失败时可能提前return，成功才继续；按该函数所属文件推进基础 socket 连接或 TCP 多 socket 后端握手，支持异步未就绪返回。
+ *   30. 跳转标签：socket_connect_check；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *     31. 调用 / 计算 / 写入：NCCLCHECK(ncclGetSocketState(sock, &conState));；失败时可能提前return，成功才继续；检查非阻塞 socket 的连接状态及系统错误，区分仍在连接、已连接或失败。
+ *   32. 条件判断：(conState == ncclSocketConnecting)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     33. 真分支：；仅条件为真执行以下子项。
+ *       34. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     35. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       36. 条件判断：(conState == ncclSocketError)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         37. 真分支：；仅条件为真执行以下子项。
+ *           38. 函数返回：return ncclSystemError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   39. 调用 / 计算 / 写入：stage->state = ncclSocketCommStateSend;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   40. 跳转标签：socket_send；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *     41. 准备局部状态：int done = 0;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *   42. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketProgress(NCCL_SOCKET_SEND, sock, &i, sizeof(uint8_t), &done));；失败时可能提前return，成功才继续；调用非阻塞进度基础逻辑推进一段字节流，保留 offset 供后续调用接着传。
+ *   43. 条件判断：(done == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     44. 真分支：；仅条件为真执行以下子项。
+ *       45. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 46. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 47. 调用 / 计算 / 写入：*sendComm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 48. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1141
+ */
 /* 中文逐项-函数 F1141：ncclSocketConnect
  * 用途与位置：按该函数所属文件推进基础 socket 连接或 TCP 多 socket 后端握手，支持异步未就绪返回。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -887,6 +1165,61 @@ socket_send:
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1142：ncclSocketAccept
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocketListenComm* lComm = (struct ncclSocketListenComm*)listenComm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclSocketCommStage* stage = &lComm->stage;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct ncclSocketComm* rComm = stage->comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：uint8_t i = stage->iteration;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：struct ncclSocket* sock = stage->sock;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：*recvComm = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 条件判断：(stage->state == ncclSocketCommStateAccept)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 控制转移：goto socket_accept;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 10. 条件判断：(stage->state == ncclSocketCommStateRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 控制转移：goto socket_recv;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketNewComm(&rComm));；失败时可能提前return，成功才继续；分配并清零 TCP 后端监听/通信对象，设置请求池及状态初值。
+ * 14. 调用 / 计算 / 写入：stage->comm = rComm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 15. 调用 / 计算 / 写入：rComm->nSocks = lComm->nSocks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 调用 / 计算 / 写入：rComm->nThreads = lComm->nThreads;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：rComm->dev = lComm->dev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 调用 / 计算 / 写入：CUDACHECK(cudaGetDevice(&rComm->cudaDev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 19. 调用 / 计算 / 写入：lComm->sock.asyncFlag = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 20. 循环：初始 ；继续条件 i<rComm->nSocks+1；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   21. 准备局部状态：uint8_t sendSockIdx;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   22. 调用 / 计算 / 写入：ncclCalloc(&sock, 1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   23. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketInit(sock, NULL, NULL, 1));；失败时可能提前return，成功才继续；本文件定义决定是基础 socket 对象初始化还是 TCP 后端接口枚举，请结合参数和所属文件阅读。
+ *   24. 调用 / 计算 / 写入：stage->sock = sock;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   25. 调用 / 计算 / 写入：stage->state = ncclSocketCommStateAccept;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   26. 调用 / 计算 / 写入：stage->iteration = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   27. 跳转标签：socket_accept；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *     28. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketAccept(sock, &lComm->sock));；失败时可能提前return，成功才继续；按该函数所属文件接收基础连接或组成 TCP 后端多 socket 通信对象，保留握手阶段状态。
+ *   29. 条件判断：(sock->fd == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     30. 真分支：；仅条件为真执行以下子项。
+ *       31. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   32. 调用 / 计算 / 写入：stage->state = ncclSocketCommStateRecv;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   33. 跳转标签：socket_recv；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *     34. 准备局部状态：int done = 0;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *   35. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketProgress(NCCL_SOCKET_RECV, sock, &sendSockIdx, sizeof(uint8_t), &done));；失败时可能提前return，成功才继续；调用非阻塞进度基础逻辑推进一段字节流，保留 offset 供后续调用接着传。
+ *   36. 条件判断：(done == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     37. 真分支：；仅条件为真执行以下子项。
+ *       38. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   39. 条件判断：(sendSockIdx == rComm->nSocks)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     40. 真分支：；仅条件为真执行以下子项。
+ *       41. 调用 / 计算 / 写入：memcpy(&rComm->ctrlSock, sock, sizeof(struct ncclSocket));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     42. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       43. 调用 / 计算 / 写入：memcpy(rComm->socks+sendSockIdx, sock, sizeof(struct ncclSocket));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   44. 调用 / 计算 / 写入：free(sock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 45. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 46. 调用 / 计算 / 写入：*recvComm = rComm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 47. 调用 / 计算 / 写入：stage->state = ncclSocketCommStateStart;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 48. 调用 / 计算 / 写入：stage->iteration = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 49. 调用 / 计算 / 写入：stage->sock = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 50. 调用 / 计算 / 写入：stage->comm = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 51. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1142
+ */
 /* 中文逐项-函数 F1142：ncclSocketAccept
  * 用途与位置：按该函数所属文件接收基础连接或组成 TCP 后端多 socket 通信对象，保留握手阶段状态。
  * 参数 listenComm（void* listenComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
@@ -976,6 +1309,26 @@ socket_recv:
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1143：ncclSocketGetRequest
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 循环：初始 int i=0;；继续条件 i<MAX_REQUESTS；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   2. 准备局部状态：struct ncclSocketRequest* r = comm->requests+i;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(r->used == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：r->op = op;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       6. 调用 / 计算 / 写入：r->data = data;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       7. 调用 / 计算 / 写入：r->size = size;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       8. 调用 / 计算 / 写入：r->ctrlSock = &comm->ctrlSock;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       9. 调用 / 计算 / 写入：r->used = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       10. 调用 / 计算 / 写入：r->comm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       11. 调用 / 计算 / 写入：r->nSubs = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       12. 调用 / 计算 / 写入：*req = r;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 14. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 15. 调用 / 计算 / 写入：WARN("NET/Socket : unable to allocate requests");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 16. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1143
+ */
 /* 中文逐项-函数 F1143：ncclSocketGetRequest
  * 用途与位置：从 TCP 后端固定请求表申请一项记录消息方向、地址与总长度的状态。
  * 参数 comm（struct ncclSocketComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1015,6 +1368,42 @@ ncclResult_t ncclSocketGetRequest(struct ncclSocketComm* comm, int op, void* dat
   return ncclInternalError;
 }
 
+/* 中文内部逻辑 F1144：ncclSocketGetTask
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int tid = comm->nextSock % comm->nThreads;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclSocketThreadResources* res = comm->threadResources+tid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct ncclSocketTaskQueue* queue = &res->threadTaskQueue;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 条件判断：(queue->tasks == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 调用 / 计算 / 写入：queue->len = MAX_REQUESTS * DIVUP(comm->nSocks, comm->nThreads);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&queue->tasks, queue->len));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     8. 调用 / 计算 / 写入：queue->next = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 调用 / 计算 / 写入：res->comm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 调用 / 计算 / 写入：pthread_mutex_init(&res->threadLock, NULL);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     11. 调用 / 计算 / 写入：pthread_cond_init(&res->threadCond, NULL);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     12. 调用 / 计算 / 写入：pthread_create(comm->helperThread+tid, NULL, persistentSocketThread, res);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     13. 调用 / 计算 / 写入：ncclSetThreadName(comm->helperThread[tid], "NCCL Sock%c%1u%2u%2u", op == NCCL_SOCKET_SEND ? 'S' : 'R', comm->dev, tid, comm->cudaDev);；为后台线程设置便于系统工具识别的名称，方便区分 Proxy 服务与数据推进线程。
+ * 14. 准备局部状态：struct ncclSocketTask* r = queue->tasks+queue->next;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 15. 条件判断：(r->used == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   16. 真分支：；仅条件为真执行以下子项。
+ *     17. 调用 / 计算 / 写入：r->op = op;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     18. 调用 / 计算 / 写入：r->data = data;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     19. 调用 / 计算 / 写入：r->size = size;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     20. 调用 / 计算 / 写入：r->sock = comm->socks+comm->nextSock;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     21. 调用 / 计算 / 写入：r->offset = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     22. 调用 / 计算 / 写入：r->result = ncclSuccess;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     23. 调用 / 计算 / 写入：comm->nextSock = (comm->nextSock + 1) % comm->nSocks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     24. 调用 / 计算 / 写入：r->used = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     25. 调用 / 计算 / 写入：*req = r;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     26. 调用 / 计算 / 写入：pthread_mutex_lock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     27. 调用 / 计算 / 写入：queue->next = (queue->next+1)%queue->len;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     28. 调用 / 计算 / 写入：pthread_cond_signal(&res->threadCond);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     29. 调用 / 计算 / 写入：pthread_mutex_unlock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     30. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 31. 调用 / 计算 / 写入：WARN("NET/Socket : unable to allocate subtasks");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 32. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1144
+ */
 /* 中文逐项-函数 F1144：ncclSocketGetTask
  * 用途与位置：把请求划为 TCP 子任务并交给相应 socket/线程，复用任务队列与后台线程。
  * 参数 comm（struct ncclSocketComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1088,6 +1477,82 @@ ncclResult_t ncclSocketGetTask(struct ncclSocketComm* comm, int op, void* data, 
  * read/write 可能只完成一部分，必须保留 offset 继续，不能把一次系统调用当成整条消息完成。
  * 多 socket/线程用于并行推进 TCP 数据，最终 done 仍回到上层 Proxy 的相同接口。
  * 该后端仅接受主机指针注册，不创建 verbs QP/MR，网络路径会使用可访问的主机通信缓冲。
+ */
+/* 中文内部逻辑 F1145：ncclSocketTest
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*done = 0;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 2. 准备局部状态：struct ncclSocketRequest *r = (struct ncclSocketRequest*)request;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 条件判断：(r == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：WARN("NET/Socket : test called with NULL request");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 条件判断：(r->used == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 准备局部状态：int data = r->size;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     10. 准备局部状态：int offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     11. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketProgress(r->op, r->ctrlSock, &data, sizeof(int), &offset));；失败时可能提前return，成功才继续；调用非阻塞进度基础逻辑推进一段字节流，保留 offset 供后续调用接着传。
+ *     12. 条件判断：(offset == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       13. 真分支：；仅条件为真执行以下子项。
+ *         14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     15. 条件判断：(offset < sizeof(int))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       16. 真分支：；仅条件为真执行以下子项。
+ *         17. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketWait(r->op, r->ctrlSock, &data, sizeof(int), &offset));；失败时可能提前return，成功才继续；重复推进直到指定长度完成，等待过程中继续处理临时错误和中止。
+ *     18. 条件判断：(r->op == NCCL_SOCKET_RECV && data > r->size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       19. 真分支：；仅条件为真执行以下子项。
+ *         20. 准备局部状态：char line[SOCKET_NAME_MAXLEN+1];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         21. 调用 / 计算 / 写入：WARN("NET/Socket : peer %s message truncated : receiving %d bytes instead of %d. If you believe your socket network is in healthy state, \ there may be a mismatch in collective sizes or environment se …（完整代码见函数体）；把 IPv4/IPv6 socket 地址和端口格式化为可读文本，用于日志与错误定位。
+ *         22. 函数返回：return ncclInvalidUsage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     23. 调用 / 计算 / 写入：r->size = data;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     24. 调用 / 计算 / 写入：r->offset = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     25. 调用 / 计算 / 写入：r->used = 2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     26. 准备局部状态：int chunkOffset = 0, i = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     27. 条件判断：(r->comm->nSocks > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       28. 真分支：；仅条件为真执行以下子项。
+ *         29. 准备局部状态：int taskSize = std::max(MIN_CHUNKSIZE, DIVUP(r->size, r->comm->nSocks));；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         30. 循环：初始 ；继续条件 (chunkOffset < r->size)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           31. 准备局部状态：int chunkSize = std::min(taskSize, r->size-chunkOffset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *           32. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketGetTask(r->comm, r->op, (char*)(r->data)+chunkOffset, chunkSize, r->tasks+i++));；失败时可能提前return，成功才继续；把请求划为 TCP 子任务并交给相应 socket/线程，复用任务队列与后台线程。
+ *           33. 调用 / 计算 / 写入：chunkOffset += chunkSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         34. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     35. 调用 / 计算 / 写入：r->nSubs = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 36. 条件判断：(r->used == 2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   37. 真分支：；仅条件为真执行以下子项。
+ *     38. 条件判断：(r->nSubs > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       39. 真分支：；仅条件为真执行以下子项。
+ *         40. 准备局部状态：int nCompleted = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         41. 循环：初始 int i=0;；继续条件 i<r->nSubs；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           42. 准备局部状态：struct ncclSocketTask* sub = r->tasks[i];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           43. 条件判断：(sub->result != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             44. 真分支：；仅条件为真执行以下子项。
+ *               45. 函数返回：return sub->result;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *           46. 条件判断：(sub->offset == sub->size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             47. 真分支：；仅条件为真执行以下子项。
+ *               48. 调用 / 计算 / 写入：nCompleted++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         49. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *         50. 条件判断：(nCompleted == r->nSubs)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           51. 真分支：；仅条件为真执行以下子项。
+ *             52. 条件判断：(size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               53. 真分支：；仅条件为真执行以下子项。
+ *                 54. 调用 / 计算 / 写入：*size = r->size;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             55. 调用 / 计算 / 写入：*done = 1;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *             56. 调用 / 计算 / 写入：r->used = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             57. 循环：初始 int i=0;；继续条件 i<r->nSubs；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               58. 准备局部状态：struct ncclSocketTask* sub = r->tasks[i];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               59. 调用 / 计算 / 写入：sub->used = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             60. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       61. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         62. 条件判断：(r->offset < r->size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           63. 真分支：；仅条件为真执行以下子项。
+ *             64. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketProgress(r->op, r->ctrlSock, r->data, r->size, &r->offset));；失败时可能提前return，成功才继续；调用非阻塞进度基础逻辑推进一段字节流，保留 offset 供后续调用接着传。
+ *         65. 条件判断：(r->offset == r->size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           66. 真分支：；仅条件为真执行以下子项。
+ *             67. 条件判断：(size)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               68. 真分支：；仅条件为真执行以下子项。
+ *                 69. 调用 / 计算 / 写入：*size = r->size;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             70. 调用 / 计算 / 写入：*done = 1;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *             71. 调用 / 计算 / 写入：r->used = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 72. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1145
  */
 /* 中文逐项-函数 F1145：ncclSocketTest
  * 用途与位置：推进控制长度交换并检查所有子任务 offset，直到一条上层异步请求完成。
@@ -1226,6 +1691,11 @@ ncclResult_t ncclSocketTest(void* request, int* done, int* size) {
  * Socket 后端为适配统一接口提供的注册回调，不执行 ibv_reg_mr。
  * 因此走 Socket 的同一上层任务不会按内置 IB 的公式消耗 RDMA QP/MR，但有 socket/线程/缓冲开销。
  */
+/* 中文内部逻辑 F1146：ncclSocketRegMr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (type != NCCL_PTR_HOST) ? ncclInternalError : ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1146
+ */
 /* 中文逐项-函数 F1146：ncclSocketRegMr
  * 用途与位置：仅验证主机指针类型，TCP 后端无需创建 verbs MR；不支持直接传 GPU 指针。
  * 参数 comm（void* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1240,6 +1710,11 @@ ncclResult_t ncclSocketTest(void* request, int* done, int* size) {
 ncclResult_t ncclSocketRegMr(void* comm, void* data, int size, int type, void** mhandle) {
   return (type != NCCL_PTR_HOST) ? ncclInternalError : ncclSuccess;
 }
+/* 中文内部逻辑 F1147：ncclSocketDeregMr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1147
+ */
 /* 中文逐项-函数 F1147：ncclSocketDeregMr
  * 用途与位置：TCP 后端没有真实 verbs MR，可直接成功完成接口对应的注销动作。
  * 参数 comm（void* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1250,6 +1725,13 @@ ncclResult_t ncclSocketRegMr(void* comm, void* data, int size, int type, void** 
  */
 ncclResult_t ncclSocketDeregMr(void* comm, void* mhandle) { return ncclSuccess; }
 
+/* 中文内部逻辑 F1148：ncclSocketIsend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocketComm* comm = (struct ncclSocketComm*)sendComm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketGetRequest(comm, NCCL_SOCKET_SEND, data, size, (struct ncclSocketRequest**)request));；失败时可能提前return，成功才继续；从 TCP 后端固定请求表申请一项记录消息方向、地址与总长度的状态。
+ * 3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1148
+ */
 /* 中文逐项-函数 F1148：ncclSocketIsend
  * 用途与位置：为 TCP 消息分配异步请求，数据在后续 Test/线程推进中完成，不保证本调用返回时已传完。
  * 参数 sendComm（void* sendComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -1272,6 +1754,16 @@ ncclResult_t ncclSocketIsend(void* sendComm, void* data, int size, int tag, void
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1149：ncclSocketIrecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocketComm* comm = (struct ncclSocketComm*)recvComm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(n != 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(ncclSocketGetRequest(comm, NCCL_SOCKET_RECV, data[0], sizes[0], (struct ncclSocketRequest**)request));；失败时可能提前return，成功才继续；从 TCP 后端固定请求表申请一项记录消息方向、地址与总长度的状态。
+ * 6. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1149
+ */
 /* 中文逐项-函数 F1149：ncclSocketIrecv
  * 用途与位置：为 TCP 消息分配异步请求，数据在后续 Test/线程推进中完成，不保证本调用返回时已传完。
  * 参数 recvComm（void* recvComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -1297,6 +1789,11 @@ ncclResult_t ncclSocketIrecv(void* recvComm, int n, void** data, int* sizes, int
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1150：ncclSocketIflush
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1150
+ */
 /* 中文逐项-函数 F1150：ncclSocketIflush
  * 用途与位置：TCP 主机缓冲路径不需 GPU RDMA flush，对应接口立即完成而不创建额外硬件请求。
  * 参数 recvComm（void* recvComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -1314,6 +1811,18 @@ ncclResult_t ncclSocketIflush(void* recvComm, int n, void** data, int* sizes, vo
   return ncclInternalError;
 }
 
+/* 中文内部逻辑 F1151：ncclSocketCloseListen
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocketListenComm* comm = (struct ncclSocketListenComm*)opaqueComm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(comm)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 条件判断：(comm->sock.fd != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       5. 真分支：；仅条件为真执行以下子项。
+ *         6. 调用 / 计算 / 写入：close(comm->sock.fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：free(comm);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1151
+ */
 /* 中文逐项-函数 F1151：ncclSocketCloseListen
  * 用途与位置：关闭 TCP 后端监听 socket 并释放其监听对象。
  * 参数 opaqueComm（void* opaqueComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
@@ -1335,6 +1844,34 @@ ncclResult_t ncclSocketCloseListen(void* opaqueComm) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1152：ncclSocketClose
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct ncclSocketComm* comm = (struct ncclSocketComm*)opaqueComm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(comm)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 循环：初始 int i=0;；继续条件 i<comm->nThreads；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       5. 准备局部状态：struct ncclSocketThreadResources* res = comm->threadResources+i;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       6. 条件判断：(comm->helperThread[i])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         7. 真分支：；仅条件为真执行以下子项。
+ *           8. 调用 / 计算 / 写入：pthread_mutex_lock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           9. 调用 / 计算 / 写入：res->stop = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           10. 调用 / 计算 / 写入：pthread_cond_signal(&res->threadCond);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           11. 调用 / 计算 / 写入：pthread_mutex_unlock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           12. 调用 / 计算 / 写入：pthread_join(comm->helperThread[i], NULL);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       13. 调用 / 计算 / 写入：free(res->threadTaskQueue.tasks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     14. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     15. 条件判断：(comm->ctrlSock.fd != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       16. 真分支：；仅条件为真执行以下子项。
+ *         17. 调用 / 计算 / 写入：close(comm->ctrlSock.fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     18. 循环：初始 int i=0;；继续条件 i<comm->nSocks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       19. 条件判断：(comm->socks[i].fd != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         20. 真分支：；仅条件为真执行以下子项。
+ *           21. 调用 / 计算 / 写入：close(comm->socks[i].fd);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     22. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     23. 调用 / 计算 / 写入：free(comm);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 24. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_socket_cc.md#f1152
+ */
 /* 中文逐项-函数 F1152：ncclSocketClose
  * 用途与位置：通知 TCP 通信后台线程停止，关闭各数据/控制 socket 并释放任务、请求及线程资源。
  * 参数 opaqueComm（void* opaqueComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。

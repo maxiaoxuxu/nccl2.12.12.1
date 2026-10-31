@@ -192,6 +192,15 @@ struct ncclQueueInfo {
   ncclQueueElemList* elemList;
 };
 
+/* 中文内部逻辑 F0632：ncclCreateQueueInfo
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(eqInfo, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 调用 / 计算 / 写入：(*eqInfo)->comm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：(*eqInfo)->elemList = new ncclQueueElemList();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：(*eqInfo)->comm->nQueueInfoCreated++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__enqueue_h.md#f0632
+ */
 /* 中文逐项-函数 F0632：ncclCreateQueueInfo
  * 用途与位置：分配一个提交/图持有的 QueueInfo 和可复用元素列表，记录 communicator 队列生命周期计数。
  * 参数 eqInfo（struct ncclQueueInfo** eqInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -209,6 +218,18 @@ static ncclResult_t ncclCreateQueueInfo(struct ncclQueueInfo** eqInfo, ncclComm_
 }
 
 // Reset element queue
+/* 中文内部逻辑 F0633：ncclResetQueueInfo
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(eqInfo == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 调用 / 计算 / 写入：eqInfo->maxChannels = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：eqInfo->ret = ncclSuccess;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：eqInfo->nRegBuffs = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：eqInfo->elemList->recycle();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__enqueue_h.md#f0633
+ */
 /* 中文逐项-函数 F0633：ncclResetQueueInfo
  * 用途与位置：清理一批已经提交的队列统计并 recycle 元素节点，保留容量供后续批次复用。
  * 参数 eqInfo（struct ncclQueueInfo* eqInfo）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -228,6 +249,59 @@ static ncclResult_t ncclResetQueueInfo(struct ncclQueueInfo* eqInfo) {
 
 // Destroy enqueue info space
 // used by both CUDA graph and non CUDA graph
+/* 中文内部逻辑 F0634：ncclDestroyQueueInfo
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ptr == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：struct ncclQueueInfo* eqInfo = (struct ncclQueueInfo*)ptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：struct ncclComm* comm = eqInfo->comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：struct ncclQueueElem* eqElem = eqInfo->elemList->begin();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 编译期分支/指令：#if 0；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   8. 循环：初始 ；继续条件 (eqElem != NULL)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     9. 循环：初始 int i=0;；继续条件 i<eqElem->buffRegInfo.nBuffs；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       10. 条件判断：(i == eqInfo->comm->localRank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         11. 真分支：；仅条件为真执行以下子项。
+ *           12. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *       13. 调用 / 计算 / 写入：CUDACHECKIGNORE(cudaIpcCloseMemHandle(eqElem->buffRegInfo.sendbuffsBase[i]));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *       14. 调用 / 计算 / 写入：CUDACHECKIGNORE(cudaIpcCloseMemHandle(eqElem->buffRegInfo.recvbuffsBase[i]));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     15. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     16. 调用 / 计算 / 写入：eqElem = eqInfo->elemList->getNext();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   18. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     19. 准备局部状态：struct ncclGraphHelperResources* res = comm->graphHelperResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     20. 准备局部状态：int ipcTailOld = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     21. 条件判断：(res == NULL || (!comm->graphHelperThread) || eqInfo->nRegBuffs == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       22. 真分支：；仅条件为真执行以下子项。
+ *         23. 控制转移：goto skip;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ *     24. 调用 / 计算 / 写入：pthread_mutex_lock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     25. 调用 / 计算 / 写入：ipcTailOld = res->ipcTail;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     26. 循环：初始 ；继续条件 (eqElem != NULL)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       27. 循环：初始 int i=0;；继续条件 i<eqElem->buffRegInfo.nBuffs；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         28. 条件判断：(eqElem->buffRegInfo.sendbuffsBase[i] != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           29. 真分支：；仅条件为真执行以下子项。
+ *             30. 调用 / 计算 / 写入：res->ipcBases[res->ipcTail] = eqElem->buffRegInfo.sendbuffsBase[i];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             31. 调用 / 计算 / 写入：res->ipcTail = (res->ipcTail+1)%NCCL_IPC_POOL_SIZE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         32. 条件判断：(eqElem->buffRegInfo.recvbuffsBase[i] != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           33. 真分支：；仅条件为真执行以下子项。
+ *             34. 调用 / 计算 / 写入：res->ipcBases[res->ipcTail] = eqElem->buffRegInfo.recvbuffsBase[i];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             35. 调用 / 计算 / 写入：res->ipcTail = (res->ipcTail+1)%NCCL_IPC_POOL_SIZE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       36. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       37. 调用 / 计算 / 写入：eqElem = eqInfo->elemList->getNext();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     38. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     39. 条件判断：(res->ipcTail != ipcTailOld)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       40. 真分支：；仅条件为真执行以下子项。
+ *         41. 调用 / 计算 / 写入：res->threadState = ThreadStart;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         42. 调用 / 计算 / 写入：TRACE(NCCL_COLL, "CUDA Graph destroy function signaling helper thread with %d IPC handles", res->ipcTail-ipcTailOld);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         43. 调用 / 计算 / 写入：pthread_cond_signal(&res->threadCond);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     44. 调用 / 计算 / 写入：pthread_mutex_unlock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 45. 跳转标签：skip；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   46. 调用 / 计算 / 写入：delete eqInfo->elemList;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ * 47. 调用 / 计算 / 写入：free(eqInfo);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 48. 调用 / 计算 / 写入：comm->nQueueInfoDestroyed++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 49. 函数返回：return;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__enqueue_h.md#f0634
+ */
 /* 中文逐项-函数 F0634：ncclDestroyQueueInfo
  * 用途与位置：释放图/普通提交持有的队列，把不能在图析构回调直接关闭的 CUDA IPC 句柄转交辅助线程。
  * 参数 ptr（void* ptr）：当前数据/元数据对象地址；请结合类型与赋值区分CPU、设备或输出指针。

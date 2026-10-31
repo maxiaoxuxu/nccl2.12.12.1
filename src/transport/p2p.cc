@@ -90,6 +90,26 @@ struct p2pRecvResources {
 #include <sys/types.h>
 
 /* Convert a PCI busId string into a local cudaDev device index (cf. CUDA_VISIBLE_DEVICES) */
+/* 中文内部逻辑 F1153：busIdToCudaDev
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int ndev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(cudaGetDeviceCount(&ndev) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return -1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 循环：初始 int i = 0;；继续条件 i < ndev；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   6. 准备局部状态：char devBusIdStr[NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   7. 条件判断：(cudaDeviceGetPCIBusId(devBusIdStr, NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE, i) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     8. 真分支：；仅条件为真执行以下子项。
+ *       9. 函数返回：return -1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   10. 准备局部状态：int64_t devBusId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   11. 调用 / 计算 / 写入：NCCLCHECK(busIdToInt64(devBusIdStr, &devBusId));；失败时可能提前return，成功才继续；在 PCI BDF 字符串和整数标识之间转换，统一关联 CUDA/NVML/NET 的同一硬件设备。
+ *   12. 条件判断：(busId == devBusId)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     13. 真分支：；仅条件为真执行以下子项。
+ *       14. 函数返回：return i;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 15. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 16. 函数返回：return -1;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1153
+ */
 /* 中文逐项-函数 F1153：busIdToCudaDev
  * 用途与位置：把 GPU PCI busId 映射到本进程 CUDA_VISIBLE_DEVICES 下可见设备序号。
  * 参数 busId（int64_t busId）：PCI BDF 的整数标识，用于将 CUDA、NVML 与拓扑中的同一设备关联。
@@ -136,6 +156,60 @@ static int busIdToCudaDev(int64_t busId) {
 /* 中文导读：
  * 判断两个 GPU 是否能走 P2P，包括拓扑、CUDA peer access/IPC 能力等条件。
  * 这里的 GPU P2P transport 与公开 ncclSend/ncclRecv 的点对点语义不是同一个层次。
+ */
+/* 中文内部逻辑 F1154：p2pCanConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(info1->hostHash != info2->hostHash || info1->shmDev != info2->shmDev)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：*ret = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int intermediateRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCheckP2p(topo, info1->busId, info2->busId, ret, NULL, &intermediateRank));；失败时可能提前return，成功才继续；结合拓扑距离、环境策略和硬件 P2P 状态判断 GPU 间能否直接访问及是否需中间 GPU。
+ * 7. 条件判断：(*ret == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 10. 条件判断：(intermediateRank != -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 准备局部状态：int cudaDev1 = busIdToCudaDev(info1->busId);；把 GPU PCI busId 映射到本进程 CUDA_VISIBLE_DEVICES 下可见设备序号。
+ * 14. 准备局部状态：int cudaDev2 = busIdToCudaDev(info2->busId);；把 GPU PCI busId 映射到本进程 CUDA_VISIBLE_DEVICES 下可见设备序号。
+ * 15. 条件判断：(cudaDev1 == -1 || cudaDev2 == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   16. 真分支：；仅条件为真执行以下子项。
+ *     17. 编译期分支/指令：#if CUDART_VERSION >= 10010；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *       18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *       19. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *         20. 调用 / 计算 / 写入：*ret = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         21. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 22. 准备局部状态：int p2p;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 23. 条件判断：(cudaDeviceCanAccessPeer(&p2p, cudaDev1, cudaDev2) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   24. 真分支：；仅条件为真执行以下子项。
+ *     25. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_P2P,"peer query failed between dev %d(=%lx) and dev %d(=%lx)", cudaDev1, info1->busId, cudaDev2, info2->busId);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     26. 调用 / 计算 / 写入：*ret = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     27. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 28. 条件判断：(p2p != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   29. 真分支：；仅条件为真执行以下子项。
+ *     30. 准备局部状态：static int legacyIPC = -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     31. 条件判断：(legacyIPC >= 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       32. 真分支：；仅条件为真执行以下子项。
+ *         33. 调用 / 计算 / 写入：*ret = legacyIPC;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         34. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     35. 准备局部状态：char *dummy;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     36. 准备局部状态：cudaIpcMemHandle_t ipc;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     37. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaCalloc(&dummy, CUDA_IPC_MIN));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     38. 条件判断：(cudaIpcGetMemHandle(&ipc, dummy) != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       39. 真分支：；仅条件为真执行以下子项。
+ *         40. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_P2P,"Legacy IPC not supported");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         41. 调用 / 计算 / 写入：*ret = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     42. 调用 / 计算 / 写入：CUDACHECK(cudaFree(dummy));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     43. 调用 / 计算 / 写入：legacyIPC = *ret;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     44. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 45. 条件判断：(p2p == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   46. 真分支：；仅条件为真执行以下子项。
+ *     47. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_P2P,"Could not enable P2P between dev %d(=%lx) and dev %d(=%lx)", cudaDev1, info1->busId, cudaDev2, info2->busId);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     48. 调用 / 计算 / 写入：*ret = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     49. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 50. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1154
  */
 /* 中文逐项-函数 F1154：p2pCanConnect
  * 用途与位置：检查同机/共享环境、拓扑策略、CUDA peer access 与 IPC 支持，决定能否走 GPU P2P transport。
@@ -270,6 +344,17 @@ NCCL_PARAM(P2pReadEnable, "P2P_READ_ENABLE", -2);
  */
 NCCL_PARAM(P2pDirectDisable, "P2P_DIRECT_DISABLE", 0);
 
+/* 中文内部逻辑 F1155：p2pGetInfo
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int p2p;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCheckP2p(topo, info1->busId, info2->busId, &p2p, read, intermediateRank));；失败时可能提前return，成功才继续；结合拓扑距离、环境策略和硬件 P2P 状态判断 GPU 间能否直接访问及是否需中间 GPU。
+ * 3. 准备局部状态：int readEnable = ncclParamP2pReadEnable();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 条件判断：(readEnable != -2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 调用 / 计算 / 写入：*read = readEnable;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1155
+ */
 /* 中文逐项-函数 F1155：p2pGetInfo
  * 用途与位置：查询 GPU 对的 P2P 可达性、读写模式及可能的中间 rank，把拓扑结果提供给 setup。
  * 参数 topo（struct ncclTopoSystem* topo）：本 rank 可见且裁剪后的硬件拓扑模型，供路径与通信图搜索使用。
@@ -305,6 +390,29 @@ static ncclResult_t p2pGetInfo(struct ncclTopoSystem* topo, struct ncclPeerInfo*
 /* 中文导读：
  * 把对端 GPU 缓冲区映射到本进程可用的设备地址，同进程直连与跨进程 CUDA IPC 分开处理。
  * 跨进程交换 IPC handle 后在本地打开映射，不是把另一个进程的裸虚拟地址直接拿来解引用。
+ */
+/* 中文内部逻辑 F1156：p2pMap
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(myInfo->pidHash == peerInfo->pidHash)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 条件判断：(peerInfo->cudaDev != myInfo->cudaDev)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       4. 真分支：；仅条件为真执行以下子项。
+ *         5. 准备局部状态：cudaError_t err = cudaDeviceEnablePeerAccess(peerInfo->cudaDev, 0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         6. 条件判断：(err == cudaErrorPeerAccessAlreadyEnabled)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           7. 真分支：；仅条件为真执行以下子项。
+ *             8. 调用 / 计算 / 写入：cudaGetLastError();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           9. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             10. 条件判断：(err != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               11. 真分支：；仅条件为真执行以下子项。
+ *                 12. 调用 / 计算 / 写入：WARN("failed to peer with device %d(=%lx): %d %s", peerInfo->cudaDev, peerInfo->busId, err, cudaGetErrorString(err));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                 13. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     14. 调用 / 计算 / 写入：*devMem = p2pBuff->directPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     15. 调用 / 计算 / 写入：*ipcPtr = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   16. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     17. 调用 / 计算 / 写入：CUDACHECK(cudaIpcOpenMemHandle(devMem, p2pBuff->devIpc, cudaIpcMemLazyEnablePeerAccess));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     18. 调用 / 计算 / 写入：*ipcPtr = *devMem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1156
  */
 /* 中文逐项-函数 F1156：p2pMap
  * 用途与位置：同进程直接使用/启用 peer 访问，跨进程打开 CUDA IPC 句柄得到本进程可用映射。
@@ -346,6 +454,46 @@ static ncclResult_t p2pMap(struct ncclPeerInfo* myInfo, struct ncclPeerInfo* pee
 }
 
 /* Send: Create and return connect structures for this peer to connect to me */
+/* 中文内部逻辑 F1157：p2pSendSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct p2pSendResources* resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&resources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：send->transportResources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 准备局部状态：int useRead, intermediateRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead, &intermediateRank));；失败时可能提前return，成功才继续；查询 GPU 对的 P2P 可达性、读写模式及可能的中间 rank，把拓扑结果提供给 setup。
+ * 6. 源码语法片段：static_assert(sizeof(struct p2pConnectInfo) <= sizeof(struct ncclConnect), "p2p Connect Info is too big");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 7. 准备局部状态：struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：info->read = useRead;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 条件判断：(graph && connIndex == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：info->read = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 准备局部状态：const char* useReadStr = info->read ? "/read" : "";；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 13. 准备局部状态：int sendSize = sizeof(struct ncclSendMem);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 条件判断：(info->read)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   15. 真分支：；仅条件为真执行以下子项。
+ *     16. 调用 / 计算 / 写入：sendSize += send->comm->buffSizes[NCCL_PROTO_SIMPLE];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：ALIGN_SIZE(sendSize, CUDA_IPC_MIN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 18. 条件判断：(intermediateRank == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   19. 真分支：；仅条件为真执行以下子项。
+ *     20. 调用 / 计算 / 写入：info->rank = myInfo->rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     21. 条件判断：(myInfo->pidHash == peerInfo->pidHash)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       22. 真分支：；仅条件为真执行以下子项。
+ *         23. 条件判断：(ncclParamP2pDirectDisable() == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           24. 真分支：；仅条件为真执行以下子项。
+ *             25. 调用 / 计算 / 写入：send->conn.direct |= info->read ? NCCL_DIRECT_READ : NCCL_DIRECT_WRITE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         26. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_P2P, "Channel %02d : %d[%lx] -> %d[%lx] via P2P/direct pointer%s", channelId, myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId, useReadStr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       27. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         28. 调用 / 计算 / 写入：send->conn.direct |= info->read ? NCCL_IPC_READ : NCCL_IPC_WRITE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         29. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_P2P,"Channel %02d : %d[%lx] -> %d[%lx] via P2P/IPC%s", channelId, myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId, useReadStr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   30. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     31. 调用 / 计算 / 写入：info->rank = intermediateRank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     32. 调用 / 计算 / 写入：INFO(NCCL_INIT|NCCL_P2P, "Channel %02d : %d[%lx] -> %d[%lx] via P2P/indirect/%d[%lx]%s", channelId, myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId, intermediateRank, comm->peerInfo[inter …（完整代码见函数体）；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 33. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_P2P, 1, info->rank, &send->proxyConn));；失败时可能提前return，成功才继续；联系目标代理服务并申请 transport/方向连接，建立主线程到该代理连接的控制引用。
+ * 34. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&send->proxyConn, ncclProxyMsgSetup, &sendSize, sizeof(int), &info->p2pBuff, sizeof(struct ncclP2pBuff)));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ * 35. 调用 / 计算 / 写入：NCCLCHECK(p2pMap(myInfo, comm->peerInfo+info->rank, &info->p2pBuff, (void**)&resources->devMem, &resources->sendMemIpc));；失败时可能提前return，成功才继续；同进程直接使用/启用 peer 访问，跨进程打开 CUDA IPC 句柄得到本进程可用映射。
+ * 36. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1157
+ */
 /* 中文逐项-函数 F1157：p2pSendSetup
  * 用途与位置：按方向分配/导出 GPU P2P 控制和协议缓冲，必要时借助中间 GPU 代理准备资源。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -432,6 +580,44 @@ ncclResult_t p2pSendSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, st
 }
 
 /* Create and return connect structures for this peer to connect to me */
+/* 中文内部逻辑 F1158：p2pRecvSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct p2pRecvResources* resources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&resources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：recv->transportResources = resources;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 准备局部状态：int useRead, intermediateRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(p2pGetInfo(comm->topo, myInfo, peerInfo, &useRead, &intermediateRank));；失败时可能提前return，成功才继续；查询 GPU 对的 P2P 可达性、读写模式及可能的中间 rank，把拓扑结果提供给 setup。
+ * 6. 源码语法片段：static_assert(sizeof(struct p2pConnectInfo) <= sizeof(struct ncclConnect), "p2p Connect Info is too big");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 7. 准备局部状态：struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：info->read = useRead;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 条件判断：(graph && connIndex == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：info->read = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 准备局部状态：int recvSize = sizeof(struct ncclRecvMem);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 13. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   14. 条件判断：(!(info->read && p == NCCL_PROTO_SIMPLE))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     15. 真分支：；仅条件为真执行以下子项。
+ *       16. 调用 / 计算 / 写入：recvSize += recv->comm->buffSizes[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 18. 调用 / 计算 / 写入：ALIGN_SIZE(recvSize, CUDA_IPC_MIN);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 19. 条件判断：(intermediateRank == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 调用 / 计算 / 写入：info->rank = myInfo->rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     22. 条件判断：(myInfo->pidHash == peerInfo->pidHash)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       23. 真分支：；仅条件为真执行以下子项。
+ *         24. 条件判断：(ncclParamP2pDirectDisable() == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           25. 真分支：；仅条件为真执行以下子项。
+ *             26. 调用 / 计算 / 写入：recv->conn.direct |= info->read ? NCCL_DIRECT_READ : NCCL_DIRECT_WRITE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       27. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         28. 调用 / 计算 / 写入：recv->conn.direct |= info->read ? NCCL_IPC_READ : NCCL_IPC_WRITE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   29. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     30. 调用 / 计算 / 写入：info->rank = intermediateRank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_P2P, 0, info->rank, &recv->proxyConn));；失败时可能提前return，成功才继续；联系目标代理服务并申请 transport/方向连接，建立主线程到该代理连接的控制引用。
+ * 32. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&recv->proxyConn, ncclProxyMsgSetup, &recvSize, sizeof(int), &info->p2pBuff, sizeof(struct ncclP2pBuff)));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ * 33. 调用 / 计算 / 写入：NCCLCHECK(p2pMap(myInfo, comm->peerInfo+info->rank, &info->p2pBuff, (void**)&resources->devMem, &resources->recvMemIpc));；失败时可能提前return，成功才继续；同进程直接使用/启用 peer 访问，跨进程打开 CUDA IPC 句柄得到本进程可用映射。
+ * 34. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1158
+ */
 /* 中文逐项-函数 F1158：p2pRecvSetup
  * 用途与位置：按方向分配/导出 GPU P2P 控制和协议缓冲，必要时借助中间 GPU 代理准备资源。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -510,6 +696,28 @@ ncclResult_t p2pRecvSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, st
 }
 
 /* Connect/Send to this peer */
+/* 中文内部逻辑 F1159：p2pSendConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct p2pSendResources* resources = (struct p2pSendResources*)send->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclRecvMem* remDevMem;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(p2pMap(comm->peerInfo+rank, comm->peerInfo+info->rank, &info->p2pBuff, (void**)&remDevMem, &resources->recvMemIpc));；失败时可能提前return，成功才继续；同进程直接使用/启用 peer 访问，跨进程打开 CUDA IPC 句柄得到本进程可用映射。
+ * 5. 准备局部状态：char* buff = (char*)(remDevMem+1);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 条件判断：(info->read && p == NCCL_PROTO_SIMPLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     8. 真分支：；仅条件为真执行以下子项。
+ *       9. 调用 / 计算 / 写入：send->conn.buffs[p] = (char*)(resources->devMem+1);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       11. 调用 / 计算 / 写入：send->conn.buffs[p] = buff;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       12. 调用 / 计算 / 写入：buff += send->comm->buffSizes[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 14. 调用 / 计算 / 写入：send->conn.tail = &remDevMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 15. 调用 / 计算 / 写入：send->conn.head = &resources->devMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 16. 调用 / 计算 / 写入：send->conn.ptrExchange = &resources->devMem->ptrExchange;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：send->conn.redOpArgExchange = resources->devMem->redOpArgExchange;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1159
+ */
 /* 中文逐项-函数 F1159：p2pSendConnect
  * 用途与位置：导入对端 GPU 分配并填充协议缓冲、head/tail 和直接访问指针交换区。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -568,6 +776,28 @@ static ncclResult_t p2pSendConnect(struct ncclComm* comm, struct ncclConnect* co
 }
 
 /* Connect/Recv from this peer */
+/* 中文内部逻辑 F1160：p2pRecvConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct p2pRecvResources* resources = (struct p2pRecvResources*)recv->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：struct ncclSendMem* remDevMem;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：struct p2pConnectInfo* info = (struct p2pConnectInfo*)connectInfo;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(p2pMap(comm->peerInfo+rank, comm->peerInfo+info->rank, &info->p2pBuff, (void**)&remDevMem, &resources->sendMemIpc));；失败时可能提前return，成功才继续；同进程直接使用/启用 peer 访问，跨进程打开 CUDA IPC 句柄得到本进程可用映射。
+ * 5. 准备局部状态：char* buff = (char*)(resources->devMem+1);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 条件判断：(info->read && p == NCCL_PROTO_SIMPLE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     8. 真分支：；仅条件为真执行以下子项。
+ *       9. 调用 / 计算 / 写入：recv->conn.buffs[p] = (char*)(remDevMem+1);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       11. 调用 / 计算 / 写入：recv->conn.buffs[p] = buff;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       12. 调用 / 计算 / 写入：buff += recv->comm->buffSizes[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 14. 调用 / 计算 / 写入：recv->conn.tail = &resources->devMem->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 15. 调用 / 计算 / 写入：recv->conn.head = &remDevMem->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 16. 调用 / 计算 / 写入：recv->conn.ptrExchange = &remDevMem->ptrExchange;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：recv->conn.redOpArgExchange = remDevMem->redOpArgExchange;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1160
+ */
 /* 中文逐项-函数 F1160：p2pRecvConnect
  * 用途与位置：导入对端 GPU 分配并填充协议缓冲、head/tail 和直接访问指针交换区。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -625,6 +855,19 @@ ncclResult_t p2pRecvConnect(struct ncclComm* comm, struct ncclConnect* connectIn
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1161：p2pSendFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct p2pSendResources* resources = (struct p2pSendResources*)send->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(resources->sendMemIpc)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：CUDACHECK(cudaIpcCloseMemHandle(resources->sendMemIpc));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 5. 条件判断：(resources->recvMemIpc)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：CUDACHECK(cudaIpcCloseMemHandle(resources->recvMemIpc));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 8. 调用 / 计算 / 写入：free(resources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1161
+ */
 /* 中文逐项-函数 F1161：p2pSendFree
  * 用途与位置：关闭导入的 IPC 映射并归还拥有的 GPU 分配或代理资源。
  * 参数 send（struct ncclConnector* send）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
@@ -645,6 +888,19 @@ ncclResult_t p2pSendFree(struct ncclConnector* send) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1162：p2pRecvFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct p2pRecvResources* resources = (struct p2pRecvResources*)recv->transportResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(resources->sendMemIpc)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：CUDACHECK(cudaIpcCloseMemHandle(resources->sendMemIpc));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 5. 条件判断：(resources->recvMemIpc)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：CUDACHECK(cudaIpcCloseMemHandle(resources->recvMemIpc));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 8. 调用 / 计算 / 写入：free(resources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1162
+ */
 /* 中文逐项-函数 F1162：p2pRecvFree
  * 用途与位置：关闭导入的 IPC 映射并归还拥有的 GPU 分配或代理资源。
  * 参数 recv（struct ncclConnector* recv）：按当前类型表示发送/接收方向资源或连接数组；两个方向独立保存进度。
@@ -665,6 +921,29 @@ ncclResult_t p2pRecvFree(struct ncclConnector* recv) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1163：p2pProxySetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(reqSize != sizeof(int))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：int size = *((int*)reqBuff);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：(respSize != sizeof(struct ncclP2pBuff))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 8. 准备局部状态：struct ncclP2pBuff* p2pBuff = (struct ncclP2pBuff*)respBuff;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaCalloc((char**)&p2pBuff->directPtr, size));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 10. 调用 / 计算 / 写入：connection->transportResources = p2pBuff->directPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 准备局部状态：cudaError_t res = cudaIpcGetMemHandle(&p2pBuff->devIpc, p2pBuff->directPtr);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 条件判断：(res != cudaSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   13. 真分支：；仅条件为真执行以下子项。
+ *     14. 调用 / 计算 / 写入：WARN("cudaIpcGetMemHandle failed : %s", cudaGetErrorString(res));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     15. 调用 / 计算 / 写入：cudaFree(p2pBuff->directPtr);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     16. 调用 / 计算 / 写入：free(p2pBuff);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     17. 调用 / 计算 / 写入：CUDACHECK(res);；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 18. 调用 / 计算 / 写入：*done = 1;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1163
+ */
 /* 中文逐项-函数 F1163：p2pProxySetup
  * 用途与位置：由资源所属代理分配/导出 GPU 内存，供主线程建立 P2P/中间 GPU 路径。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。
@@ -709,6 +988,12 @@ static ncclResult_t p2pProxySetup(struct ncclProxyConnection* connection, struct
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F1164：p2pProxyFree
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：cudaFree(connection->transportResources);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__p2p_cc.md#f1164
+ */
 /* 中文逐项-函数 F1164：p2pProxyFree
  * 用途与位置：由拥有分配的代理回收 P2P GPU 资源，与映射导入方的解除映射分工。
  * 参数 connection（struct ncclProxyConnection* connection）：当前传输或代理连接对象；查看其声明类型辨认设备视图与主机后台对象。

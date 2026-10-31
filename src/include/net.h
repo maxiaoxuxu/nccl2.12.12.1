@@ -38,6 +38,11 @@ int ncclNetVersion();
  * 相同 regMr/isend 接口在 IB、Socket 或外部插件中的实现不同；不能只凭接口名判断有多少硬件 MR/QP。
  */
 // Translation to external API
+/* 中文内部逻辑 F0660：ncclNetName
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclNet->name;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0660
+ */
 /* 中文逐项-函数 F0660：ncclNetName
  * 用途与位置：读取已选网络后端名字；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -46,6 +51,12 @@ int ncclNetVersion();
  * 源码返回表达式：return ncclNet->name;。CHECK类宏还可能提前返回/跳转。
  */
 static const char* ncclNetName() { return ncclNet->name; }
+/* 中文内部逻辑 F0661：ncclNetDevices
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->devices(ndev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0661
+ */
 /* 中文逐项-函数 F0661：ncclNetDevices
  * 用途与位置：查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
@@ -54,6 +65,12 @@ static const char* ncclNetName() { return ncclNet->name; }
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetDevices(int* ndev) { NCCLCHECK(ncclNet->devices(ndev)); return ncclSuccess; }
+/* 中文内部逻辑 F0662：ncclNetGetProperties
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->getProperties(dev, props));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0662
+ */
 /* 中文逐项-函数 F0662：ncclNetGetProperties
  * 用途与位置：读取设备拓扑/速度/指针/接收能力属性；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -63,6 +80,12 @@ static ncclResult_t ncclNetDevices(int* ndev) { NCCLCHECK(ncclNet->devices(ndev)
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetGetProperties(int dev, ncclNetProperties_t* props) { NCCLCHECK(ncclNet->getProperties(dev, props)); return ncclSuccess; }
+/* 中文内部逻辑 F0663：ncclNetListen
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->listen(dev, handle, listenComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0663
+ */
 /* 中文逐项-函数 F0663：ncclNetListen
  * 用途与位置：创建接收监听并导出连接句柄；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -73,6 +96,12 @@ static ncclResult_t ncclNetGetProperties(int dev, ncclNetProperties_t* props) { 
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetListen(int dev, void* handle, void** listenComm) { NCCLCHECK(ncclNet->listen(dev, handle, listenComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0664：ncclNetConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->connect(dev, handle, sendComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0664
+ */
 /* 中文逐项-函数 F0664：ncclNetConnect
  * 用途与位置：推进发送端连接建立；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -83,6 +112,12 @@ static ncclResult_t ncclNetListen(int dev, void* handle, void** listenComm) { NC
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetConnect(int dev, void* handle, void** sendComm) { NCCLCHECK(ncclNet->connect(dev, handle, sendComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0665：ncclNetAccept
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->accept(listenComm, recvComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0665
+ */
 /* 中文逐项-函数 F0665：ncclNetAccept
  * 用途与位置：推进接收端接受连接；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 listenComm（void* listenComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
@@ -92,6 +127,12 @@ static ncclResult_t ncclNetConnect(int dev, void* handle, void** sendComm) { NCC
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetAccept(void* listenComm, void** recvComm) { NCCLCHECK(ncclNet->accept(listenComm, recvComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0666：ncclNetRegMr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->regMr(comm, data, size, type, mhandle));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0666
+ */
 /* 中文逐项-函数 F0666：ncclNetRegMr
  * 用途与位置：注册后续网络要访问的内存并返回后端句柄；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 comm（void* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -104,6 +145,12 @@ static ncclResult_t ncclNetAccept(void* listenComm, void** recvComm) { NCCLCHECK
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetRegMr(void* comm, void* data, int size, int type, void** mhandle) { NCCLCHECK(ncclNet->regMr(comm, data, size, type, mhandle)); return ncclSuccess; }
+/* 中文内部逻辑 F0667：ncclNetDeregMr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->deregMr(comm, mhandle));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0667
+ */
 /* 中文逐项-函数 F0667：ncclNetDeregMr
  * 用途与位置：解除对应后端内存注册引用；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 comm（void* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -113,6 +160,12 @@ static ncclResult_t ncclNetRegMr(void* comm, void* data, int size, int type, voi
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetDeregMr(void* comm, void* mhandle) { NCCLCHECK(ncclNet->deregMr(comm, mhandle)); return ncclSuccess; }
+/* 中文内部逻辑 F0668：ncclNetIsend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->isend(sendComm, data, size, tag, mhandle, request));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0668
+ */
 /* 中文逐项-函数 F0668：ncclNetIsend
  * 用途与位置：提交异步发送请求；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 sendComm（void* sendComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -126,6 +179,12 @@ static ncclResult_t ncclNetDeregMr(void* comm, void* mhandle) { NCCLCHECK(ncclNe
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetIsend(void* sendComm, void* data, int size, int tag, void* mhandle, void** request) { NCCLCHECK(ncclNet->isend(sendComm, data, size, tag, mhandle, request)); return ncclSuccess; }
+/* 中文内部逻辑 F0669：ncclNetIrecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->irecv(recvComm, n, data, sizes, tags, mhandles, request));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0669
+ */
 /* 中文逐项-函数 F0669：ncclNetIrecv
  * 用途与位置：提交一组带地址/长度/tag的异步接收；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 recvComm（void* recvComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -140,6 +199,12 @@ static ncclResult_t ncclNetIsend(void* sendComm, void* data, int size, int tag, 
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetIrecv(void* recvComm, int n, void** data, int* sizes, int* tags, void** mhandles, void** request) { NCCLCHECK(ncclNet->irecv(recvComm, n, data, sizes, tags, mhandles, request)); return ncclSuccess; }
+/* 中文内部逻辑 F0670：ncclNetIflush
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->iflush(recvComm, n, data, sizes, mhandles, request));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0670
+ */
 /* 中文逐项-函数 F0670：ncclNetIflush
  * 用途与位置：提交接收缓冲可见性刷新请求；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 recvComm（void* recvComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -153,6 +218,12 @@ static ncclResult_t ncclNetIrecv(void* recvComm, int n, void** data, int* sizes,
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetIflush(void* recvComm, int n, void** data, int* sizes, void** mhandles, void** request) { NCCLCHECK(ncclNet->iflush(recvComm, n, data, sizes, mhandles, request)); return ncclSuccess; }
+/* 中文内部逻辑 F0671：ncclNetTest
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->test(request, done, sizes));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0671
+ */
 /* 中文逐项-函数 F0671：ncclNetTest
  * 用途与位置：查询并推进异步请求完成；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 request（void* request）：本次异步网络请求的句柄/状态，成功提交不等于请求已经完成。
@@ -163,6 +234,12 @@ static ncclResult_t ncclNetIflush(void* recvComm, int n, void** data, int* sizes
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetTest(void* request, int* done, int* sizes) { NCCLCHECK(ncclNet->test(request, done, sizes)); return ncclSuccess; }
+/* 中文内部逻辑 F0672：ncclNetCloseSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->closeSend(sendComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0672
+ */
 /* 中文逐项-函数 F0672：ncclNetCloseSend
  * 用途与位置：关闭发送连接；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 sendComm（void* sendComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -171,6 +248,12 @@ static ncclResult_t ncclNetTest(void* request, int* done, int* sizes) { NCCLCHEC
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetCloseSend(void* sendComm) { NCCLCHECK(ncclNet->closeSend(sendComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0673：ncclNetCloseRecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->closeRecv(recvComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0673
+ */
 /* 中文逐项-函数 F0673：ncclNetCloseRecv
  * 用途与位置：关闭接收连接；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 recvComm（void* recvComm）：后端实际发送/接收连接句柄；可被多个满足共享条件的逻辑 connector 引用。
@@ -179,6 +262,12 @@ static ncclResult_t ncclNetCloseSend(void* sendComm) { NCCLCHECK(ncclNet->closeS
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t ncclNetCloseRecv(void* recvComm) { NCCLCHECK(ncclNet->closeRecv(recvComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0674：ncclNetCloseListen
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclNet->closeListen(listenComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__net_h.md#f0674
+ */
 /* 中文逐项-函数 F0674：ncclNetCloseListen
  * 用途与位置：关闭监听对象；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 listenComm（void* listenComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。

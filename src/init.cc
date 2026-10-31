@@ -103,6 +103,14 @@ NCCL_PARAM(GdrCopyEnable, "GDRCOPY_ENABLE", 0);
  */
 gdr_t ncclGdrCopy = NULL;
 
+/* 中文内部逻辑 F0881：initGdrCopy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ncclParamGdrCopyEnable() == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：ncclGdrCopy = ncclGdrInit();；动态初始化 GDRCopy 并取得映射句柄，失败时由调用者决定是否使用普通回退路径。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0881
+ */
 /* 中文逐项-函数 F0881：initGdrCopy
  * 用途与位置：按编译支持及运行环境尝试初始化 GDRCopy，供小量显存映射访问优化使用。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -141,6 +149,28 @@ static bool initialized = false;
  * 初值/来源 maxLocalSizeBytes = 0；初始清零；有效数量/进度从零开始，指针类型时表示空地址。
  */
 static size_t maxLocalSizeBytes = 0;
+/* 中文内部逻辑 F0882：ncclInit
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(initialized)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 调用 / 计算 / 写入：pthread_mutex_lock(&initLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 条件判断：(!initialized)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：initEnv();；按用户配置、系统配置顺序加载配置文件，已有键不会被后读文件覆盖。
+ *     8. 调用 / 计算 / 写入：initGdrCopy();；按编译支持及运行环境尝试初始化 GDRCopy，供小量显存映射访问优化使用。
+ *     9. 调用 / 计算 / 写入：maxLocalSizeBytes = ncclKernMaxLocalSize();；遍历入口 kernel 属性以求最大局部内存使用，供初始化设备栈/资源配置参考。
+ *     10. 准备局部状态：int carveout = ncclParamL1SharedMemoryCarveout();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     11. 条件判断：(carveout)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       12. 真分支：；仅条件为真执行以下子项。
+ *         13. 调用 / 计算 / 写入：ncclKernSetSharedMemoryCarveout(carveout);；给受支持的 CUDA kernel 入口设置共享内存划分偏好，影响 SM 资源分配而不改算法语义。
+ *     14. 调用 / 计算 / 写入：NCCLCHECK(ncclNetInit());；失败时可能提前return，成功才继续；总是初始化 bootstrap，再按外部插件、内置 IB、内置 Socket 顺序选可用数据后端，支持显式名字筛选。
+ *     15. 调用 / 计算 / 写入：INFO(NCCL_INIT, "Using network %s", ncclNetName());；读取已选网络后端名字；本层通过函数指针转交已选后端，不额外复制整个用户张量。
+ *     16. 调用 / 计算 / 写入：initialized = true;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：pthread_mutex_unlock(&initLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 18. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0882
+ */
 /* 中文逐项-函数 F0882：ncclInit
  * 用途与位置：进程级单次初始化配置、网络与相关支持库，避免每个 communicator 重复初始化全局组件。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -172,6 +202,15 @@ static ncclResult_t ncclInit() {
 }
 
 NCCL_API(ncclResult_t, ncclGetVersion, int* version);
+/* 中文内部逻辑 F0883：ncclGetVersion
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(version == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 调用 / 计算 / 写入：*version = NCCL_VERSION_CODE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0883
+ */
 /* 中文逐项-函数 F0883：ncclGetVersion
  * 用途与位置：把本库编译版本写到用户输出参数，帮助应用确认实际链接的 NCCL 版本。
  * 参数 version（int* version）：外部库事件/导出结构的布局大小与版本号，接收方据此判断可安全读取哪些字段。
@@ -187,6 +226,13 @@ ncclResult_t ncclGetVersion(int* version) {
 }
 
 NCCL_API(ncclResult_t, ncclGetUniqueId, ncclUniqueId* out);
+/* 中文内部逻辑 F0884：ncclGetUniqueId
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclInit());；失败时可能提前return，成功才继续；进程级单次初始化配置、网络与相关支持库，避免每个 communicator 重复初始化全局组件。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(out, "GetUniqueId", "out"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 3. 函数返回：return bootstrapGetUniqueId(out);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0884
+ */
 /* 中文逐项-函数 F0884：ncclGetUniqueId
  * 用途与位置：先完成库级初始化，再生成应用需要分发给全组 rank 的 bootstrap 标识。
  * 参数 out（ncclUniqueId* out）：CollNet 连接网络的特殊对端槽位，-1 表示当前 GPU 非对应网络出口。
@@ -211,6 +257,11 @@ ncclResult_t ncclGetUniqueId(ncclUniqueId* out) {
 #define NCCL_NO_OPTIMIZE __attribute__((optimize("O0")))
 #endif
 
+/* 中文内部逻辑 F0885：commPoison
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：comm->rank = comm->cudaDev = comm->busId = comm->nRanks = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0885
+ */
 /* 中文逐项-函数 F0885：commPoison
  * 用途与位置：在释放/销毁流程给 communicator 关键字段写入无效状态，辅助发现后续误用。
  * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -347,6 +398,79 @@ NCCL_PARAM(GraphRegister, "GRAPH_REGISTER", 0);
  * 后面要经历拓扑搜索、initChannel、transport setup/connect，才能拿到可用的设备连接指针。
  * 读资源生命周期时，应把 comm 分配、channel 分配和 backend 连接分配分成三个阶段。
  */
+/* 中文内部逻辑 F0886：commAlloc
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(ndev < 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("invalid device count (%d) requested", ndev);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 条件判断：(rank >= ndev || rank < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：WARN("rank %d exceeds ndev=%d", rank, ndev);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 9. 准备局部状态：cudaEvent_t doneEvent;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 调用 / 计算 / 写入：CUDACHECK(cudaEventCreateWithFlags(&doneEvent, cudaEventDisableTiming));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 11. 准备局部状态：cudaEvent_t intDoneEvent;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 调用 / 计算 / 写入：CUDACHECK(cudaEventCreateWithFlags(&intDoneEvent, cudaEventDisableTiming));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 13. 准备局部状态：struct ncclComm* comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 15. 调用 / 计算 / 写入：comm->rank = comm->hostDevComm.rank = rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 调用 / 计算 / 写入：comm->nRanks = comm->hostDevComm.nRanks = ndev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 17. 调用 / 计算 / 写入：cudaGetDevice(&comm->cudaDev);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 18. 调用 / 计算 / 写入：NCCLCHECK(getBusId(comm->cudaDev, &comm->busId));；失败时可能提前return，成功才继续；查询本进程 CUDA 设备的 PCI 地址并转为整数标识，不能把设备 ordinal 当作 busId。
+ * 19. 调用 / 计算 / 写入：TRACE(NCCL_INIT,"comm %p rank %d nranks %d cudaDev %d busId %lx", comm, rank, ndev, comm->cudaDev, comm->busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 20. 调用 / 计算 / 写入：comm->doneEvent = doneEvent;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 21. 调用 / 计算 / 写入：comm->intDoneEvent = intDoneEvent;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 22. 调用 / 计算 / 写入：comm->checkPointers = ncclParamCheckPointers() == 1 ? true : false;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 23. 编译期分支/指令：#if CUDART_VERSION >= 9020；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   24. 调用 / 计算 / 写入：comm->groupCudaStream = ncclParamGroupCudaStream();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   25. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     26. 调用 / 计算 / 写入：comm->groupCudaStream = NCCL_GROUP_CUDA_STREAM;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 27. 调用 / 计算 / 写入：comm->fatalError = ncclSuccess;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 28. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaHostCalloc((uint32_t**)&comm->abortFlag, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 29. 调用 / 计算 / 写入：comm->hostDevComm.abortFlag = comm->abortFlag;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 30. 调用 / 计算 / 写入：*comm->abortFlag = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 调用 / 计算 / 写入：comm->argsptrs[0] = &comm->devComm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 32. 调用 / 计算 / 写入：comm->argsptrs[1] = &comm->args;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 33. 调用 / 计算 / 写入：comm->collNetSupport = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 34. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->asyncOps, NCCL_MAX_OPS));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 35. 调用 / 计算 / 写入：comm->asyncOpCount = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 36. 调用 / 计算 / 写入：comm->asyncTotalSize = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 37. 调用 / 计算 / 写入：comm->channelSize = ncclParamAggChannelSize();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 38. 调用 / 计算 / 写入：comm->asyncAllocMode = ncclComm::SHORTEST_QUEUE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 39. 准备局部状态：char* str = getenv("NCCL_AGG_ALLOC_MODE");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 40. 条件判断：(str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   41. 真分支：；仅条件为真执行以下子项。
+ *     42. 调用 / 计算 / 写入：INFO(NCCL_ENV, "NCCL_AGG_ALLOC_MODE set by environment to %s", str);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 43. 条件判断：(str && strcmp(str, "ROUND_ROBIN") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   44. 真分支：；仅条件为真执行以下子项。
+ *     45. 调用 / 计算 / 写入：comm->asyncAllocMode = ncclComm::ROUND_ROBIN;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 46. 调用 / 计算 / 写入：CUDACHECK(cudaDriverGetVersion(&comm->driverVersion));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 47. 调用 / 计算 / 写入：NCCLCHECK(ncclCreateQueueInfo(&comm->enqueueInfo, comm));；失败时可能提前return，成功才继续；分配一个提交/图持有的 QueueInfo 和可复用元素列表，记录 communicator 队列生命周期计数。
+ * 48. 调用 / 计算 / 写入：comm->lastSetupNode = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 49. 调用 / 计算 / 写入：comm->lastCudaGraphId = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 50. 调用 / 计算 / 写入：comm->disableGraphHelper = ncclParamDisableGraphHelper();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 51. 调用 / 计算 / 写入：comm->graphRegister = ncclParamGraphRegister();；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 52. 编译期分支/指令：#if CUDART_VERSION >= 11030；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   53. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->graphHelperResources, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   54. 调用 / 计算 / 写入：comm->graphHelperResources->comm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   55. 条件判断：(comm->driverVersion >= 11030)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     56. 真分支：；仅条件为真执行以下子项。
+ *       57. 调用 / 计算 / 写入：CUDACHECK(cudaGetDriverEntryPoint("cuMemGetAddressRange", (void**)&comm->pfnCuMemGetAddressRange, cudaEnableDefault));；失败时可能提前return，成功才继续；提供旧版静态 CUDA runtime 缺少新符号时的 weak stub；调用即返回 cudaErrorStubLibrary，不实现真正 CUDA 功能。
+ * 58. 源码语法片段：static_assert(MAXCHANNELS <= sizeof(*comm->connectSend)*8, "comm->connectSend must have enough bits for all channels");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 59. 源码语法片段：static_assert(MAXCHANNELS <= sizeof(*comm->connectRecv)*8, "comm->connectRecv must have enough bits for all channels");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 60. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->connectSend, comm->nRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 61. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->connectRecv, comm->nRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 62. 调用 / 计算 / 写入：comm->p2pSendCount = comm->p2pRecvCount = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 63. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->p2pSends, comm->nRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 64. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->p2pRecvs, comm->nRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 65. 循环：初始 int c=0;；继续条件 c<MAXCHANNELS；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   66. 调用 / 计算 / 写入：comm->channels[c].id = -1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 67. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 68. 调用 / 计算 / 写入：*comret = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 69. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0886
+ */
 /* 中文逐项-函数 F0886：commAlloc
  * 用途与位置：分配并初始化当前 rank 的 communicator 总对象、排队状态、事件与连接需求表。
  * 参数 comret（ncclComm_t* comret）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -476,6 +600,21 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
  * peers 要指向 devPeers，workFifoDev 要指向 GPU 可读取的位置；设备 kernel 再拷到共享内存。
  * 因此调试 host 地址与 device 地址时必须辨认当前字段属于哪一侧，不能只看结构体名字相同。
  */
+/* 中文内部逻辑 F0887：devCommSetup
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：ncclDevCommAndChannels *devCommAndChans;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaCalloc(&devCommAndChans, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：comm->devComm = &devCommAndChans->comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：comm->hostDevComm.channels = devCommAndChans->channels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 准备局部状态：int nChannels = std::max(comm->nChannels, comm->p2pnChannels);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, nChannels));；失败时可能提前return，成功才继续；按模板元素数量调用 cudaMemcpyDefault，实际字节数乘 sizeof(T)。
+ * 7. 循环：初始 int r=0;；继续条件 r<comm->nChannels；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   8. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaMemcpy(comm->channels[r].ring.devUserRanks, comm->channels[r].ring.userRanks, comm->nRanks));；失败时可能提前return，成功才继续；按模板元素数量调用 cudaMemcpyDefault，实际字节数乘 sizeof(T)。
+ * 9. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 10. 调用 / 计算 / 写入：NCCLCHECK(ncclCudaMemcpy(comm->devComm, &comm->hostDevComm, 1));；失败时可能提前return，成功才继续；按模板元素数量调用 cudaMemcpyDefault，实际字节数乘 sizeof(T)。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0887
+ */
 /* 中文逐项-函数 F0887：devCommSetup
  * 用途与位置：构造设备端精简 communicator 和连续 channel 布局，把主机连接视图转换成 GPU 可访问地址。
  * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -523,6 +662,19 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
  * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
  */
 #define VERSION_STRING "NCCL version " STR(NCCL_MAJOR) "." STR(NCCL_MINOR) "." STR(NCCL_PATCH) NCCL_SUFFIX "+cuda" STR(CUDA_MAJOR) "." STR(CUDA_MINOR)
+/* 中文内部逻辑 F0888：showVersion
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：static int shown = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(shown == 0 && ncclDebugLevel >= NCCL_LOG_VERSION)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：printf("%s\n", VERSION_STRING);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 调用 / 计算 / 写入：fflush(stdout);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 条件判断：(ncclDebugFile != stdout)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 调用 / 计算 / 写入：INFO(NCCL_ALL,"%s", VERSION_STRING);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     9. 调用 / 计算 / 写入：shown = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0888
+ */
 /* 中文逐项-函数 F0888：showVersion
  * 用途与位置：按日志配置打印库版本和构建相关信息，辅助确认实际加载的库。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -545,6 +697,22 @@ static void showVersion() {
   }
 }
 
+/* 中文内部逻辑 F0889：fillInfo
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：info->rank = comm->rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：CUDACHECK(cudaGetDevice(&info->cudaDev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 调用 / 计算 / 写入：info->hostHash=getHostHash()+commHash;；由主机/启动环境相关身份生成一致摘要，帮助识别同一主机上的参与者。
+ * 4. 调用 / 计算 / 写入：info->pidHash=getPidHash()+commHash;；结合进程命名空间/进程标识形成摘要，用于判断是否同进程共享本地指针与发射状态。
+ * 5. 准备局部状态：struct stat statbuf;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：SYSCHECK(stat("/dev/shm", &statbuf), "stat");；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 7. 调用 / 计算 / 写入：info->shmDev = statbuf.st_dev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：info->busId = comm->busId;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(ncclGpuGdrSupport(&info->gdrSupport));；失败时可能提前return，成功才继续；优先查询 CUDA GDR 属性；旧运行时通过临时连接和 GPU 缓冲注册探测，探测资源用后回收。
+ * 10. 调用 / 计算 / 写入：info->comm = comm;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 调用 / 计算 / 写入：info->cudaCompCap = ncclCudaCompCap();；查询当前 CUDA 设备主次计算能力并编码成整数，供协议和架构策略判断。
+ * 12. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0889
+ */
 /* 中文逐项-函数 F0889：fillInfo
  * 用途与位置：收集当前 rank 的主机、进程、GPU、共享内存和 GDR 能力摘要供 bootstrap 汇总。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -584,6 +752,27 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
  * setupChannel 把环顺序旋转到本 rank 开头，写入 userRanks/devUserRanks，并算 ring.index。
  * AllGather/ReduceScatter 用用户 rank 决定输出/输入段位置；AllReduce 用内部环 index 排算法块。
  * 物理相邻 GPU、用户 rank 相邻、环顺序相邻是三种关系，应分别跟踪。
+ */
+/* 中文内部逻辑 F0890：setupChannel
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "rank %d nranks %d", rank, nranks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(initChannel(comm, channelId));；失败时可能提前return，成功才继续；为单条逻辑 channel 分配环顺序表、peer 连接表和 GPU 可读取的工作描述符 FIFO。
+ * 3. 准备局部状态：struct ncclRing* ring = &comm->channels[channelId].ring;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int ixZero=0, ixRank=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 循环：初始 int i=0;；继续条件 i < nranks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   6. 条件判断：(ringRanks[i] == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     7. 真分支：；仅条件为真执行以下子项。
+ *       8. 调用 / 计算 / 写入：ixZero = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   9. 条件判断：(ringRanks[i] == rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     10. 真分支：；仅条件为真执行以下子项。
+ *       11. 调用 / 计算 / 写入：ixRank = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 调用 / 计算 / 写入：ring->index = (ixRank-ixZero + nranks)%nranks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 14. 循环：初始 int i=0;；继续条件 i<nranks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   15. 调用 / 计算 / 写入：ring->userRanks[i] = ringRanks[(i+ixRank)%nranks];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 16. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 17. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0890
  */
 /* 中文逐项-函数 F0890：setupChannel
  * 用途与位置：把拓扑环顺序旋转到本 rank 开头，建立用户 rank 表及本 rank 内部环索引。
@@ -633,6 +822,15 @@ static ncclResult_t setupChannel(struct ncclComm* comm, int channelId, int rank,
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0891：waitForNonNullPtr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：volatile void** ptr = (volatile void**) p;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 循环：初始 ；继续条件 (*ptr == NULL)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   3. 调用 / 计算 / 写入：sched_yield();；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 4. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 5. 函数返回：return (void*)*ptr;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0891
+ */
 /* 中文逐项-函数 F0891：waitForNonNullPtr
  * 用途与位置：等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
  * 参数 p（void* p）：当前遍历或处理对象的局部引用/值，类型和下面初始化来源确定其具体身份。
@@ -651,6 +849,19 @@ void* waitForNonNullPtr(void* p) {
   return (void*)*ptr;
 }
 
+/* 中文内部逻辑 F0892：initParams
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：struct cudaLaunchParams* params = comm->myParams = comm->intraParams+comm->intraRank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：params->args = comm->argsptrs;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：params->stream = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：params->sharedMem = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：params->blockDim.x = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：params->blockDim.y = params->blockDim.z = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：params->gridDim.x = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：params->gridDim.y = params->gridDim.z = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0892
+ */
 /* 中文逐项-函数 F0892：initParams
  * 用途与位置：初始化当前 communicator 的 CUDA 发射参数、参数指针与设备 kernel 所需上下文。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -673,6 +884,61 @@ ncclResult_t initParams(struct ncclComm* comm) {
 }
 
 // Allocate/Set Intra Process Structures and set CG options
+/* 中文内部逻辑 F0893：ncclCommSetIntraProc
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：comm->intraRank = rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：comm->intraRanks = ranks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：comm->intraPhase = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 条件判断：(rank == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 调用 / 计算 / 写入：assert(comm == comm0);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 准备局部状态：int* bar;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     8. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&bar, 2));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     9. 调用 / 计算 / 写入：bar[0] = bar[1] = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 调用 / 计算 / 写入：comm->intraBarrier = bar;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->intraParams, comm->intraRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     12. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->intraThreads, comm->intraRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     13. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->intraCudaDevs, comm->intraRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     14. 准备局部状态：int* CGMode;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     15. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&CGMode, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     16. 调用 / 计算 / 写入：*CGMode = 0x11;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 调用 / 计算 / 写入：comm->intraCGMode = CGMode;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     18. 准备局部状态：int* CC;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     19. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&CC, 1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     20. 调用 / 计算 / 写入：*CC = ncclCudaCompCap();；查询当前 CUDA 设备主次计算能力并编码成整数，供协议和架构策略判断。
+ *     21. 调用 / 计算 / 写入：comm->intraCC = CC;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   22. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     23. 调用 / 计算 / 写入：comm->intraBarrier = (int*)waitForNonNullPtr(&comm0->intraBarrier);；等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
+ *     24. 调用 / 计算 / 写入：comm->intraParams = (struct cudaLaunchParams*)waitForNonNullPtr(&comm0->intraParams);；等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
+ *     25. 调用 / 计算 / 写入：comm->intraThreads = (pthread_t*)waitForNonNullPtr(&comm0->intraThreads);；等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
+ *     26. 调用 / 计算 / 写入：comm->intraCudaDevs = (int*)waitForNonNullPtr(&comm0->intraCudaDevs);；等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
+ *     27. 调用 / 计算 / 写入：comm->intraCGMode = (int*)waitForNonNullPtr(&comm0->intraCGMode);；等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
+ *     28. 调用 / 计算 / 写入：comm->intraCC = (int*)waitForNonNullPtr(&comm0->intraCC);；等待同进程初始化伙伴发布共享指针，作为本地对象会合的一部分。
+ * 29. 调用 / 计算 / 写入：comm->intraCudaDevs[comm->intraRank] = comm->cudaDev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 30. 调用 / 计算 / 写入：comm->intraThreads[comm->intraRank] = comm->proxyState.thread;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 调用 / 计算 / 写入：NCCLCHECK(initParams(comm));；失败时可能提前return，成功才继续；初始化当前 communicator 的 CUDA 发射参数、参数指针与设备 kernel 所需上下文。
+ * 32. 准备局部状态：int cgMdLaunch = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 33. 调用 / 计算 / 写入：comm->launchMode = ncclComm::PARALLEL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 34. 准备局部状态：char* str = getenv("NCCL_LAUNCH_MODE");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 35. 条件判断：(str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   36. 真分支：；仅条件为真执行以下子项。
+ *     37. 调用 / 计算 / 写入：INFO(NCCL_ENV, "NCCL_LAUNCH_MODE set by environment to %s", str);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 38. 条件判断：(str && strcmp(str, "GROUP") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   39. 真分支：；仅条件为真执行以下子项。
+ *     40. 调用 / 计算 / 写入：comm->launchMode = ncclComm::GROUP;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 41. 条件判断：(comm->launchMode == ncclComm::GROUP)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   42. 真分支：；仅条件为真执行以下子项。
+ *     43. 调用 / 计算 / 写入：CUDACHECK(cudaStreamCreateWithFlags(&comm->groupStream, cudaStreamNonBlocking));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     44. 编译期分支/指令：#if CUDART_VERSION >= 9000；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *       45. 条件判断：(*comm->intraCC && (ncclCudaCompCap() == *comm->intraCC))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         46. 真分支：；仅条件为真执行以下子项。
+ *           47. 调用 / 计算 / 写入：(void) cudaDeviceGetAttribute(&cgMdLaunch, cudaDevAttrCooperativeMultiDeviceLaunch, comm->cudaDev);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 48. 条件判断：(cgMdLaunch == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   49. 真分支：；仅条件为真执行以下子项。
+ *     50. 调用 / 计算 / 写入：*comm->intraCGMode = 0x10;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 51. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0893
+ */
 /* 中文逐项-函数 F0893：ncclCommSetIntraProc
  * 用途与位置：把同进程 rank 加入本地发射协调组，设置屏障、设备列表及协作发射能力。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -805,6 +1071,21 @@ NCCL_PARAM(LlBuffSize, "LL_BUFFSIZE", -2);
  */
 NCCL_PARAM(Ll128BuffSize, "LL128_BUFFSIZE", -2);
 
+/* 中文内部逻辑 F0894：computeBuffSizes
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int cpuArch, cpuVendor, cpuModel;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCpuType(comm->topo, &cpuArch, &cpuVendor, &cpuModel));；失败时可能提前return，成功才继续；从硬件图读取 CPU 架构、厂商和型号，供容量建模和策略选择。
+ * 3. 准备局部状态：int64_t envs[NCCL_NUM_PROTOCOLS] = { ncclParamLlBuffSize(), ncclParamLl128BuffSize(), ncclParamBuffSize() };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int defaults[NCCL_NUM_PROTOCOLS] = { DEFAULT_LL_BUFFSIZE, DEFAULT_LL128_BUFFSIZE, DEFAULT_BUFFSIZE };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 条件判断：(cpuArch == NCCL_TOPO_CPU_ARCH_ARM)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：defaults[NCCL_PROTO_SIMPLE] = DEFAULT_BUFFSIZE_ARM;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 循环：初始 int p=0;；继续条件 p<NCCL_NUM_PROTOCOLS；每轮更新 p++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   9. 调用 / 计算 / 写入：comm->buffSizes[p] = comm->hostDevComm.buffSizes[p] = envs[p] != -2 ? envs[p] : defaults[p];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 10. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0894
+ */
 /* 中文逐项-函数 F0894：computeBuffSizes
  * 用途与位置：读取/选择 LL、LL128、Simple 的协议缓冲尺寸，为后续 channel 传输与分片提供容量。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -884,6 +1165,362 @@ NCCL_PARAM(NvbPreconnect, "NVB_PRECONNECT", 1);
  * 4. Preset/Postset 将机内顺序与机间端点拼成完整 ring/tree，分配 channel 并建立邻居连接。
  * 5. 调优模型、P2P channel 映射、共享资源和启动参数就绪后，devCommSetup 复制设备视图。
  * 这里的 bootstrapAllGather 是 CPU 控制信息交换，不是调用公开 ncclAllGather GPU API。
+ */
+/* 中文内部逻辑 F0895：initTransportsRank
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int rank = comm->rank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int nranks = comm->nRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：uint64_t commHash = getHash(commId->internal, NCCL_UNIQUE_ID_BYTES);；对给定字符串字节计算哈希，供主机/进程身份摘要使用，不承担安全认证。
+ * 4. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "comm %p, commHash %lx, rank %d nranks %d - BEGIN", comm, commHash, rank, nranks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 5. 调用 / 计算 / 写入：NCCLCHECK(bootstrapInit(commId, comm));；失败时可能提前return，成功才继续；让当前 rank 加入控制网络并交换 peer/proxy 地址，为拓扑发现和传输建链准备控制通道。
+ * 6. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->peerInfo, nranks+1));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 7. 调用 / 计算 / 写入：NCCLCHECK(fillInfo(comm, comm->peerInfo+rank, commHash));；失败时可能提前return，成功才继续；收集当前 rank 的主机、进程、GPU、共享内存和 GDR 能力摘要供 bootstrap 汇总。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(bootstrapAllGather(comm->bootstrap, comm->peerInfo, sizeof(struct ncclPeerInfo)));；失败时可能提前return，成功才继续；沿控制 socket 环逐轮交换每个 rank 的固定尺寸元数据，最终每方拥有全组摘要。
+ * 9. 循环：初始 int i = 0;；继续条件 i < nranks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   10. 条件判断：((i != rank) && (comm->peerInfo[i].hostHash == comm->peerInfo[rank].hostHash) && (comm->peerInfo[i].busId == comm->peerInfo[rank].busId))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     11. 真分支：；仅条件为真执行以下子项。
+ *       12. 调用 / 计算 / 写入：WARN("Duplicate GPU detected : rank %d and rank %d both on CUDA device %lx", rank, i, comm->peerInfo[rank].busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       13. 函数返回：return ncclInvalidUsage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 14. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 15. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetSystem(comm, &comm->topo));；失败时可能提前return，成功才继续；读入可选拓扑文件并补齐当前 rank 所见 GPU/NIC 的自动发现信息，再生成硬件图。
+ * 16. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoComputePaths(comm->topo, comm->peerInfo));；失败时可能提前return，成功才继续；计算 CPU/GPU/NET 路径，并按 P2P、GDR、PXN 策略替换不可直接使用的路径。
+ * 17. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoTrimSystem(comm->topo, comm));；失败时可能提前return，成功才继续；删除不属于当前通信可达域的硬件节点，并在完全机内通信时裁剪不需要的网络对象。
+ * 18. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoComputePaths(comm->topo, comm->peerInfo));；失败时可能提前return，成功才继续；计算 CPU/GPU/NET 路径，并按 P2P、GDR、PXN 策略替换不可直接使用的路径。
+ * 19. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoSearchInit(comm->topo));；失败时可能提前return，成功才继续；初始化拓扑搜索的最大宽度和总宽度，建立速度候选与提前终止判断依据。
+ * 20. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPrint(comm->topo));；失败时可能提前return，成功才继续；递归打印硬件节点、类型和直接链路，验证发现到的硬件树。
+ * 21. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetCpuAffinity(comm->topo, comm->rank, &comm->cpuAffinity));；失败时可能提前return，成功才继续；结合 GPU 的近端 CPU/NUMA 亲和范围与当前进程约束，生成线程亲和性掩码。
+ * 22. 准备局部状态：cpu_set_t affinitySave;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 23. 条件判断：(CPU_COUNT(&comm->cpuAffinity))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   24. 真分支：；仅条件为真执行以下子项。
+ *     25. 调用 / 计算 / 写入：sched_getaffinity(0, sizeof(cpu_set_t), &affinitySave);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     26. 调用 / 计算 / 写入：sched_setaffinity(0, sizeof(cpu_set_t), &comm->cpuAffinity);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 27. 准备局部状态：ncclResult_t ret;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 28. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCreate(comm));；失败时可能提前return，成功才继续；按需要创建并命名代理后台线程，线程生命周期覆盖多次通信调用。
+ * 29. 准备局部状态：struct ncclTopoGraph ringGraph;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 30. 调用 / 计算 / 写入：ringGraph.id = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 31. 调用 / 计算 / 写入：ringGraph.pattern = NCCL_TOPO_PATTERN_RING;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 32. 调用 / 计算 / 写入：ringGraph.collNet = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 33. 调用 / 计算 / 写入：ringGraph.minChannels = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 34. 调用 / 计算 / 写入：ringGraph.maxChannels = MAXCHANNELS/2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 35. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCompute(comm->topo, &ringGraph));；失败时可能提前return，成功才继续；在搜索预算内调整速度、路径级别、同序通道和 crossNic，挑选通信图并必要时复制或退回简单顺序。
+ * 36. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPrintGraph(comm->topo, &ringGraph));；失败时可能提前return，成功才继续；输出通信图的模式/带宽/端点及 GPU 顺序，或导出到配置指定的图文件。
+ * 37. 准备局部状态：struct ncclTopoGraph treeGraph;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 38. 调用 / 计算 / 写入：treeGraph.id = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 39. 调用 / 计算 / 写入：treeGraph.pattern = NCCL_TOPO_PATTERN_BALANCED_TREE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 40. 调用 / 计算 / 写入：treeGraph.collNet = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 41. 调用 / 计算 / 写入：treeGraph.minChannels = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 42. 调用 / 计算 / 写入：treeGraph.maxChannels = ringGraph.nChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 43. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCompute(comm->topo, &treeGraph));；失败时可能提前return，成功才继续；在搜索预算内调整速度、路径级别、同序通道和 crossNic，挑选通信图并必要时复制或退回简单顺序。
+ * 44. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPrintGraph(comm->topo, &treeGraph));；失败时可能提前return，成功才继续；输出通信图的模式/带宽/端点及 GPU 顺序，或导出到配置指定的图文件。
+ * 45. 准备局部状态：struct ncclTopoGraph collNetGraph;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 46. 调用 / 计算 / 写入：collNetGraph.id = 2;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 47. 调用 / 计算 / 写入：collNetGraph.pattern = NCCL_TOPO_PATTERN_TREE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 48. 调用 / 计算 / 写入：collNetGraph.collNet = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 49. 调用 / 计算 / 写入：collNetGraph.minChannels = collNetGraph.maxChannels = ringGraph.nChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 50. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoCompute(comm->topo, &collNetGraph));；失败时可能提前return，成功才继续；在搜索预算内调整速度、路径级别、同序通道和 crossNic，挑选通信图并必要时复制或退回简单顺序。
+ * 51. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPrintGraph(comm->topo, &collNetGraph));；失败时可能提前return，成功才继续；输出通信图的模式/带宽/端点及 GPU 顺序，或导出到配置指定的图文件。
+ * 52. 条件判断：(comm->rank == ncclParamGraphDumpFileRank())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   53. 真分支：；仅条件为真执行以下子项。
+ *     54. 准备局部状态：struct ncclTopoGraph* graphs[3] = { &ringGraph, &treeGraph, &collNetGraph };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     55. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoDumpGraphs(comm->topo, 3, graphs));；失败时可能提前return，成功才继续；输出通信图的模式/带宽/端点及 GPU 顺序，或导出到配置指定的图文件。
+ * 56. 条件判断：(collNetSupport())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   57. 真分支：；仅条件为真执行以下子项。
+ *     58. 准备局部状态：char *collNetEnable = getenv("NCCL_COLLNET_ENABLE");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     59. 条件判断：(collNetEnable != NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       60. 真分支：；仅条件为真执行以下子项。
+ *         61. 调用 / 计算 / 写入：INFO(NCCL_ALL, "NCCL_COLLNET_ENABLE set by environment to %s.", collNetEnable);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         62. 条件判断：(strcmp(collNetEnable, "1") == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           63. 真分支：；仅条件为真执行以下子项。
+ *             64. 调用 / 计算 / 写入：comm->collNetSupport = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 65. 条件判断：(comm->collNetSupport == 1 && collNetGraph.nChannels <= 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   66. 真分支：；仅条件为真执行以下子项。
+ *     67. 调用 / 计算 / 写入：comm->collNetSupport = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 68. 源码语法片段：struct ncclGraphInfo { int pattern; int nChannels; int sameChannels; float speedIntra; float speedInter; int typeIntra; int typeInter; }；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 69. 准备局部状态：struct { int netDev; int collNetSupport; struct ncclGraphInfo tree; struct ncclGraphInfo ring; struct ncclGraphInfo collNet; struct ncclTopoRanks topoRanks; } *allGather3Data;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 70. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&allGather3Data, nranks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 71. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetLocalNet(comm->topo, rank, &allGather3Data[rank].netDev));；失败时可能提前return，成功才继续；按 GPU 到 NIC 路径的距离/带宽等条件找出合适本地网络设备。
+ * 72. 调用 / 计算 / 写入：allGather3Data[rank].tree.pattern = treeGraph.pattern;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 73. 调用 / 计算 / 写入：allGather3Data[rank].tree.nChannels = treeGraph.nChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 74. 调用 / 计算 / 写入：allGather3Data[rank].tree.sameChannels = treeGraph.sameChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 75. 调用 / 计算 / 写入：allGather3Data[rank].tree.speedIntra = treeGraph.speedIntra;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 76. 调用 / 计算 / 写入：allGather3Data[rank].tree.speedInter = treeGraph.speedInter;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 77. 调用 / 计算 / 写入：allGather3Data[rank].tree.typeIntra = treeGraph.typeIntra;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 78. 调用 / 计算 / 写入：allGather3Data[rank].tree.typeInter = treeGraph.typeInter;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 79. 调用 / 计算 / 写入：allGather3Data[rank].ring.pattern = ringGraph.pattern;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 80. 调用 / 计算 / 写入：allGather3Data[rank].ring.nChannels = ringGraph.nChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 81. 调用 / 计算 / 写入：allGather3Data[rank].ring.sameChannels = ringGraph.sameChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 82. 调用 / 计算 / 写入：allGather3Data[rank].ring.speedIntra = ringGraph.speedIntra;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 83. 调用 / 计算 / 写入：allGather3Data[rank].ring.speedInter = ringGraph.speedInter;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 84. 调用 / 计算 / 写入：allGather3Data[rank].ring.typeIntra = ringGraph.typeIntra;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 85. 调用 / 计算 / 写入：allGather3Data[rank].ring.typeInter = ringGraph.typeInter;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 86. 调用 / 计算 / 写入：allGather3Data[rank].collNet.pattern = collNetGraph.pattern;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 87. 调用 / 计算 / 写入：allGather3Data[rank].collNet.nChannels = collNetGraph.nChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 88. 调用 / 计算 / 写入：allGather3Data[rank].collNet.sameChannels = collNetGraph.sameChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 89. 调用 / 计算 / 写入：allGather3Data[rank].collNet.speedIntra = collNetGraph.speedIntra;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 90. 调用 / 计算 / 写入：allGather3Data[rank].collNet.speedInter = collNetGraph.speedInter;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 91. 调用 / 计算 / 写入：allGather3Data[rank].collNet.typeIntra = collNetGraph.typeIntra;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 92. 调用 / 计算 / 写入：allGather3Data[rank].collNet.typeInter = collNetGraph.typeInter;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 93. 调用 / 计算 / 写入：allGather3Data[rank].collNetSupport = comm->collNetSupport;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 94. 调用 / 计算 / 写入：comm->nChannels = std::min(treeGraph.nChannels, ringGraph.nChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ * 95. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPreset(comm, &treeGraph, &ringGraph, &allGather3Data[rank].topoRanks));；失败时可能提前return，成功才继续；将本机搜索图转成可交换的局部环/树端点摘要，为跨节点拼接准备元数据。
+ * 96. 调用 / 计算 / 写入：NCCLCHECK(bootstrapAllGather(comm->bootstrap, allGather3Data, sizeof(*allGather3Data)));；失败时可能提前return，成功才继续；沿控制 socket 环逐轮交换每个 rank 的固定尺寸元数据，最终每方拥有全组摘要。
+ * 97. 准备局部状态：int *nodesFirstRank, *nodesTreePatterns;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 98. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&nodesFirstRank, nranks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 99. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&nodesTreePatterns, nranks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 100. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->rankToNode, comm->nRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 101. 循环：初始 int r=0;；继续条件 r<nranks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   102. 准备局部状态：int node;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   103. 准备局部状态：int firstRank = allGather3Data[r].topoRanks.ringRecv[0];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   104. 循环：初始 node=0；继续条件 node<comm->nNodes && nodesFirstRank[node] != firstRank；每轮更新 node++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     105. 调用 / 计算 / 写入：;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *   106. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   107. 条件判断：(node == comm->nNodes)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     108. 真分支：；仅条件为真执行以下子项。
+ *       109. 调用 / 计算 / 写入：comm->nNodes++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       110. 调用 / 计算 / 写入：nodesFirstRank[node] = firstRank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       111. 调用 / 计算 / 写入：nodesTreePatterns[node] = allGather3Data[r].tree.pattern;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   112. 调用 / 计算 / 写入：comm->rankToNode[r] = node;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 113. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 114. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->nodeRanks, comm->nNodes));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 115. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->rankToLocalRank, comm->nRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 116. 循环：初始 int r=0;；继续条件 r<comm->nRanks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   117. 准备局部状态：int node = comm->rankToNode[r];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   118. 调用 / 计算 / 写入：comm->rankToLocalRank[r] = comm->nodeRanks[node].localRanks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   119. 调用 / 计算 / 写入：comm->nodeRanks[node].localRanks++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 120. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 121. 循环：初始 int n=0;；继续条件 n<comm->nNodes；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   122. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&comm->nodeRanks[n].localRankToRank, comm->nodeRanks[n].localRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *   123. 调用 / 计算 / 写入：comm->maxLocalRanks = std::max(comm->maxLocalRanks, comm->nodeRanks[n].localRanks);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   124. 调用 / 计算 / 写入：comm->nodeRanks[n].localRanks = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 125. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 126. 循环：初始 int r=0;；继续条件 r<comm->nRanks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   127. 准备局部状态：int node = comm->rankToNode[r];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   128. 调用 / 计算 / 写入：comm->nodeRanks[node].localRankToRank[comm->nodeRanks[node].localRanks++] = r;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 129. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 130. 调用 / 计算 / 写入：comm->node = comm->rankToNode[rank];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 131. 调用 / 计算 / 写入：comm->localRankToRank = comm->nodeRanks[comm->node].localRankToRank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 132. 调用 / 计算 / 写入：comm->localRank = comm->rankToLocalRank[rank];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 133. 调用 / 计算 / 写入：comm->localRanks = comm->nodeRanks[comm->node].localRanks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 134. 调用 / 计算 / 写入：TRACE(NCCL_INIT,"hostHash[%d] %lx localRank %d localRanks %d localRank0 %d", rank, comm->peerInfo[rank].hostHash, comm->localRank, comm->localRanks, comm->localRankToRank[0]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 135. 条件判断：(comm->localRank == -1 || comm->localRankToRank[0] == -1 || comm->localRanks == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   136. 真分支：；仅条件为真执行以下子项。
+ *     137. 调用 / 计算 / 写入：WARN("Failed to determine local ranks rank %d hostHash %lx pidHash %lx localRank %d localRanks %d localRank0 %d", rank, comm->peerInfo[rank].hostHash, comm->peerInfo[rank].pidHash, comm->localRank, co …（完整代码见函数体）；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     138. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 139. 准备局部状态：int nChannelsOrig = comm->nChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 140. 准备局部状态：struct ncclTopoRanks** allTopoRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 141. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&allTopoRanks, comm->nRanks));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 142. 循环：初始 int i=0;；继续条件 i<nranks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   143. 调用 / 计算 / 写入：comm->peerInfo[i].netDev = allGather3Data[i].netDev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   144. 调用 / 计算 / 写入：allTopoRanks[i] = &allGather3Data[i].topoRanks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   145. 调用 / 计算 / 写入：treeGraph.nChannels = std::min(allGather3Data[i].tree.nChannels, treeGraph.nChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   146. 调用 / 计算 / 写入：treeGraph.sameChannels = std::min(allGather3Data[i].tree.sameChannels, treeGraph.sameChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   147. 调用 / 计算 / 写入：treeGraph.speedIntra = std::min(allGather3Data[i].tree.speedIntra, treeGraph.speedIntra);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   148. 调用 / 计算 / 写入：treeGraph.speedInter = std::min(allGather3Data[i].tree.speedInter, treeGraph.speedInter);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   149. 调用 / 计算 / 写入：treeGraph.typeIntra = std::max(allGather3Data[i].tree.typeIntra, treeGraph.typeIntra);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   150. 调用 / 计算 / 写入：treeGraph.typeInter = std::max(allGather3Data[i].tree.typeInter, treeGraph.typeInter);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   151. 调用 / 计算 / 写入：ringGraph.nChannels = std::min(allGather3Data[i].ring.nChannels, ringGraph.nChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   152. 调用 / 计算 / 写入：ringGraph.sameChannels = std::min(allGather3Data[i].ring.sameChannels, ringGraph.sameChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   153. 调用 / 计算 / 写入：ringGraph.speedIntra = std::min(allGather3Data[i].ring.speedIntra, ringGraph.speedIntra);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   154. 调用 / 计算 / 写入：ringGraph.speedInter = std::min(allGather3Data[i].ring.speedInter, ringGraph.speedInter);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   155. 调用 / 计算 / 写入：ringGraph.typeIntra = std::max(allGather3Data[i].ring.typeIntra, ringGraph.typeIntra);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   156. 调用 / 计算 / 写入：ringGraph.typeInter = std::max(allGather3Data[i].ring.typeInter, ringGraph.typeInter);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   157. 调用 / 计算 / 写入：collNetGraph.nChannels = std::min(allGather3Data[i].collNet.nChannels, collNetGraph.nChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   158. 调用 / 计算 / 写入：collNetGraph.sameChannels = std::min(allGather3Data[i].collNet.sameChannels, collNetGraph.sameChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   159. 调用 / 计算 / 写入：collNetGraph.speedIntra = std::min(allGather3Data[i].collNet.speedIntra, collNetGraph.speedIntra);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   160. 调用 / 计算 / 写入：collNetGraph.speedInter = std::min(allGather3Data[i].collNet.speedInter, collNetGraph.speedInter);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   161. 调用 / 计算 / 写入：collNetGraph.typeIntra = std::max(allGather3Data[i].collNet.typeIntra, collNetGraph.typeIntra);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   162. 调用 / 计算 / 写入：collNetGraph.typeInter = std::max(allGather3Data[i].collNet.typeInter, collNetGraph.typeInter);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   163. 调用 / 计算 / 写入：comm->collNetSupport = std::min(allGather3Data[i].collNetSupport, comm->collNetSupport);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ * 164. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 165. 调用 / 计算 / 写入：comm->nChannels = treeGraph.nChannels = ringGraph.nChannels = std::min(treeGraph.nChannels, ringGraph.nChannels);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ * 166. 条件判断：(comm->nChannels < nChannelsOrig)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   167. 真分支：；仅条件为真执行以下子项。
+ *     168. 循环：初始 int i=0;；继续条件 i<comm->nChannels；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       169. 调用 / 计算 / 写入：memcpy(comm->channels+comm->nChannels+i, comm->channels+nChannelsOrig+i, sizeof(struct ncclChannel));；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     170. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 171. 条件判断：(comm->collNetSupport == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   172. 真分支：；仅条件为真执行以下子项。
+ *     173. 准备局部状态：int collNetNodeThreshold = ncclParamCollNetNodeThreshold();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     174. 条件判断：(comm->nNodes < collNetNodeThreshold)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       175. 真分支：；仅条件为真执行以下子项。
+ *         176. 调用 / 计算 / 写入：INFO(NCCL_INIT, "Communicator has %d nodes which is less than CollNet node threshold %d, disabling CollNet", comm->nNodes, collNetNodeThreshold);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         177. 调用 / 计算 / 写入：comm->collNetSupport = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     178. 循环：初始 int n=0;；继续条件 n<comm->nNodes；每轮更新 n++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       179. 条件判断：(comm->nodeRanks[n].localRanks > NCCL_MAX_DIRECT_ARITY+1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         180. 真分支：；仅条件为真执行以下子项。
+ *           181. 调用 / 计算 / 写入：WARN("CollNet currently only supports up to %d GPUs per node, disabling CollNet", NCCL_MAX_DIRECT_ARITY+1);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *           182. 调用 / 计算 / 写入：comm->collNetSupport = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           183. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *     184. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 185. 准备局部状态：int *rings;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 186. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&rings, nranks*MAXCHANNELS));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 187. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoPostset(comm, nodesFirstRank, nodesTreePatterns, allTopoRanks, rings, &collNetGraph));；失败时可能提前return，成功才继续；汇总全部节点的端点信息并拼接全局 Ring/Tree，复制/裁剪通道后验证环完整性。
+ * 188. 调用 / 计算 / 写入：free(allTopoRanks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 189. 调用 / 计算 / 写入：free(nodesTreePatterns);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 190. 调用 / 计算 / 写入：free(nodesFirstRank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 191. 调用 / 计算 / 写入：free(allGather3Data);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 192. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "rank %d nranks %d - BUILT %d TREES/RINGS", rank, nranks, comm->nChannels);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 193. 准备局部状态：char line[1024];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 194. 调用 / 计算 / 写入：line[0]='\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 195. 循环：初始 int c=0;；继续条件 c<comm->nChannels；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   196. 准备局部状态：struct ncclTree* tree = &comm->channels[c].tree;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   197. 调用 / 计算 / 写入：snprintf(line+strlen(line), 1023-strlen(line), " [%d] %d/%d/%d->%d->%d", c, tree->down[0], tree->down[1], tree->down[2], rank, tree->up);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   198. 调用 / 计算 / 写入：INFO(NCCL_GRAPH, "Ring %02d : %d -> %d -> %d", c, comm->channels[c].ring.prev, comm->rank, comm->channels[c].ring.next);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 199. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 200. 调用 / 计算 / 写入：line[1023] = '\0';；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 201. 调用 / 计算 / 写入：INFO(NCCL_INIT, "Trees%s", line);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 202. 调用 / 计算 / 写入：NCCLCHECK(computeBuffSizes(comm));；失败时可能提前return，成功才继续；读取/选择 LL、LL128、Simple 的协议缓冲尺寸，为后续 channel 传输与分片提供容量。
+ * 203. 循环：初始 int c=0;；继续条件 c<comm->nChannels；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   204. 准备局部状态：struct ncclChannel* channel = comm->channels+c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   205. 调用 / 计算 / 写入：NCCLCHECKGOTO(setupChannel(comm, c, rank, nranks, rings+c*nranks), ret, affinity_restore);；失败时保存错误并跳到清理标签，成功才继续；把拓扑环顺序旋转到本 rank 开头，建立用户 rank 表及本 rank 内部环索引。
+ *   206. 条件判断：(comm->nRanks == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     207. 真分支：；仅条件为真执行以下子项。
+ *       208. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   209. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channel, 1, &channel->ring.prev, 1, &channel->ring.next, 0), ret, affinity_restore);；失败时保存错误并跳到清理标签，成功才继续；为尚未连通的邻居方向/channel 设置建链需求位，真正资源创建留到 Setup。
+ * 210. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 211. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &ringGraph, 0), ret, affinity_restore);；失败时保存错误并跳到清理标签，成功才继续；按需求位批量选择 transport、交换建链句柄并 connect，将完成的连接复制给设备 peer 表。
+ * 212. 调用 / 计算 / 写入：free(rings);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 213. 调用 / 计算 / 写入：INFO(NCCL_INIT, "Connected all rings");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 214. 循环：初始 int c=0;；继续条件 c<comm->nChannels；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   215. 准备局部状态：struct ncclChannel* channel = comm->channels+c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   216. 条件判断：(comm->nRanks == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     217. 真分支：；仅条件为真执行以下子项。
+ *       218. 控制转移：continue;；跳到当前最内层循环的下一轮，for还会执行其增量步骤。
+ *   219. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channel, NCCL_MAX_TREE_ARITY, channel->tree.down, 1, &channel->tree.up, 0), ret, affinity_restore);；失败时保存错误并跳到清理标签，成功才继续；为尚未连通的邻居方向/channel 设置建链需求位，真正资源创建留到 Setup。
+ *   220. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channel, 1, &channel->tree.up, NCCL_MAX_TREE_ARITY, channel->tree.down, 0), ret, affinity_restore);；失败时保存错误并跳到清理标签，成功才继续；为尚未连通的邻居方向/channel 设置建链需求位，真正资源创建留到 Setup。
+ * 221. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 222. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &treeGraph, 0), ret, affinity_restore);；失败时保存错误并跳到清理标签，成功才继续；按需求位批量选择 transport、交换建链句柄并 connect，将完成的连接复制给设备 peer 表。
+ * 223. 调用 / 计算 / 写入：INFO(NCCL_INIT, "Connected all trees");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 224. 条件判断：(comm->collNetSupport > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   225. 真分支：；仅条件为真执行以下子项。
+ *     226. 准备局部状态：int collNetSetupFail = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     227. 准备局部状态：int highestTypes[NCCL_MAX_LOCAL_RANKS] = {TRANSPORT_P2P};；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     228. 准备局部状态：int nHeads = collNetGraph.nChannels;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     229. 准备局部状态：int *heads;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     230. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&heads, nHeads));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     231. 循环：初始 int c=0;；继续条件 c<nHeads；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       232. 调用 / 计算 / 写入：heads[c] = collNetGraph.intra[c*comm->localRanks+0];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     233. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     234. 循环：初始 int c=0;；继续条件 c<comm->nChannels；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       235. 准备局部状态：struct ncclChannel* channel = comm->channels+c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       236. 循环：初始 int h=0;；继续条件 h<nHeads；每轮更新 h++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         237. 准备局部状态：const int head = heads[h];；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         238. 调用 / 计算 / 写入：collNetSetupFail = ncclTransportCollNetSetup(comm, &collNetGraph, channel, head, head, h, collNetRecv);；为网络归约 head 建立特殊 CollNet 连接并交换网络参与者句柄。
+ *         239. 条件判断：(!collNetSetupFail)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           240. 真分支：；仅条件为真执行以下子项。
+ *             241. 调用 / 计算 / 写入：collNetSetupFail = ncclTransportCollNetSetup(comm, &collNetGraph, channel, head, head, h, collNetSend);；为网络归约 head 建立特殊 CollNet 连接并交换网络参与者句柄。
+ *       242. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       243. 条件判断：(c == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         244. 真分支：；仅条件为真执行以下子项。
+ *           245. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportCollNetCheck(comm, collNetSetupFail), ret, collnet_cleanup);；失败时保存错误并跳到清理标签，成功才继续；全组汇总 CollNet 建链失败状态，一处不支持时一致回退，避免各 rank 选择不一致。
+ *     246. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     247. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportCollNetCheck(comm, collNetSetupFail), ret, collnet_cleanup);；失败时保存错误并跳到清理标签，成功才继续；全组汇总 CollNet 建链失败状态，一处不支持时一致回退，避免各 rank 选择不一致。
+ *     248. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "rank %d Connected inter-node CollNet", rank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     249. 准备局部状态：int highestTransportType0, highestTransportType1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     250. 循环：初始 int c=0;；继续条件 c<comm->nChannels；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       251. 准备局部状态：struct ncclChannel* channelRecv = comm->channels+c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       252. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channelRecv, NCCL_MAX_DIRECT_ARITY, channelRecv->collTree.up, NCCL_MAX_DIRECT_ARITY, channelRecv->collTree.down, 0), ret, collnet_cleanup);；失败时保存错误并跳到清理标签，成功才继续；为尚未连通的邻居方向/channel 设置建链需求位，真正资源创建留到 Setup。
+ *     253. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     254. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &collNetGraph, 0, &highestTransportType0), ret, collnet_cleanup);；失败时保存错误并跳到清理标签，成功才继续；按需求位批量选择 transport、交换建链句柄并 connect，将完成的连接复制给设备 peer 表。
+ *     255. 循环：初始 int c=0;；继续条件 c<comm->nChannels；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       256. 准备局部状态：struct ncclChannel* channelSend = comm->channels+c;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       257. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pConnect(comm, channelSend, NCCL_MAX_DIRECT_ARITY, channelSend->collTree.down, NCCL_MAX_DIRECT_ARITY, channelSend->collTree.up, 1), ret, collnet_cleanup);；失败时保存错误并跳到清理标签，成功才继续；为尚未连通的邻居方向/channel 设置建链需求位，真正资源创建留到 Setup。
+ *     258. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     259. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &collNetGraph, 1, &highestTransportType1), ret, collnet_cleanup);；失败时保存错误并跳到清理标签，成功才继续；按需求位批量选择 transport、交换建链句柄并 connect，将完成的连接复制给设备 peer 表。
+ *     260. 调用 / 计算 / 写入：comm->intraHighestTransportType = highestTypes[comm->localRank] = highestTransportType0 > highestTransportType1 ? highestTransportType0 : highestTransportType1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     261. 调用 / 计算 / 写入：NCCLCHECK(bootstrapIntraNodeAllGather(comm->bootstrap, comm->localRankToRank, comm->localRank, comm->localRanks, highestTypes, sizeof(int)));；失败时可能提前return，成功才继续；只在所选节点内 rank 集合交换固定大小控制信息，按局部索引映射到全局 rank。
+ *     262. 循环：初始 int i=0;；继续条件 i<comm->localRanks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       263. 条件判断：(highestTypes[i] > comm->intraHighestTransportType)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         264. 真分支：；仅条件为真执行以下子项。
+ *           265. 调用 / 计算 / 写入：comm->intraHighestTransportType = highestTypes[i];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     266. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     267. 调用 / 计算 / 写入：INFO(NCCL_INIT, "rank %d Connected CollNet", rank);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     268. 跳转标签：collnet_cleanup；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *       269. 调用 / 计算 / 写入：free(heads);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     270. 条件判断：(ret != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       271. 真分支：；仅条件为真执行以下子项。
+ *         272. 调用 / 计算 / 写入：NCCLCHECK(ncclTransportCollNetFree(comm));；失败时可能提前return，成功才继续；关闭已创建的 CollNet 特殊连接，配合初始化失败回退或整体销毁。
+ *         273. 调用 / 计算 / 写入：comm->collNetSupport = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         274. 调用 / 计算 / 写入：ret = ncclSuccess;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 275. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "rank %d nranks %d - CONNECTED %d RINGS AND TREES", rank, nranks, comm->nChannels);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 276. 先执行一次的循环：初始 ；继续条件 (0)；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *   277. 准备局部状态：int myCompCap = comm->peerInfo[rank].cudaCompCap;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   278. 准备局部状态：int minCompCap = myCompCap, maxCompCap = myCompCap;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   279. 循环：初始 int i = 0;；继续条件 i < nranks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     280. 调用 / 计算 / 写入：minCompCap = std::min(comm->peerInfo[i].cudaCompCap, minCompCap);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     281. 调用 / 计算 / 写入：maxCompCap = std::max(comm->peerInfo[i].cudaCompCap, maxCompCap);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   282. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   283. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoTuneModel(comm, minCompCap, maxCompCap, &treeGraph, &ringGraph, &collNetGraph));；失败时可能提前return，成功才继续；结合拓扑图带宽、节点规模、GPU 架构和配置构建各 API/算法/协议的延迟与带宽表。
+ * 284. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 285. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoComputeP2pChannels(comm));；失败时可能提前return，成功才继续；收敛所有本地 GPU 到 peer 的通道预算，计算全局 P2P 空间与每 peer 数量并生成位反转偏移。
+ * 286. 条件判断：(ncclParamNvbPreconnect())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   287. 真分支：；仅条件为真执行以下子项。
+ *     288. 准备局部状态：int nvbNpeers;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     289. 准备局部状态：int* nvbPeers;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     290. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetNvbGpus(comm->topo, comm->rank, &nvbNpeers, &nvbPeers));；失败时可能提前return，成功才继续；找出可经一个中间 GPU 走 NVLink 桥接的 peer，为特定机内路径预连接提供候选。
+ *     291. 循环：初始 int r=0;；继续条件 r<nvbNpeers；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       292. 准备局部状态：int peer = nvbPeers[r];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       293. 准备局部状态：int channelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       294. 循环：初始 int c=0;；继续条件 c<comm->p2pnChannelsPerPeer；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         295. 调用 / 计算 / 写入：NCCLCHECK(ncclChannelCompute(comm, peer, c, ncclFuncSend, &channelId));；失败时可能提前return，成功才继续；组合基准计算和分散偏移，得到指定 peer/块号/方向的最终 P2P channelId。
+ *         296. 条件判断：(comm->channels[channelId].peers[peer].send[1].connected == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           297. 真分支：；仅条件为真执行以下子项。
+ *             298. 调用 / 计算 / 写入：comm->connectSend[peer] |= (1<<channelId);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       299. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       300. 循环：初始 int c=0;；继续条件 c<comm->p2pnChannelsPerPeer；每轮更新 c++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         301. 调用 / 计算 / 写入：NCCLCHECK(ncclChannelCompute(comm, peer, c, ncclFuncRecv, &channelId));；失败时可能提前return，成功才继续；组合基准计算和分散偏移，得到指定 peer/块号/方向的最终 P2P channelId。
+ *         302. 条件判断：(comm->channels[channelId].peers[peer].recv[1].connected == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           303. 真分支：；仅条件为真执行以下子项。
+ *             304. 调用 / 计算 / 写入：comm->connectRecv[peer] |= (1<<channelId);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       305. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     306. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     307. 调用 / 计算 / 写入：NCCLCHECK(ncclTransportP2pSetup(comm, NULL, 1));；失败时可能提前return，成功才继续；按需求位批量选择 transport、交换建链句柄并 connect，将完成的连接复制给设备 peer 表。
+ *     308. 调用 / 计算 / 写入：free(nvbPeers);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 309. 准备局部状态：struct ncclProxyConnector proxyConn;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 310. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_NET, 1, comm->rank, &proxyConn));；失败时可能提前return，成功才继续；联系目标代理服务并申请 transport/方向连接，建立主线程到该代理连接的控制引用。
+ * 311. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&proxyConn, ncclProxyMsgSharedInit, &comm->p2pnChannels, sizeof(int), NULL, 0));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ * 312. 条件判断：(ncclPxnDisable() == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   313. 真分支：；仅条件为真执行以下子项。
+ *     314. 准备局部状态：int nranks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     315. 准备局部状态：int* pxnPeers;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     316. 调用 / 计算 / 写入：NCCLCHECK(ncclTopoGetPxnRanks(comm, &pxnPeers, &nranks));；失败时可能提前return，成功才继续；列出本 rank 网络路径可能依赖的中间 GPU rank，为共享代理资源提前准备。
+ *     317. 循环：初始 int r=0;；继续条件 r<nranks；每轮更新 r++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       318. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyConnect(comm, TRANSPORT_NET, 1, pxnPeers[r], &proxyConn));；失败时可能提前return，成功才继续；联系目标代理服务并申请 transport/方向连接，建立主线程到该代理连接的控制引用。
+ *       319. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyCall(&proxyConn, ncclProxyMsgSharedInit, &comm->p2pnChannels, sizeof(int), NULL, 0));；失败时可能提前return，成功才继续；通过代理控制 socket 发送指定请求及参数并接收回复，供 setup/connect/free 等控制操作使用。
+ *     320. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     321. 调用 / 计算 / 写入：free(pxnPeers);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 322. 先执行一次的循环：初始 ；继续条件 (0)；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *   323. 准备局部状态：int intraProcRank0 = -1, intraProcRank = -1, intraProcRanks = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   324. 循环：初始 int i = 0;；继续条件 i < nranks；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *     325. 条件判断：((comm->peerInfo[i].hostHash == comm->peerInfo[rank].hostHash) && (comm->peerInfo[i].pidHash == comm->peerInfo[rank].pidHash))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       326. 真分支：；仅条件为真执行以下子项。
+ *         327. 条件判断：(intraProcRanks == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           328. 真分支：；仅条件为真执行以下子项。
+ *             329. 调用 / 计算 / 写入：intraProcRank0 = i;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         330. 条件判断：(i == rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           331. 真分支：；仅条件为真执行以下子项。
+ *             332. 调用 / 计算 / 写入：intraProcRank = intraProcRanks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         333. 调用 / 计算 / 写入：intraProcRanks++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   334. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   335. 调用 / 计算 / 写入：TRACE(NCCL_INIT,"pidHash[%d] %lx intraProcRank %d intraProcRanks %d intraProcRank0 %d", rank, comm->peerInfo[rank].pidHash, intraProcRank, intraProcRanks, intraProcRank0);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *   336. 条件判断：(intraProcRank == -1 || intraProcRank0 == -1 || comm->peerInfo[intraProcRank0].comm == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     337. 真分支：；仅条件为真执行以下子项。
+ *       338. 调用 / 计算 / 写入：WARN("Failed to determine intra proc ranks rank %d hostHash %lx pidHash %lx intraProcRank %d intraProcRanks %d intraProcRank0 %d", rank, comm->peerInfo[rank].hostHash, comm->peerInfo[rank].pidHash, in …（完整代码见函数体）；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       339. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   340. 调用 / 计算 / 写入：NCCLCHECK(ncclCommSetIntraProc(comm, intraProcRank, intraProcRanks, comm->peerInfo[intraProcRank0].comm));；失败时可能提前return，成功才继续；把同进程 rank 加入本地发射协调组，设置屏障、设备列表及协作发射能力。
+ * 341. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 342. 调用 / 计算 / 写入：NCCLCHECK(bootstrapBarrier(comm->bootstrap, comm->localRankToRank, comm->localRank, comm->localRanks, comm->localRankToRank[0]));；失败时可能提前return，成功才继续；使用倍增距离的控制消息交换，使所选 rank 子集合完成初始化会合。
+ * 343. 调用 / 计算 / 写入：NCCLCHECK(ncclProxyShmUnlink(comm));；失败时可能提前return，成功才继续；移除代理共享内存对象名字，已有映射仍按各自引用和退出流程释放。
+ * 344. 跳转标签：affinity_restore；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   345. 条件判断：(CPU_COUNT(&comm->cpuAffinity))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     346. 真分支：；仅条件为真执行以下子项。
+ *       347. 调用 / 计算 / 写入：sched_setaffinity(0, sizeof(cpu_set_t), &affinitySave);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 348. 条件判断：(ret != ncclSuccess)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   349. 真分支：；仅条件为真执行以下子项。
+ *     350. 函数返回：return ret;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 351. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "rank %d nranks %d - DONE", rank, nranks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 352. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0895
  */
 /* 中文逐项-函数 F0895：initTransportsRank
  * 用途与位置：串联 bootstrap、硬件建图、路径搜索、全局图拼接、传输建链和性能模型，建立当前 rank 通信环境。
@@ -1716,6 +2353,28 @@ NCCL_PARAM(SetStackSize, "SET_STACK_SIZE", 0);
  * 真正执行单 rank 初始化的工作函数：切换 CUDA 设备，分配 communicator，建立拓扑/连接，配置设备视图。
  * Sync 指这里执行初始化流程，不代表后续集合通信会同步等待 GPU 完成。
  */
+/* 中文内部逻辑 F0896：ncclCommInitRankSync
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：ncclResult_t res;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：CUDACHECK(cudaSetDevice(cudaDev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 3. 条件判断：(maxLocalSizeBytes > 0 && ncclParamSetStackSize() == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "Setting cudaLimitStackSize to %zi", maxLocalSizeBytes);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 调用 / 计算 / 写入：CUDACHECKIGNORE(cudaDeviceSetLimit(cudaLimitStackSize, maxLocalSizeBytes));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 7. 调用 / 计算 / 写入：*newcomm = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：NCCLCHECKGOTO(commAlloc(newcomm, nranks, myrank), res, cleanup);；失败时保存错误并跳到清理标签，成功才继续；分配并初始化当前 rank 的 communicator 总对象、排队状态、事件与连接需求表。
+ * 9. 调用 / 计算 / 写入：NCCLCHECKGOTO(initTransportsRank(*newcomm, &commId), res, cleanup);；失败时保存错误并跳到清理标签，成功才继续；串联 bootstrap、硬件建图、路径搜索、全局图拼接、传输建链和性能模型，建立当前 rank 通信环境。
+ * 10. 调用 / 计算 / 写入：NCCLCHECKGOTO(devCommSetup(*newcomm), res, cleanup);；失败时保存错误并跳到清理标签，成功才继续；构造设备端精简 communicator 和连续 channel 布局，把主机连接视图转换成 GPU 可访问地址。
+ * 11. 调用 / 计算 / 写入：INFO(NCCL_INIT,"comm %p rank %d nranks %d cudaDev %d busId %lx - Init COMPLETE", *newcomm, myrank, nranks, (*newcomm)->cudaDev, (*newcomm)->busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 12. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 13. 跳转标签：cleanup；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   14. 条件判断：((*newcomm) && (*newcomm)->bootstrap)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     15. 真分支：；仅条件为真执行以下子项。
+ *       16. 调用 / 计算 / 写入：bootstrapAbort((*newcomm)->bootstrap);；异常退出时关闭控制网络并回收状态，配合中止流程打破初始化等待。
+ * 17. 调用 / 计算 / 写入：*newcomm = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 函数返回：return res;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0896
+ */
 /* 中文逐项-函数 F0896：ncclCommInitRankSync
  * 用途与位置：同步建立一个 rank 的 communicator，完成设备选择、总对象分配、传输初始化和设备视图构造。
  * 参数 newcomm（ncclComm_t* newcomm）：公开初始化结果句柄的输出地址，只有初始化成功后才能交给后续通信调用。
@@ -1760,6 +2419,38 @@ cleanup:
 /* 中文导读：
  * 公开初始化 API 与实际初始化之间的调度层。
  * 处于 group 时记录异步初始化任务，最外层 GroupEnd 再启动线程，使同进程多 GPU 初始化能够相互握手。
+ */
+/* 中文内部逻辑 F0897：ncclCommInitRankDev
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：ncclResult_t res;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：char* env = getenv("NCCL_COMM_ID");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 条件判断：(env && myrank == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：INFO(NCCL_ENV, "NCCL_COMM_ID set by environment to %s", env);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 调用 / 计算 / 写入：NCCLCHECKGOTO(bootstrapCreateRoot(&commId, true), res, end);；失败时保存错误并跳到清理标签，成功才继续；创建 bootstrap root 监听对象和后台线程，为后续 rank 会合提供入口。
+ * 7. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclInit(), res, end);；失败时保存错误并跳到清理标签，成功才继续；进程级单次初始化配置、网络与相关支持库，避免每个 communicator 重复初始化全局组件。
+ * 8. 条件判断：(myrank == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   9. 真分支：；仅条件为真执行以下子项。
+ *     10. 调用 / 计算 / 写入：showVersion();；按日志配置打印库版本和构建相关信息，辅助确认实际加载的库。
+ * 11. 调用 / 计算 / 写入：CUDACHECKGOTO(cudaFree(NULL), res, end);；执行被包装调用；失败时保存错误并跳到指定清理标签，成功才继续下一项。
+ * 12. 调用 / 计算 / 写入：NCCLCHECKGOTO(PtrCheck(newcomm, "CommInitRank", "newcomm"), res, end);；失败时保存错误并跳到清理标签，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 13. 条件判断：(nranks < 1 || myrank < 0 || myrank >= nranks)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 调用 / 计算 / 写入：WARN("Invalid rank requested : %d/%d", myrank, nranks);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     16. 调用 / 计算 / 写入：res = ncclInvalidArgument;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     17. 控制转移：goto end;；跳到明确标签，不再顺序执行当前位置后面的项；通常用于统一清理或复用计算段。
+ * 18. 条件判断：(ncclAsyncMode())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   19. 真分支：；仅条件为真执行以下子项。
+ *     20. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclAsyncInit(ncclCommInitRankSync, newcomm, nranks, commId, myrank, cudaDev), res, end);；失败时保存错误并跳到清理标签，成功才继续；把初始化函数、rank、设备和 uniqueId 复制到本线程 Group 任务数组。
+ *   21. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     22. 调用 / 计算 / 写入：NCCLCHECKGOTO(ncclCommInitRankSync(newcomm, nranks, commId, myrank, cudaDev), res, end);；失败时保存错误并跳到清理标签，成功才继续；同步建立一个 rank 的 communicator，完成设备选择、总对象分配、传输初始化和设备视图构造。
+ * 23. 跳转标签：end；来自goto或正常贯穿的路径可在此会合，标签本身不执行额外计算。
+ *   24. 条件判断：(ncclAsyncMode())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     25. 真分支：；仅条件为真执行以下子项。
+ *       26. 函数返回：return ncclAsyncErrCheck(res);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     27. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       28. 函数返回：return res;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0897
  */
 /* 中文逐项-函数 F0897：ncclCommInitRankDev
  * 用途与位置：按是否处于 Group 选择立即初始化或保存异步初始化任务，并处理设备上下文。
@@ -1815,6 +2506,15 @@ end:
 }
 
 NCCL_API(ncclResult_t, ncclCommInitRank, ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank);
+/* 中文内部逻辑 F0898：ncclCommInitRank
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：int cudaDev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：CUDACHECK(cudaGetDevice(&cudaDev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 4. 调用 / 计算 / 写入：NCCLCHECK(ncclCommInitRankDev(newcomm, nranks, commId, myrank, cudaDev));；失败时可能提前return，成功才继续；按是否处于 Group 选择立即初始化或保存异步初始化任务，并处理设备上下文。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0898
+ */
 /* 中文逐项-函数 F0898：ncclCommInitRank
  * 用途与位置：公开多进程/多机初始化入口，使用当前设备、全组规模和 uniqueId 建立当前 rank。
  * 参数 newcomm（ncclComm_t* newcomm）：公开初始化结果句柄的输出地址，只有初始化成功后才能交给后续通信调用。
@@ -1843,6 +2543,24 @@ NCCL_API(ncclResult_t, ncclCommInitAll, ncclComm_t* comms, int ndev, const int* 
  * 这样这些 rank 的初始化能够并行推进，避免第一个 rank 等待尚未开始初始化的其他 rank。
  * 它面向单进程本地设备；多进程/多机器通常由应用分发 uniqueId 后各自调用 ncclCommInitRank。
  * 这里 ndev 是 communicator 的 rank 数，不意味着创建一个覆盖整个集群的硬件对象。
+ */
+/* 中文内部逻辑 F0899：ncclCommInitAll
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(comms, "CommInitAll", "comms"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 3. 条件判断：(ndev < 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   4. 真分支：；仅条件为真执行以下子项。
+ *     5. 调用 / 计算 / 写入：WARN("Invalid device count requested : %d", ndev);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     6. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 7. 准备局部状态：ncclUniqueId uniqueId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(ncclGetUniqueId(&uniqueId));；失败时可能提前return，成功才继续；先完成库级初始化，再生成应用需要分发给全组 rank 的 bootstrap 标识。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(ncclGroupStart());；失败时可能提前return，成功才继续；进入线程局部 Group 嵌套，最外层首次进入时清理组任务状态。
+ * 10. 循环：初始 int i=0;；继续条件 i<ndev；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   11. 调用 / 计算 / 写入：ncclCommInitRankDev(comms+i, ndev, uniqueId, i, devlist ? devlist[i] : i);；按是否处于 Group 选择立即初始化或保存异步初始化任务，并处理设备上下文。
+ * 12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 调用 / 计算 / 写入：NCCLCHECK(ncclGroupEnd());；失败时可能提前return，成功才继续；最外层出口统一执行初始化、P2P 预建链、消息分块、collective 聚合、Proxy 发布和 kernel 发射。
+ * 14. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0899
  */
 /* 中文逐项-函数 F0899：ncclCommInitAll
  * 用途与位置：单进程本地多 GPU 便捷初始化，使用同一 uniqueId 和 Group 协调各设备加入同一通信组。
@@ -1881,6 +2599,23 @@ ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist) {
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0900：ncclGraphHelperDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：auto res = comm->graphHelperResources;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(comm->graphHelperThread && res)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：pthread_mutex_lock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     5. 调用 / 计算 / 写入：res->threadState = ThreadStop;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：pthread_cond_signal(&res->threadCond);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     7. 调用 / 计算 / 写入：pthread_mutex_unlock(&res->threadLock);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     8. 调用 / 计算 / 写入：pthread_join(comm->graphHelperThread, NULL);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 9. 条件判断：(res)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   10. 真分支：；仅条件为真执行以下子项。
+ *     11. 调用 / 计算 / 写入：free(res);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     12. 调用 / 计算 / 写入：res = NULL;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0900
+ */
 /* 中文逐项-函数 F0900：ncclGraphHelperDestroy
  * 用途与位置：停止并等待图 IPC 清理辅助线程，回收其锁、队列与同步对象。
  * 参数 comm（ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -1913,6 +2648,31 @@ static ncclResult_t ncclGraphHelperDestroy(ncclComm* comm) {
 /* 中文导读：
  * 销毁 communicator 的完整生命周期入口之一：协调后台服务与图辅助资源，再释放通道及主机/设备状态。
  * 做资源统计时要区分单次操作完成、连接仍驻留和 communicator 最终销毁，三者释放范围不同。
+ */
+/* 中文内部逻辑 F0901：commDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(comm->rank == -1 || comm->nRanks <= 0 || comm->cudaDev == -1 || comm->busId == -1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：WARN("comm %p has already been destroyed", comm);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     4. 函数返回：return ncclInvalidArgument;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int savedDevice;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 调用 / 计算 / 写入：CUDACHECK(cudaGetDevice(&savedDevice));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 7. 准备局部状态：int commDevice = comm->cudaDev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 8. 条件判断：(savedDevice != commDevice)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   9. 真分支：；仅条件为真执行以下子项。
+ *     10. 调用 / 计算 / 写入：CUDACHECK(cudaSetDevice(commDevice));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 11. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "Destroying comm %p rank %d abortFlag %d fatalError %d", comm, comm->rank, *comm->abortFlag, comm->fatalError);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 12. 调用 / 计算 / 写入：CUDACHECK(cudaStreamSynchronize(comm->groupStream));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 13. 调用 / 计算 / 写入：ncclDestroyQueueInfo(comm->enqueueInfo);；释放图/普通提交持有的队列，把不能在图析构回调直接关闭的 CUDA IPC 句柄转交辅助线程。
+ * 14. 编译期分支/指令：#if CUDART_VERSION >= 11030；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   15. 调用 / 计算 / 写入：NCCLCHECK(ncclGraphHelperDestroy(comm));；失败时可能提前return，成功才继续；停止并等待图 IPC 清理辅助线程，回收其锁、队列与同步对象。
+ * 16. 调用 / 计算 / 写入：INFO(NCCL_COLL, "Created %d queue info, destroyed %d", comm->nQueueInfoCreated, comm->nQueueInfoDestroyed);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 17. 调用 / 计算 / 写入：NCCLCHECK(commFree(comm));；失败时可能提前return，成功才继续；回收 communicator 分配的 channel、拓扑、事件、队列、映射等对象，按依赖顺序释放。
+ * 18. 条件判断：(savedDevice != commDevice)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   19. 真分支：；仅条件为真执行以下子项。
+ *     20. 调用 / 计算 / 写入：CUDACHECK(cudaSetDevice(savedDevice));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 21. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0901
  */
 /* 中文逐项-函数 F0901：commDestroy
  * 用途与位置：协调 Proxy 和图辅助资源停止，再进入 communicator 总资源释放。
@@ -1965,6 +2725,20 @@ static ncclResult_t commDestroy(ncclComm_t comm) {
 }
 
 NCCL_API(ncclResult_t, ncclCommDestroy, ncclComm_t comm);
+/* 中文内部逻辑 F0902：ncclCommDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 条件判断：(comm == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int rank = comm->rank, nranks = comm->nRanks, cudaDev = comm->cudaDev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int64_t busId = comm->busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "comm %p rank %d nRanks %d cudaDev %d busId %lx", comm, rank, nranks, cudaDev, busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 调用 / 计算 / 写入：NCCLCHECK(commDestroy(comm));；失败时可能提前return，成功才继续；协调 Proxy 和图辅助资源停止，再进入 communicator 总资源释放。
+ * 9. 调用 / 计算 / 写入：INFO(NCCL_INIT,"comm %p rank %d nranks %d cudaDev %d busId %lx - Destroy COMPLETE", comm, rank, nranks, cudaDev, busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0902
+ */
 /* 中文逐项-函数 F0902：ncclCommDestroy
  * 用途与位置：正常销毁公开 communicator 句柄，按本版生命周期要求回收长期通信对象。
  * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -2006,6 +2780,21 @@ NCCL_API(ncclResult_t, ncclCommAbort, ncclComm_t comm);
  * 应用正常路径先确保相关 CUDA 工作生命周期正确，再 Destroy；异步错误可用 GetAsyncError 查询。
  * 本版本不包含后来版本的 InitRankConfig/Split 等 API，不应套用新版对象生命周期。
  */
+/* 中文内部逻辑 F0903：ncclCommAbort
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 条件判断：(comm == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 准备局部状态：int rank = comm->rank, nranks = comm->nRanks, cudaDev = comm->cudaDev;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int64_t busId = comm->busId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：TRACE(NCCL_INIT, "comm %p rank %d nRanks %d cudaDev %d busId %lx", comm, rank, nranks, cudaDev, busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 8. 调用 / 计算 / 写入：*comm->abortFlag = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 调用 / 计算 / 写入：NCCLCHECK(commDestroy(comm));；失败时可能提前return，成功才继续；协调 Proxy 和图辅助资源停止，再进入 communicator 总资源释放。
+ * 10. 调用 / 计算 / 写入：INFO(NCCL_INIT,"comm %p rank %d nranks %d cudaDev %d busId %lx - Abort COMPLETE", comm, rank, nranks, cudaDev, busId);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 11. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0903
+ */
 /* 中文逐项-函数 F0903：ncclCommAbort
  * 用途与位置：设置共享中止标志并执行异常清理，帮助 GPU/Proxy/socket 等待退出。
  * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -2044,6 +2833,25 @@ ncclResult_t ncclCommAbort(ncclComm_t comm) {
 }
 
 NCCL_API(const char*, ncclGetErrorString, ncclResult_t code);
+/* 中文内部逻辑 F0904：ncclGetErrorString
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 多路分派：(code)；按case匹配进入；没有break/return/goto时可能贯穿下一个case。
+ *   2. case / default：ncclSuccess；从匹配项进入，随后依源码直到break等跳转。
+ *     3. 函数返回：return "no error";；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   4. case / default：ncclUnhandledCudaError；从匹配项进入，随后依源码直到break等跳转。
+ *     5. 函数返回：return "unhandled cuda error";；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   6. case / default：ncclSystemError；从匹配项进入，随后依源码直到break等跳转。
+ *     7. 函数返回：return "unhandled system error";；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   8. case / default：ncclInternalError；从匹配项进入，随后依源码直到break等跳转。
+ *     9. 函数返回：return "internal error";；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   10. case / default：ncclInvalidArgument；从匹配项进入，随后依源码直到break等跳转。
+ *     11. 函数返回：return "invalid argument";；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   12. case / default：ncclInvalidUsage；从匹配项进入，随后依源码直到break等跳转。
+ *     13. 函数返回：return "invalid usage";；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   14. case / default：default；从匹配项进入，随后依源码直到break等跳转。
+ *     15. 函数返回：return "unknown result code";；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0904
+ */
 /* 中文逐项-函数 F0904：ncclGetErrorString
  * 用途与位置：把 NCCL 结果枚举映射成稳定可读字符串，不改变 communicator 的执行状态。
  * 参数 code（ncclResult_t code）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -2065,6 +2873,14 @@ const char* ncclGetErrorString(ncclResult_t code) {
 }
 
 NCCL_API(ncclResult_t, ncclCommGetAsyncError, ncclComm_t comm, ncclResult_t *asyncError);
+/* 中文内部逻辑 F0905：ncclCommGetAsyncError
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(comm, "ncclGetAsyncError", "comm"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(asyncError, "ncclGetAsyncError", "asyncError"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 3. 调用 / 计算 / 写入：*asyncError = comm->fatalError;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0905
+ */
 /* 中文逐项-函数 F0905：ncclCommGetAsyncError
  * 用途与位置：查询 communicator 已记录的异步失败，使应用可在提交成功后检测后台错误。
  * 参数 comm（ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -2081,6 +2897,15 @@ ncclResult_t ncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError) {
 }
 
 NCCL_API(ncclResult_t, ncclCommCount, const ncclComm_t comm, int* count);
+/* 中文内部逻辑 F0906：ncclCommCount
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(comm, "CommCount", "comm"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(count, "CommCount", "count"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 4. 调用 / 计算 / 写入：*count = comm->nRanks;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0906
+ */
 /* 中文逐项-函数 F0906：ncclCommCount
  * 用途与位置：读取通信组 rank 总数到用户输出参数，返回的是逻辑参与规模。
  * 参数 comm（const ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -2098,6 +2923,15 @@ ncclResult_t ncclCommCount(const ncclComm_t comm, int* count) {
 }
 
 NCCL_API(ncclResult_t, ncclCommCuDevice, const ncclComm_t comm, int* devid);
+/* 中文内部逻辑 F0907：ncclCommCuDevice
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(comm, "CommCuDevice", "comm"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(devid, "CommCuDevice", "devid"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 4. 调用 / 计算 / 写入：*devid = comm->cudaDev;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0907
+ */
 /* 中文逐项-函数 F0907：ncclCommCuDevice
  * 用途与位置：查询该 communicator 所属本地 CUDA 设备序号，不能把它等同于全局 rank。
  * 参数 comm（const ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -2115,6 +2949,15 @@ ncclResult_t ncclCommCuDevice(const ncclComm_t comm, int* devid) {
 }
 
 NCCL_API(ncclResult_t, ncclCommUserRank, const ncclComm_t comm, int* rank);
+/* 中文内部逻辑 F0908：ncclCommUserRank
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(comm, "CommUserRank", "comm"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(PtrCheck(rank, "CommUserRank", "rank"));；失败时可能提前return，成功才继续；检查必要的指针参数非空，失败时报告具体 API/参数名称。
+ * 4. 调用 / 计算 / 写入：*rank = comm->rank;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__init_cc.md#f0908
+ */
 /* 中文逐项-函数 F0908：ncclCommUserRank
  * 用途与位置：查询本 communicator 当前对象对应的用户 rank 编号。
  * 参数 comm（const ncclComm_t comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。

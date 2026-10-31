@@ -13,6 +13,13 @@ NCCL_API(ncclResult_t, ncclReduce, const void* sendbuff, void* recvbuff, size_t 
  * Reduce 汇总各 rank 的输入，但最终结果只要求在 root 的接收缓冲有效。
  * 数据归约由设备原语执行；API 层的 root 语义与 P2P 把同一字段用作 peer 的语义不同。
  */
+/* 中文内部逻辑 F0377：ncclReduce
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 2. 准备局部状态：struct ncclInfo info = { ncclFuncReduce, "Reduce", sendbuff, recvbuff, count, datatype, op, root, comm, stream, REDUCE_CHUNKSTEPS, REDUCE_SLICESTEPS };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 函数返回：return ncclEnqueueCheck(&info);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__reduce_cc.md#f0377
+ */
 /* 中文逐项-函数 F0377：ncclReduce
  * 用途与位置：沿选定通信路径把全部贡献归约到 root，其他 rank 不保证持有完整结果。
  * 参数 sendbuff（const void* sendbuff）：输入数据地址，偏移单位由实际指针元素类型和当前 API 的归一化结果决定。

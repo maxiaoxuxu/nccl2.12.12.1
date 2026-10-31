@@ -697,6 +697,20 @@ struct ncclComm {
 // communicator memory address. Used to catch bugs so that integer handles
 // associated with this communicator won't collide with handles of other
 // communicatrs. This function is its own inverse.
+/* 中文内部逻辑 F0627：ncclUserRedOpMangle
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(int(op) < int(ncclNumOps))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return op;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 4. 准备局部状态：uint64_t h = reinterpret_cast<uint64_t>(comm);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：h ^= h >> 32;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：h *= 0x9e3779b97f4a7c13u;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：h >>= 32;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：h &= int(ncclMaxRedOp);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 准备局部状态：int op1 = int(h) ^ int(op);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 函数返回：return op1 < int(ncclNumOps) ? op : ncclRedOp_t(op1);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__comm_h.md#f0627
+ */
 /* 中文逐项-函数 F0627：ncclUserRedOpMangle
  * 用途与位置：用 communicator 地址导出的可逆异或扰动用户操作句柄，减少把别的 comm 句柄误用于本 comm 的风险。
  * 参数 comm（ncclComm *comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。

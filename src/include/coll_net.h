@@ -22,6 +22,11 @@ extern ncclCollNet_t* ncclCollNet;
 typedef char collNetHandle_t[NCCL_NET_HANDLE_MAXSIZE];
 
 // Translation to external API
+/* 中文内部逻辑 F0613：collNetName
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclCollNet->name;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0613
+ */
 /* 中文逐项-函数 F0613：collNetName
  * 用途与位置：读取已选网络后端名字；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -30,6 +35,12 @@ typedef char collNetHandle_t[NCCL_NET_HANDLE_MAXSIZE];
  * 源码返回表达式：return ncclCollNet->name;。CHECK类宏还可能提前返回/跳转。
  */
 static const char* collNetName() { return ncclCollNet->name; }
+/* 中文内部逻辑 F0614：collNetDevices
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->devices(ndev));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0614
+ */
 /* 中文逐项-函数 F0614：collNetDevices
  * 用途与位置：查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
@@ -38,6 +49,12 @@ static const char* collNetName() { return ncclCollNet->name; }
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetDevices(int* ndev) { NCCLCHECK(ncclCollNet->devices(ndev)); return ncclSuccess; }
+/* 中文内部逻辑 F0615：collNetGetProperties
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->getProperties(dev, props));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0615
+ */
 /* 中文逐项-函数 F0615：collNetGetProperties
  * 用途与位置：读取设备拓扑/速度/指针/接收能力属性；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -47,6 +64,12 @@ static ncclResult_t collNetDevices(int* ndev) { NCCLCHECK(ncclCollNet->devices(n
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetGetProperties(int dev, ncclNetProperties_t* props) { NCCLCHECK(ncclCollNet->getProperties(dev, props)); return ncclSuccess; }
+/* 中文内部逻辑 F0616：collNetListen
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->listen(dev, handle, listenComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0616
+ */
 /* 中文逐项-函数 F0616：collNetListen
  * 用途与位置：创建接收监听并导出连接句柄；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 dev（int dev）：当前设备在相关库/拓扑表内的下标，NVML编号、CUDA ordinal和NET编号不可直接互换。
@@ -57,6 +80,12 @@ static ncclResult_t collNetGetProperties(int dev, ncclNetProperties_t* props) { 
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetListen(int dev, void* handle, void** listenComm) { NCCLCHECK(ncclCollNet->listen(dev, handle, listenComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0617：collNetConnect
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->connect(handles, nranks, rank, listenComm, collComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0617
+ */
 /* 中文逐项-函数 F0617：collNetConnect
  * 用途与位置：推进发送端连接建立；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 handles（void* handles[]）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -69,6 +98,12 @@ static ncclResult_t collNetListen(int dev, void* handle, void** listenComm) { NC
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetConnect(void* handles[], int nranks, int rank, void* listenComm, void** collComm) { NCCLCHECK(ncclCollNet->connect(handles, nranks, rank, listenComm, collComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0618：collNetReduceSupport
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->reduceSupport(dataType, redOp, supported));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0618
+ */
 /* 中文逐项-函数 F0618：collNetReduceSupport
  * 用途与位置：查询某数据类型和归约操作能否在网络内完成；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 dataType（ncclDataType_t dataType）：实际元素类型枚举，决定每元素字节数与网络/设备归约支持组合。
@@ -79,6 +114,12 @@ static ncclResult_t collNetConnect(void* handles[], int nranks, int rank, void* 
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetReduceSupport(ncclDataType_t dataType, ncclRedOp_t redOp, int* supported) { NCCLCHECK(ncclCollNet->reduceSupport(dataType, redOp, supported)); return ncclSuccess; }
+/* 中文内部逻辑 F0619：collNetRegMr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->regMr(comm, data, size, type, mhandle));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0619
+ */
 /* 中文逐项-函数 F0619：collNetRegMr
  * 用途与位置：注册后续网络要访问的内存并返回后端句柄；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 comm（void* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -91,6 +132,12 @@ static ncclResult_t collNetReduceSupport(ncclDataType_t dataType, ncclRedOp_t re
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetRegMr(void* comm, void* data, int size, int type, void** mhandle) { NCCLCHECK(ncclCollNet->regMr(comm, data, size, type, mhandle)); return ncclSuccess; }
+/* 中文内部逻辑 F0620：collNetDeregMr
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->deregMr(comm, mhandle));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0620
+ */
 /* 中文逐项-函数 F0620：collNetDeregMr
  * 用途与位置：解除对应后端内存注册引用；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 comm（void* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -100,6 +147,12 @@ static ncclResult_t collNetRegMr(void* comm, void* data, int size, int type, voi
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetDeregMr(void* comm, void* mhandle) { NCCLCHECK(ncclCollNet->deregMr(comm, mhandle)); return ncclSuccess; }
+/* 中文内部逻辑 F0621：collNetIallreduce
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->iallreduce(collComm, sendData, recvData, count, dataType, redOp, sendMhandle, recvMhandle, request));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0621
+ */
 /* 中文逐项-函数 F0621：collNetIallreduce
  * 用途与位置：提交网络集合归约请求；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 collComm（void* collComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
@@ -117,6 +170,12 @@ static ncclResult_t collNetDeregMr(void* comm, void* mhandle) { NCCLCHECK(ncclCo
  */
 static ncclResult_t collNetIallreduce(void* collComm, void* sendData, void* recvData, int count, ncclDataType_t dataType, ncclRedOp_t redOp, void* sendMhandle, void* recvMhandle,  void** request) {
   NCCLCHECK(ncclCollNet->iallreduce(collComm, sendData, recvData, count, dataType, redOp, sendMhandle, recvMhandle, request)); return ncclSuccess; }
+/* 中文内部逻辑 F0622：collNetIflush
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->iflush(collComm, data, size, mhandle, request));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0622
+ */
 /* 中文逐项-函数 F0622：collNetIflush
  * 用途与位置：提交接收缓冲可见性刷新请求；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 collComm（void* collComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
@@ -129,6 +188,12 @@ static ncclResult_t collNetIallreduce(void* collComm, void* sendData, void* recv
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetIflush(void* collComm, void* data, int size, void* mhandle, void** request) { NCCLCHECK(ncclCollNet->iflush(collComm, data, size, mhandle, request)); return ncclSuccess; }
+/* 中文内部逻辑 F0623：collNetTest
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->test(request, done, size));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0623
+ */
 /* 中文逐项-函数 F0623：collNetTest
  * 用途与位置：查询并推进异步请求完成；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 request（void* request）：本次异步网络请求的句柄/状态，成功提交不等于请求已经完成。
@@ -139,6 +204,12 @@ static ncclResult_t collNetIflush(void* collComm, void* data, int size, void* mh
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetTest(void* request, int* done, int* size) { NCCLCHECK(ncclCollNet->test(request, done, size)); return ncclSuccess; }
+/* 中文内部逻辑 F0624：collNetCloseColl
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->closeColl(collComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0624
+ */
 /* 中文逐项-函数 F0624：collNetCloseColl
  * 用途与位置：关闭集合网络连接；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 collComm（void* collComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
@@ -147,6 +218,12 @@ static ncclResult_t collNetTest(void* request, int* done, int* size) { NCCLCHECK
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 static ncclResult_t collNetCloseColl(void* collComm) { NCCLCHECK(ncclCollNet->closeColl(collComm)); return ncclSuccess; }
+/* 中文内部逻辑 F0625：collNetCloseListen
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：NCCLCHECK(ncclCollNet->closeListen(listenComm));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0625
+ */
 /* 中文逐项-函数 F0625：collNetCloseListen
  * 用途与位置：关闭监听对象；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 参数 listenComm（void* listenComm）：对应库返回的不透明对象/连接句柄，必须使用匹配的关闭或释放回调。
@@ -156,6 +233,11 @@ static ncclResult_t collNetCloseColl(void* collComm) { NCCLCHECK(ncclCollNet->cl
  */
 static ncclResult_t collNetCloseListen(void* listenComm) { NCCLCHECK(ncclCollNet->closeListen(listenComm)); return ncclSuccess; }
 
+/* 中文内部逻辑 F0626：collNetSupport
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclCollNet != nullptr ? 1 : 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__coll_net_h.md#f0626
+ */
 /* 中文逐项-函数 F0626：collNetSupport
  * 用途与位置：判断已选 CollNet 接口是否存在且能使用；本层通过函数指针转交已选后端，不额外复制整个用户张量。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。

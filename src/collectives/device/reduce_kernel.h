@@ -21,13 +21,22 @@
  */
 template<typename T>
 struct FuncNull {
-  __device__ /* 中文逐项-函数 F0264：FuncNull
+  __device__ /* 中文内部逻辑 F0264：FuncNull
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0264
+ */
+/* 中文逐项-函数 F0264：FuncNull
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncNull(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0265：operator()
+  __device__ /* 中文内部逻辑 F0265：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return 0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0265
+ */
+/* 中文逐项-函数 F0265：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const T y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -50,13 +59,22 @@ template<typename T>
  * preOp/postOp 把每个原始输入的预处理与最终输出的后处理分开，防止每个中间跳重复处理。
  */
 struct FuncSum {
-  __device__ /* 中文逐项-函数 F0266：FuncSum
+  __device__ /* 中文内部逻辑 F0266：FuncSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0266
+ */
+/* 中文逐项-函数 F0266：FuncSum
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncSum(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0267：operator()
+  __device__ /* 中文内部逻辑 F0267：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x + y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0267
+ */
+/* 中文逐项-函数 F0267：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const T y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -73,13 +91,22 @@ struct FuncSum {
  */
 template<typename T>
 struct FuncProd {
-  __device__ /* 中文逐项-函数 F0268：FuncProd
+  __device__ /* 中文内部逻辑 F0268：FuncProd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0268
+ */
+/* 中文逐项-函数 F0268：FuncProd
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncProd(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0269：operator()
+  __device__ /* 中文内部逻辑 F0269：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x * y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0269
+ */
+/* 中文逐项-函数 F0269：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const T y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -96,13 +123,22 @@ struct FuncProd {
  */
 template<typename T>
 struct FuncMax {
-  __device__ /* 中文逐项-函数 F0270：FuncMax
+  __device__ /* 中文内部逻辑 F0270：FuncMax
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0270
+ */
+/* 中文逐项-函数 F0270：FuncMax
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMax(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0271：operator()
+  __device__ /* 中文内部逻辑 F0271：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x < y) ? y : x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0271
+ */
+/* 中文逐项-函数 F0271：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const T y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -119,13 +155,22 @@ struct FuncMax {
  */
 template<typename T>
 struct FuncMin {
-  __device__ /* 中文逐项-函数 F0272：FuncMin
+  __device__ /* 中文内部逻辑 F0272：FuncMin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0272
+ */
+/* 中文逐项-函数 F0272：FuncMin
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMin(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0273：operator()
+  __device__ /* 中文内部逻辑 F0273：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x < y) ? x : y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0273
+ */
+/* 中文逐项-函数 F0273：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const T y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -152,6 +197,11 @@ struct FuncTraits { // generic implementation for FuncSum,Prod,Min,Max
  */
   static constexpr bool IsPostOpIdentity = true;
 
+/* 中文内部逻辑 F0274：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0274
+ */
 /* 中文逐项-函数 F0274：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 <未命名参数>（Fn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -162,6 +212,11 @@ struct FuncTraits { // generic implementation for FuncSum,Prod,Min,Max
  */
   template<typename T>
   __device__ static T preOp(Fn, T x) { return x; }
+/* 中文内部逻辑 F0275：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0275
+ */
 /* 中文逐项-函数 F0275：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 <未命名参数>（Fn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -184,6 +239,17 @@ struct FuncTraits { // generic implementation for FuncSum,Prod,Min,Max
  * 下方预处理条件决定该定义何时有效；空替换体常作头文件保护/能力开关，数值/字符串/类型别名需按实际替换内容解释。
  */
 #define MASK1 0xff00ff00
+/* 中文内部逻辑 F0276：addChar4
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const uint32_t x0 = x & MASK0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：const uint32_t x1 = x & MASK1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：const uint32_t y0 = y & MASK0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：const uint32_t y1 = y & MASK1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：const uint32_t r0 = (x0+y0);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：const uint32_t r1 = (x1+y1);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 函数返回：return (r0 & MASK0) | (r1 & MASK1);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0276
+ */
 /* 中文逐项-函数 F0276：addChar4
  * 用途与位置：用位掩码分别处理一个寄存器中的四个 8 位加法，避免跨字节进位污染其他元素。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -232,13 +298,27 @@ static __device__ uint32_t addChar4(const uint32_t x, const uint32_t y) {
  */
 template<>
 struct FuncSum<int8_t> {
-  __device__ /* 中文逐项-函数 F0277：FuncSum
+  __device__ /* 中文内部逻辑 F0277：FuncSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0277
+ */
+/* 中文逐项-函数 F0277：FuncSum
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncSum(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0278：operator()
+  __device__ /* 中文内部逻辑 F0278：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if (__CUDA_ARCH__ >= 300) && (__CUDA_ARCH__ < 500)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：int32_t rv, z=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 调用 / 计算 / 写入：asm("vadd4.s32.s32.s32 %0, %1, %2, %3;" : "=r"(rv) : "r"(x), "r"(y), "r"(z));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   4. 函数返回：return rv;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   5. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     6. 函数返回：return addChar4(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0278
+ */
+/* 中文逐项-函数 F0278：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -261,7 +341,12 @@ struct FuncSum<int8_t> {
     return addChar4(x, y);
 #endif
   }
-  __device__ /* 中文逐项-函数 F0279：operator()
+  __device__ /* 中文内部逻辑 F0279：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x+y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0279
+ */
+/* 中文逐项-函数 F0279：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const int8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const int8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -277,13 +362,27 @@ struct FuncSum<int8_t> {
  */
 template<>
 struct FuncSum<uint8_t> {
-  __device__ /* 中文逐项-函数 F0280：FuncSum
+  __device__ /* 中文内部逻辑 F0280：FuncSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0280
+ */
+/* 中文逐项-函数 F0280：FuncSum
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncSum(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0281：operator()
+  __device__ /* 中文内部逻辑 F0281：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if (__CUDA_ARCH__ >= 300) && (__CUDA_ARCH__ < 500)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：int32_t rv, z=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 调用 / 计算 / 写入：asm("vadd4.u32.u32.u32 %0, %1, %2, %3;" : "=r"(rv) : "r"(x), "r"(y), "r"(z));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   4. 函数返回：return rv;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   5. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     6. 函数返回：return addChar4(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0281
+ */
+/* 中文逐项-函数 F0281：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -306,7 +405,12 @@ struct FuncSum<uint8_t> {
     return addChar4(x, y);
 #endif
   }
-  __device__ /* 中文逐项-函数 F0282：operator()
+  __device__ /* 中文内部逻辑 F0282：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x+y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0282
+ */
+/* 中文逐项-函数 F0282：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -318,6 +422,19 @@ struct FuncSum<uint8_t> {
   }
 };
 
+/* 中文内部逻辑 F0283：mulChar4
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 源码语法片段：union converter { uint32_t storage; char4 a; }；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 2. 准备局部状态：converter cx, cy, cr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 调用 / 计算 / 写入：cx.storage = x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：cy.storage = y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：cr.a.x = cx.a.x * cy.a.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 调用 / 计算 / 写入：cr.a.y = cx.a.y * cy.a.y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 7. 调用 / 计算 / 写入：cr.a.z = cx.a.z * cy.a.z;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 调用 / 计算 / 写入：cr.a.w = cx.a.w * cy.a.w;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 9. 函数返回：return cr.storage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0283
+ */
 /* 中文逐项-函数 F0283：mulChar4
  * 用途与位置：对寄存器中四个字节分别执行乘法并重组结果，用于 int8/uint8 向量化归约。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -361,13 +478,22 @@ static __device__ uint32_t mulChar4(const uint32_t x, const uint32_t y) {
  */
 template<>
 struct FuncProd<int8_t> {
-  __device__ /* 中文逐项-函数 F0284：FuncProd
+  __device__ /* 中文内部逻辑 F0284：FuncProd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0284
+ */
+/* 中文逐项-函数 F0284：FuncProd
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncProd(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0285：operator()
+  __device__ /* 中文内部逻辑 F0285：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return mulChar4(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0285
+ */
+/* 中文逐项-函数 F0285：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -377,7 +503,12 @@ struct FuncProd<int8_t> {
  */uint32_t operator()(const uint32_t x, const uint32_t y) const {
     return mulChar4(x, y);
   }
-  __device__ /* 中文逐项-函数 F0286：operator()
+  __device__ /* 中文内部逻辑 F0286：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x*y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0286
+ */
+/* 中文逐项-函数 F0286：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const int8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const int8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -393,13 +524,22 @@ struct FuncProd<int8_t> {
  */
 template<>
 struct FuncProd<uint8_t> {
-  __device__ /* 中文逐项-函数 F0287：FuncProd
+  __device__ /* 中文内部逻辑 F0287：FuncProd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0287
+ */
+/* 中文逐项-函数 F0287：FuncProd
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncProd(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0288：operator()
+  __device__ /* 中文内部逻辑 F0288：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return mulChar4(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0288
+ */
+/* 中文逐项-函数 F0288：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -409,7 +549,12 @@ struct FuncProd<uint8_t> {
  */uint32_t operator()(const uint32_t x, const uint32_t y) const {
     return mulChar4(x, y);
   }
-  __device__ /* 中文逐项-函数 F0289：operator()
+  __device__ /* 中文内部逻辑 F0289：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x*y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0289
+ */
+/* 中文逐项-函数 F0289：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -427,7 +572,11 @@ struct FuncProd<uint8_t> {
  */
 template<>
 struct FuncMax<int8_t> {
-  __device__ /* 中文逐项-函数 F0290：FuncMax
+  __device__ /* 中文内部逻辑 F0290：FuncMax
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0290
+ */
+/* 中文逐项-函数 F0290：FuncMax
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -443,7 +592,24 @@ struct FuncMax<int8_t> {
  */uint32_t storage; /* 中文逐项-变量 V0759：a
  * a（char4；成员 FuncMax<int8_t>::converter）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
  */char4 a; };
-  __device__ /* 中文逐项-函数 F0291：operator()
+  __device__ /* 中文内部逻辑 F0291：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if (__CUDA_ARCH__ >= 300) && (__CUDA_ARCH__ < 500)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：int32_t rv, z=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 调用 / 计算 / 写入：asm("vmax4.s32.s32.s32 %0, %1, %2, %3;" : "=r"(rv) : "r"(x), "r"(y), "r"(z));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   4. 函数返回：return rv;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   5. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     6. 准备局部状态：converter cx, cy, cr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 调用 / 计算 / 写入：cx.storage = x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：cy.storage = y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 调用 / 计算 / 写入：cr.a.x = max(cx.a.x, cy.a.x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 调用 / 计算 / 写入：cr.a.y = max(cx.a.y, cy.a.y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 调用 / 计算 / 写入：cr.a.z = max(cx.a.z, cy.a.z);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     12. 调用 / 计算 / 写入：cr.a.w = max(cx.a.w, cy.a.w);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 函数返回：return cr.storage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0291
+ */
+/* 中文逐项-函数 F0291：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -481,7 +647,12 @@ struct FuncMax<int8_t> {
     return cr.storage;
 #endif
   }
-  __device__ /* 中文逐项-函数 F0292：operator()
+  __device__ /* 中文内部逻辑 F0292：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x>y) ? x : y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0292
+ */
+/* 中文逐项-函数 F0292：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const int8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const int8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -498,7 +669,11 @@ struct FuncMax<int8_t> {
  */
 template<>
 struct FuncMax<uint8_t> {
-  __device__ /* 中文逐项-函数 F0293：FuncMax
+  __device__ /* 中文内部逻辑 F0293：FuncMax
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0293
+ */
+/* 中文逐项-函数 F0293：FuncMax
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -514,7 +689,24 @@ struct FuncMax<uint8_t> {
  */uint32_t storage; /* 中文逐项-变量 V0763：a
  * a（uchar4；成员 FuncMax<uint8_t>::converter）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
  */uchar4 a; };
-  __device__ /* 中文逐项-函数 F0294：operator()
+  __device__ /* 中文内部逻辑 F0294：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if (__CUDA_ARCH__ >= 300) && (__CUDA_ARCH__ < 500)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：int32_t rv, z=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 调用 / 计算 / 写入：asm("vmax4.u32.u32.u32 %0, %1, %2, %3;" : "=r"(rv) : "r"(x), "r"(y), "r"(z));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   4. 函数返回：return rv;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   5. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     6. 准备局部状态：converter cx, cy, cr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 调用 / 计算 / 写入：cx.storage = x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：cy.storage = y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 调用 / 计算 / 写入：cr.a.x = max(cx.a.x, cy.a.x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     10. 调用 / 计算 / 写入：cr.a.y = max(cx.a.y, cy.a.y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     11. 调用 / 计算 / 写入：cr.a.z = max(cx.a.z, cy.a.z);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     12. 调用 / 计算 / 写入：cr.a.w = max(cx.a.w, cy.a.w);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     13. 函数返回：return cr.storage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0294
+ */
+/* 中文逐项-函数 F0294：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -552,7 +744,12 @@ struct FuncMax<uint8_t> {
     return cr.storage;
 #endif
   }
-  __device__ /* 中文逐项-函数 F0295：operator()
+  __device__ /* 中文内部逻辑 F0295：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x>y) ? x : y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0295
+ */
+/* 中文逐项-函数 F0295：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -570,7 +767,11 @@ struct FuncMax<uint8_t> {
  */
 template<>
 struct FuncMin<int8_t> {
-  __device__ /* 中文逐项-函数 F0296：FuncMin
+  __device__ /* 中文内部逻辑 F0296：FuncMin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0296
+ */
+/* 中文逐项-函数 F0296：FuncMin
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -586,7 +787,24 @@ struct FuncMin<int8_t> {
  */uint32_t storage; /* 中文逐项-变量 V0767：a
  * a（char4；成员 FuncMin<int8_t>::converter）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
  */char4 a; };
-  __device__ /* 中文逐项-函数 F0297：operator()
+  __device__ /* 中文内部逻辑 F0297：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if (__CUDA_ARCH__ >= 300) && (__CUDA_ARCH__ < 500)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：int32_t rv, z=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 调用 / 计算 / 写入：asm("vmin4.s32.s32.s32 %0, %1, %2, %3;" : "=r"(rv) : "r"(x), "r"(y), "r"(z));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   4. 函数返回：return rv;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   5. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     6. 准备局部状态：converter cx, cy, cr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 调用 / 计算 / 写入：cx.storage = x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：cy.storage = y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 调用 / 计算 / 写入：cr.a.x = min(cx.a.x, cy.a.x);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     10. 调用 / 计算 / 写入：cr.a.y = min(cx.a.y, cy.a.y);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     11. 调用 / 计算 / 写入：cr.a.z = min(cx.a.z, cy.a.z);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     12. 调用 / 计算 / 写入：cr.a.w = min(cx.a.w, cy.a.w);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     13. 函数返回：return cr.storage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0297
+ */
+/* 中文逐项-函数 F0297：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -624,7 +842,12 @@ struct FuncMin<int8_t> {
     return cr.storage;
 #endif
   }
-  __device__ /* 中文逐项-函数 F0298：operator()
+  __device__ /* 中文内部逻辑 F0298：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x<y) ? x : y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0298
+ */
+/* 中文逐项-函数 F0298：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const int8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const int8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -641,7 +864,11 @@ struct FuncMin<int8_t> {
  */
 template<>
 struct FuncMin<uint8_t> {
-  __device__ /* 中文逐项-函数 F0299：FuncMin
+  __device__ /* 中文内部逻辑 F0299：FuncMin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0299
+ */
+/* 中文逐项-函数 F0299：FuncMin
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -657,7 +884,24 @@ struct FuncMin<uint8_t> {
  */uint32_t storage; /* 中文逐项-变量 V0771：a
  * a（uchar4；成员 FuncMin<uint8_t>::converter）：当前循环/索引/算术分量的局部值，初始化和下方条件给出实际取值范围，不代表固定全局编号。
  */uchar4 a; };
-  __device__ /* 中文逐项-函数 F0300：operator()
+  __device__ /* 中文内部逻辑 F0300：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if (__CUDA_ARCH__ >= 300) && (__CUDA_ARCH__ < 500)；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：int32_t rv, z=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 调用 / 计算 / 写入：asm("vmin4.u32.u32.u32 %0, %1, %2, %3;" : "=r"(rv) : "r"(x), "r"(y), "r"(z));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   4. 函数返回：return rv;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   5. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     6. 准备局部状态：converter cx, cy, cr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 调用 / 计算 / 写入：cx.storage = x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：cy.storage = y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 调用 / 计算 / 写入：cr.a.x = min(cx.a.x, cy.a.x);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     10. 调用 / 计算 / 写入：cr.a.y = min(cx.a.y, cy.a.y);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     11. 调用 / 计算 / 写入：cr.a.z = min(cx.a.z, cy.a.z);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     12. 调用 / 计算 / 写入：cr.a.w = min(cx.a.w, cy.a.w);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *     13. 函数返回：return cr.storage;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0300
+ */
+/* 中文逐项-函数 F0300：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint32_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint32_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -695,7 +939,12 @@ struct FuncMin<uint8_t> {
     return cr.storage;
 #endif
   }
-  __device__ /* 中文逐项-函数 F0301：operator()
+  __device__ /* 中文内部逻辑 F0301：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return (x<y) ? x : y;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0301
+ */
+/* 中文逐项-函数 F0301：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const uint8_t x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const uint8_t y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -712,13 +961,30 @@ struct FuncMin<uint8_t> {
  */
 template<>
 struct FuncSum<half> {
-  __device__ /* 中文逐项-函数 F0302：FuncSum
+  __device__ /* 中文内部逻辑 F0302：FuncSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0302
+ */
+/* 中文逐项-函数 F0302：FuncSum
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncSum(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0303：operator()
+  __device__ /* 中文内部逻辑 F0303：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 530 && __CUDA_ARCH__ != 610；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hadd2(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float2 fx, fy, fr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fx = __half22float2(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fy = __half22float2(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fr.x = fx.x + fy.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：fr.y = fx.y + fy.y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return __float22half2_rn(fr);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0303
+ */
+/* 中文逐项-函数 F0303：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half2 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -745,7 +1011,15 @@ struct FuncSum<half> {
     return __float22half2_rn(fr);
 #endif
   }
-  __device__ /* 中文逐项-函数 F0304：operator()
+  __device__ /* 中文内部逻辑 F0304：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 530 && __CUDA_ARCH__ != 610；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hadd(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 函数返回：return __float2half( __half2float(x) + __half2float(y) );；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0304
+ */
+/* 中文逐项-函数 F0304：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -767,13 +1041,30 @@ struct FuncSum<half> {
  */
 template<>
 struct FuncSum<__nv_bfloat16> {
-  __device__ /* 中文逐项-函数 F0305：FuncSum
+  __device__ /* 中文内部逻辑 F0305：FuncSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0305
+ */
+/* 中文逐项-函数 F0305：FuncSum
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncSum(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0306：operator()
+  __device__ /* 中文内部逻辑 F0306：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hadd2(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float fxl, fxh, fyl, fyh;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fxl = __low2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fxh = __high2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fyl = __low2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：fyh = __high2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return __floats2bfloat162_rn(fxl + fyl, fxh + fyh);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0306
+ */
+/* 中文逐项-函数 F0306：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat162 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -802,7 +1093,15 @@ struct FuncSum<__nv_bfloat16> {
     return __floats2bfloat162_rn(fxl + fyl, fxh + fyh);
 #endif
    }
-  __device__ /* 中文逐项-函数 F0307：operator()
+  __device__ /* 中文内部逻辑 F0307：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hadd(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 函数返回：return __float2bfloat16( __bfloat162float(x) + __bfloat162float(y) );；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0307
+ */
+/* 中文逐项-函数 F0307：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat16 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -825,13 +1124,30 @@ struct FuncSum<__nv_bfloat16> {
  */
 template<>
 struct FuncProd<half> {
-  __device__ /* 中文逐项-函数 F0308：FuncProd
+  __device__ /* 中文内部逻辑 F0308：FuncProd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0308
+ */
+/* 中文逐项-函数 F0308：FuncProd
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncProd(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0309：operator()
+  __device__ /* 中文内部逻辑 F0309：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 530 && __CUDA_ARCH__ != 610；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmul2(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float2 fx, fy, fr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fx = __half22float2(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fy = __half22float2(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fr.x = fx.x * fy.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：fr.y = fx.y * fy.y;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return __float22half2_rn(fr);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0309
+ */
+/* 中文逐项-函数 F0309：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half2 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -858,7 +1174,15 @@ struct FuncProd<half> {
     return __float22half2_rn(fr);
 #endif
   }
-  __device__ /* 中文逐项-函数 F0310：operator()
+  __device__ /* 中文内部逻辑 F0310：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 530 && __CUDA_ARCH__ != 610；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmul(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 函数返回：return __float2half( __half2float(x) * __half2float(y) );；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0310
+ */
+/* 中文逐项-函数 F0310：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -880,13 +1204,30 @@ struct FuncProd<half> {
  */
 template<>
 struct FuncProd<__nv_bfloat16> {
-  __device__ /* 中文逐项-函数 F0311：FuncProd
+  __device__ /* 中文内部逻辑 F0311：FuncProd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0311
+ */
+/* 中文逐项-函数 F0311：FuncProd
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncProd(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0312：operator()
+  __device__ /* 中文内部逻辑 F0312：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmul2(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float fxl, fxh, fyl, fyh;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fxl = __low2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fxh = __high2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fyl = __low2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：fyh = __high2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return __floats2bfloat162_rn(fxl * fyl, fxh * fyh);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0312
+ */
+/* 中文逐项-函数 F0312：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat162 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -915,7 +1256,15 @@ struct FuncProd<__nv_bfloat16> {
     return __floats2bfloat162_rn(fxl * fyl, fxh * fyh);
 #endif
   }
-  __device__ /* 中文逐项-函数 F0313：operator()
+  __device__ /* 中文内部逻辑 F0313：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmul(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 函数返回：return __float2bfloat16( __bfloat162float(x) * __bfloat162float(y) );；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0313
+ */
+/* 中文逐项-函数 F0313：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat16 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -938,13 +1287,27 @@ struct FuncProd<__nv_bfloat16> {
  */
 template<>
 struct FuncMax<half> {
-  __device__ /* 中文逐项-函数 F0314：FuncMax
+  __device__ /* 中文内部逻辑 F0314：FuncMax
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0314
+ */
+/* 中文逐项-函数 F0314：FuncMax
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMax(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0315：operator()
+  __device__ /* 中文内部逻辑 F0315：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：float2 fx, fy, fr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：fx = __half22float2(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：fy = __half22float2(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：fr.x = fmaxf(fx.x, fy.x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：fr.y = fmaxf(fx.y, fy.y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 函数返回：return __float22half2_rn(fr);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0315
+ */
+/* 中文逐项-函数 F0315：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half2 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -967,7 +1330,16 @@ struct FuncMax<half> {
     fr.y = fmaxf(fx.y, fy.y);
     return __float22half2_rn(fr);
   }
-  __device__ /* 中文逐项-函数 F0316：operator()
+  __device__ /* 中文内部逻辑 F0316：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：float fx, fy, fm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：fx = __half2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：fy = __half2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：fm = fmaxf(fx, fy);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return __float2half(fm);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0316
+ */
+/* 中文逐项-函数 F0316：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -997,13 +1369,30 @@ struct FuncMax<half> {
  */
 template<>
 struct FuncMax<__nv_bfloat16> {
-  __device__ /* 中文逐项-函数 F0317：FuncMax
+  __device__ /* 中文内部逻辑 F0317：FuncMax
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0317
+ */
+/* 中文逐项-函数 F0317：FuncMax
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMax(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0318：operator()
+  __device__ /* 中文内部逻辑 F0318：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmax2(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float fxl, fxh, fyl, fyh;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fxl = __low2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fxh = __high2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fyl = __low2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：fyh = __high2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return __floats2bfloat162_rn(fmaxf(fxl, fyl), fmaxf(fxh, fyh));；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0318
+ */
+/* 中文逐项-函数 F0318：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat162 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1032,7 +1421,18 @@ struct FuncMax<__nv_bfloat16> {
     return __floats2bfloat162_rn(fmaxf(fxl, fyl), fmaxf(fxh, fyh));
 #endif
   }
-  __device__ /* 中文逐项-函数 F0319：operator()
+  __device__ /* 中文内部逻辑 F0319：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmax(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float fx, fy;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fx = __bfloat162float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fy = __bfloat162float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 函数返回：return __float2bfloat16(fmaxf(fx, fy));；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0319
+ */
+/* 中文逐项-函数 F0319：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat16 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1063,13 +1463,27 @@ struct FuncMax<__nv_bfloat16> {
  */
 template<>
 struct FuncMin<half> {
-  __device__ /* 中文逐项-函数 F0320：FuncMin
+  __device__ /* 中文内部逻辑 F0320：FuncMin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0320
+ */
+/* 中文逐项-函数 F0320：FuncMin
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMin(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0321：operator()
+  __device__ /* 中文内部逻辑 F0321：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：float2 fx, fy, fr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：fx = __half22float2(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：fy = __half22float2(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：fr.x = fminf(fx.x, fy.x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 调用 / 计算 / 写入：fr.y = fminf(fx.y, fy.y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 函数返回：return __float22half2_rn(fr);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0321
+ */
+/* 中文逐项-函数 F0321：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half2 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1092,7 +1506,16 @@ struct FuncMin<half> {
     fr.y = fminf(fx.y, fy.y);
     return __float22half2_rn(fr);
   }
-  __device__ /* 中文逐项-函数 F0322：operator()
+  __device__ /* 中文内部逻辑 F0322：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：float fx, fy, fm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：fx = __half2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：fy = __half2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 调用 / 计算 / 写入：fm = fminf(fx, fy);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 函数返回：return __float2half(fm);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0322
+ */
+/* 中文逐项-函数 F0322：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const half y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1122,13 +1545,30 @@ struct FuncMin<half> {
  */
 template<>
 struct FuncMin<__nv_bfloat16> {
-  __device__ /* 中文逐项-函数 F0323：FuncMin
+  __device__ /* 中文内部逻辑 F0323：FuncMin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0323
+ */
+/* 中文逐项-函数 F0323：FuncMin
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMin(uint64_t opArg=0) {}
-   __device__ /* 中文逐项-函数 F0324：operator()
+   __device__ /* 中文内部逻辑 F0324：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmin2(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float fxl, fxh, fyl, fyh;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fxl = __low2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fxh = __high2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fyl = __low2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 调用 / 计算 / 写入：fyh = __high2float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     9. 函数返回：return __floats2bfloat162_rn(fminf(fxl, fyl), fminf(fxh, fyh));；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0324
+ */
+/* 中文逐项-函数 F0324：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat162 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1157,7 +1597,18 @@ struct FuncMin<__nv_bfloat16> {
     return __floats2bfloat162_rn(fminf(fxl, fyl), fminf(fxh, fyh));
 #endif
   }
-  __device__ /* 中文逐项-函数 F0325：operator()
+  __device__ /* 中文内部逻辑 F0325：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#if __CUDA_ARCH__ >= 800；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 函数返回：return __hmin(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   3. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     4. 准备局部状态：float fx, fy;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     5. 调用 / 计算 / 写入：fx = __bfloat162float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     6. 调用 / 计算 / 写入：fy = __bfloat162float(y);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 函数返回：return __float2bfloat16(fminf(fx, fy));；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0325
+ */
+/* 中文逐项-函数 F0325：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（const __nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（const __nv_bfloat16 y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1188,13 +1639,22 @@ struct FuncMin<__nv_bfloat16> {
  */
 template<>
 struct FuncMax<float> {
-  __device__ /* 中文逐项-函数 F0326：FuncMax
+  __device__ /* 中文内部逻辑 F0326：FuncMax
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0326
+ */
+/* 中文逐项-函数 F0326：FuncMax
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMax(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0327：operator()
+  __device__ /* 中文内部逻辑 F0327：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fmaxf(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0327
+ */
+/* 中文逐项-函数 F0327：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（float x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（float y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1210,13 +1670,22 @@ struct FuncMax<float> {
  */
 template<>
 struct FuncMin<float> {
-  __device__ /* 中文逐项-函数 F0328：FuncMin
+  __device__ /* 中文内部逻辑 F0328：FuncMin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0328
+ */
+/* 中文逐项-函数 F0328：FuncMin
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMin(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0329：operator()
+  __device__ /* 中文内部逻辑 F0329：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fminf(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0329
+ */
+/* 中文逐项-函数 F0329：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（float x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（float y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1233,13 +1702,22 @@ struct FuncMin<float> {
  */
 template<>
 struct FuncMax<double> {
-  __device__ /* 中文逐项-函数 F0330：FuncMax
+  __device__ /* 中文内部逻辑 F0330：FuncMax
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0330
+ */
+/* 中文逐项-函数 F0330：FuncMax
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMax(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0331：operator()
+  __device__ /* 中文内部逻辑 F0331：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fmax(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0331
+ */
+/* 中文逐项-函数 F0331：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（double x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（double y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1255,13 +1733,22 @@ struct FuncMax<double> {
  */
 template<>
 struct FuncMin<double> {
-  __device__ /* 中文逐项-函数 F0332：FuncMin
+  __device__ /* 中文内部逻辑 F0332：FuncMin
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0332
+ */
+/* 中文逐项-函数 F0332：FuncMin
  * 用途与位置：构造无额外运行状态的归约函数对象；运算语义由所属 Func 类型决定，普通操作忽略 opArg。
  * 参数 opArg（uint64_t opArg=0）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncMin(uint64_t opArg=0) {}
-  __device__ /* 中文逐项-函数 F0333：operator()
+  __device__ /* 中文内部逻辑 F0333：operator()
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fmin(x, y);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0333
+ */
+/* 中文逐项-函数 F0333：operator()
  * 用途与位置：执行当前类型/归约函数的运算；具体加、乘、最大或最小语义由所属模板/特化确定。
  * 参数 x（double x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 参数 y（double y）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
@@ -1328,21 +1815,35 @@ struct FuncSumPostDiv<T, /*IsFloating=*/false>: FuncSum<T> {
  * n（int；成员 FuncSumPostDiv<T, / *IsFloating=* /false>）：当前对象的有效数量或归约除数，按所属Fan/FuncSumPostDiv/列表以及实际赋值确认。
  */
   int n;
-  __device__ /* 中文逐项-函数 F0334：FuncSumPostDiv
+  __device__ /* 中文内部逻辑 F0334：FuncSumPostDiv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0334
+ */
+/* 中文逐项-函数 F0334：FuncSumPostDiv
  * 用途与位置：保存整数平均最后需要的除数，累加阶段继续使用求和，最终输出处才应用除法。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncSumPostDiv(uint64_t opArg): n(opArg) {}
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0335：preOp
+  __device__ /* 中文内部逻辑 F0335：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0335
+ */
+/* 中文逐项-函数 F0335：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  * 源码返回表达式：return x;。CHECK类宏还可能提前返回/跳转。
  */T preOp(T x) const { return x; }
-  __device__ /* 中文逐项-函数 F0336：postOp
+  __device__ /* 中文内部逻辑 F0336：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return T(x/n);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0336
+ */
+/* 中文逐项-函数 F0336：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1383,21 +1884,36 @@ struct FuncPreMulSum: FuncSum<T> { // integral T since all floats are specialize
  * scale（T；成员 FuncPreMulSum）：PreMulSum 的输入缩放标量，只对原始贡献做一次预处理。
  */
   T scale;
-  __device__ /* 中文逐项-函数 F0337：FuncPreMulSum
+  __device__ /* 中文内部逻辑 F0337：FuncPreMulSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：scale = *(T*)&opArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0337
+ */
+/* 中文逐项-函数 F0337：FuncPreMulSum
  * 用途与位置：从任务中解码缩放标量，原始输入 preOp 乘该值，而中间部分和不重复缩放。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  */FuncPreMulSum(uint64_t opArg) { scale = *(T*)&opArg; }
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0338：preOp
+  __device__ /* 中文内部逻辑 F0338：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x*scale;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0338
+ */
+/* 中文逐项-函数 F0338：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  * 源码返回表达式：return x*scale;。CHECK类宏还可能提前返回/跳转。
  */T preOp(T x) const { return x*scale; }
-  __device__ /* 中文逐项-函数 F0339：postOp
+  __device__ /* 中文内部逻辑 F0339：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0339
+ */
+/* 中文逐项-函数 F0339：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（T x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1424,7 +1940,12 @@ struct FuncPreMulSum<double>: FuncSum<double> {
  * scale（double；成员 FuncPreMulSum<double>）：PreMulSum 的输入缩放标量，只对原始贡献做一次预处理。
  */
   double scale;
-  __device__ /* 中文逐项-函数 F0340：FuncPreMulSum
+  __device__ /* 中文内部逻辑 F0340：FuncPreMulSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：scale = *(double*)&opArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0340
+ */
+/* 中文逐项-函数 F0340：FuncPreMulSum
  * 用途与位置：从任务中解码缩放标量，原始输入 preOp 乘该值，而中间部分和不重复缩放。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1433,7 +1954,12 @@ struct FuncPreMulSum<double>: FuncSum<double> {
     scale = *(double*)&opArg;
   }
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0341：preOp
+  __device__ /* 中文内部逻辑 F0341：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : x*scale;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0341
+ */
+/* 中文逐项-函数 F0341：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（double x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1442,7 +1968,12 @@ struct FuncPreMulSum<double>: FuncSum<double> {
  */double preOp(double x) const {
     return IsPreOpIdentity ? x : x*scale;
   }
-  __device__ /* 中文逐项-函数 F0342：postOp
+  __device__ /* 中文内部逻辑 F0342：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : x*scale;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0342
+ */
+/* 中文逐项-函数 F0342：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（double x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1471,7 +2002,12 @@ struct FuncPreMulSum<float>: FuncSum<float> {
  * scale（float；成员 FuncPreMulSum<float>）：PreMulSum 的输入缩放标量，只对原始贡献做一次预处理。
  */
   float scale;
-  __device__ /* 中文逐项-函数 F0343：FuncPreMulSum
+  __device__ /* 中文内部逻辑 F0343：FuncPreMulSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：scale = *(float*)&opArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0343
+ */
+/* 中文逐项-函数 F0343：FuncPreMulSum
  * 用途与位置：从任务中解码缩放标量，原始输入 preOp 乘该值，而中间部分和不重复缩放。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1480,7 +2016,12 @@ struct FuncPreMulSum<float>: FuncSum<float> {
     scale = *(float*)&opArg;
   }
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0344：preOp
+  __device__ /* 中文内部逻辑 F0344：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : x*scale;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0344
+ */
+/* 中文逐项-函数 F0344：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（float x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1489,7 +2030,12 @@ struct FuncPreMulSum<float>: FuncSum<float> {
  */float preOp(float x) const {
     return IsPreOpIdentity ? x : x*scale;
   }
-  __device__ /* 中文逐项-函数 F0345：postOp
+  __device__ /* 中文内部逻辑 F0345：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : x*scale;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0345
+ */
+/* 中文逐项-函数 F0345：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（float x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1524,7 +2070,13 @@ struct FuncPreMulSum<half>: FuncSum<half> {
  * scale（half2；成员 FuncPreMulSum<half>）：PreMulSum 的输入缩放标量，只对原始贡献做一次预处理。
  */
   half2 scale;
-  __device__ /* 中文逐项-函数 F0346：FuncPreMulSum
+  __device__ /* 中文内部逻辑 F0346：FuncPreMulSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：scale.x = *(half*)&opArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：scale.y = scale.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0346
+ */
+/* 中文逐项-函数 F0346：FuncPreMulSum
  * 用途与位置：从任务中解码缩放标量，原始输入 preOp 乘该值，而中间部分和不重复缩放。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1534,7 +2086,12 @@ struct FuncPreMulSum<half>: FuncSum<half> {
     scale.y = scale.x;
   }
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0347：preOp
+  __device__ /* 中文内部逻辑 F0347：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : __hmul(x, scale.x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0347
+ */
+/* 中文逐项-函数 F0347：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1543,7 +2100,12 @@ struct FuncPreMulSum<half>: FuncSum<half> {
  */half preOp(half x) const {
     return IsPreOpIdentity ? x : __hmul(x, scale.x);
   }
-  __device__ /* 中文逐项-函数 F0348：preOp
+  __device__ /* 中文内部逻辑 F0348：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : __hmul2(x, scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0348
+ */
+/* 中文逐项-函数 F0348：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1552,7 +2114,12 @@ struct FuncPreMulSum<half>: FuncSum<half> {
  */half2 preOp(half2 x) const {
     return IsPreOpIdentity ? x : __hmul2(x, scale);
   }
-  __device__ /* 中文逐项-函数 F0349：postOp
+  __device__ /* 中文内部逻辑 F0349：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : __hmul(x, scale.x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0349
+ */
+/* 中文逐项-函数 F0349：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1561,7 +2128,12 @@ struct FuncPreMulSum<half>: FuncSum<half> {
  */half postOp(half x) const {
     return IsPostOpIdentity ? x : __hmul(x, scale.x);
   }
-  __device__ /* 中文逐项-函数 F0350：postOp
+  __device__ /* 中文内部逻辑 F0350：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : __hmul2(x, scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0350
+ */
+/* 中文逐项-函数 F0350：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1575,7 +2147,12 @@ struct FuncPreMulSum<half>: FuncSum<half> {
  * scale（float；成员 FuncPreMulSum<half>）：PreMulSum 的输入缩放标量，只对原始贡献做一次预处理。
  */
   float scale;
-  __device__ /* 中文逐项-函数 F0351：FuncPreMulSum
+  __device__ /* 中文内部逻辑 F0351：FuncPreMulSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：scale = __half2float(*(half*)&opArg);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0351
+ */
+/* 中文逐项-函数 F0351：FuncPreMulSum
  * 用途与位置：从任务中解码缩放标量，原始输入 preOp 乘该值，而中间部分和不重复缩放。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1584,7 +2161,12 @@ struct FuncPreMulSum<half>: FuncSum<half> {
     scale = __half2float(*(half*)&opArg);
   }
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0352：preOp
+  __device__ /* 中文内部逻辑 F0352：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : __float2half(__half2float(x)*scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0352
+ */
+/* 中文逐项-函数 F0352：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1593,7 +2175,19 @@ struct FuncPreMulSum<half>: FuncSum<half> {
  */half preOp(half x) const {
     return IsPreOpIdentity ? x : __float2half(__half2float(x)*scale);
   }
-  __device__ /* 中文逐项-函数 F0353：preOp
+  __device__ /* 中文内部逻辑 F0353：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(IsPreOpIdentity)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 准备局部状态：float2 a = __half22float2(x);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 调用 / 计算 / 写入：a.x *= scale;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：a.y *= scale;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 函数返回：return __float22half2_rn(a);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0353
+ */
+/* 中文逐项-函数 F0353：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1614,7 +2208,12 @@ struct FuncPreMulSum<half>: FuncSum<half> {
       return __float22half2_rn(a);
     }
   }
-  __device__ /* 中文逐项-函数 F0354：postOp
+  __device__ /* 中文内部逻辑 F0354：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : __float2half(__half2float(x)*scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0354
+ */
+/* 中文逐项-函数 F0354：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（half x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1623,7 +2222,19 @@ struct FuncPreMulSum<half>: FuncSum<half> {
  */half postOp(half x) const {
     return IsPostOpIdentity ? x : __float2half(__half2float(x)*scale);
   }
-  __device__ /* 中文逐项-函数 F0355：postOp
+  __device__ /* 中文内部逻辑 F0355：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(IsPostOpIdentity)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 准备局部状态：float2 a = __half22float2(x);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 调用 / 计算 / 写入：a.x *= scale;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：a.y *= scale;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 函数返回：return __float22half2_rn(a);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0355
+ */
+/* 中文逐项-函数 F0355：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（half2 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1672,7 +2283,13 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
  * scale（__nv_bfloat162；成员 FuncPreMulSum<__nv_bfloat16>）：PreMulSum 的输入缩放标量，只对原始贡献做一次预处理。
  */
   __nv_bfloat162 scale;
-  __device__ /* 中文逐项-函数 F0356：FuncPreMulSum
+  __device__ /* 中文内部逻辑 F0356：FuncPreMulSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：scale.x = *(__nv_bfloat16*)&opArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：scale.y = scale.x;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0356
+ */
+/* 中文逐项-函数 F0356：FuncPreMulSum
  * 用途与位置：从任务中解码缩放标量，原始输入 preOp 乘该值，而中间部分和不重复缩放。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1682,7 +2299,12 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
     scale.y = scale.x;
   }
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0357：preOp
+  __device__ /* 中文内部逻辑 F0357：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : __hmul(x, scale.x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0357
+ */
+/* 中文逐项-函数 F0357：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（__nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1691,7 +2313,12 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
  */__nv_bfloat16 preOp(__nv_bfloat16 x) const {
     return IsPreOpIdentity ? x : __hmul(x, scale.x);
   }
-  __device__ /* 中文逐项-函数 F0358：preOp
+  __device__ /* 中文内部逻辑 F0358：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : __hmul2(x, scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0358
+ */
+/* 中文逐项-函数 F0358：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（__nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1700,7 +2327,12 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
  */__nv_bfloat162 preOp(__nv_bfloat162 x) const {
     return IsPreOpIdentity ? x : __hmul2(x, scale);
   }
-  __device__ /* 中文逐项-函数 F0359：postOp
+  __device__ /* 中文内部逻辑 F0359：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : __hmul(x, scale.x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0359
+ */
+/* 中文逐项-函数 F0359：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（__nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1709,7 +2341,12 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
  */__nv_bfloat16 postOp(__nv_bfloat16 x) const {
     return IsPostOpIdentity ? x : __hmul(x, scale.x);
   }
-  __device__ /* 中文逐项-函数 F0360：postOp
+  __device__ /* 中文内部逻辑 F0360：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : __hmul2(x, scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0360
+ */
+/* 中文逐项-函数 F0360：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（__nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1723,7 +2360,12 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
  * scale（float；成员 FuncPreMulSum<__nv_bfloat16>）：PreMulSum 的输入缩放标量，只对原始贡献做一次预处理。
  */
   float scale;
-  __device__ /* 中文逐项-函数 F0361：FuncPreMulSum
+  __device__ /* 中文内部逻辑 F0361：FuncPreMulSum
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：scale = *(__nv_bfloat16*)&opArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0361
+ */
+/* 中文逐项-函数 F0361：FuncPreMulSum
  * 用途与位置：从任务中解码缩放标量，原始输入 preOp 乘该值，而中间部分和不重复缩放。
  * 参数 opArg（uint64_t opArg）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1732,7 +2374,12 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
     scale = *(__nv_bfloat16*)&opArg;
   }
   // inherits FuncSum::operator()
-  __device__ /* 中文逐项-函数 F0362：preOp
+  __device__ /* 中文内部逻辑 F0362：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPreOpIdentity ? x : __float2bfloat16(__bfloat162float(x)*scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0362
+ */
+/* 中文逐项-函数 F0362：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（__nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1741,7 +2388,19 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
  */__nv_bfloat16 preOp(__nv_bfloat16 x) const {
     return IsPreOpIdentity ? x : __float2bfloat16(__bfloat162float(x)*scale);
   }
-  __device__ /* 中文逐项-函数 F0363：preOp
+  __device__ /* 中文内部逻辑 F0363：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(IsPreOpIdentity)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 准备局部状态：float fxl, fxh;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 调用 / 计算 / 写入：fxl = __low2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fxh = __high2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 函数返回：return __floats2bfloat162_rn(fxl * scale, fxh * scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0363
+ */
+/* 中文逐项-函数 F0363：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 x（__nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1764,7 +2423,12 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
       return __floats2bfloat162_rn(fxl * scale, fxh * scale);
     }
   }
-  __device__ /* 中文逐项-函数 F0364：postOp
+  __device__ /* 中文内部逻辑 F0364：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return IsPostOpIdentity ? x : __float2bfloat16(__bfloat162float(x)*scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0364
+ */
+/* 中文逐项-函数 F0364：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（__nv_bfloat16 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1773,7 +2437,19 @@ struct FuncPreMulSum<__nv_bfloat16>: FuncSum<__nv_bfloat16> {
  */__nv_bfloat16 postOp(__nv_bfloat16 x) const {
     return IsPostOpIdentity ? x : __float2bfloat16(__bfloat162float(x)*scale);
   }
-  __device__ /* 中文逐项-函数 F0365：postOp
+  __device__ /* 中文内部逻辑 F0365：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(IsPostOpIdentity)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 函数返回：return x;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 准备局部状态：float fxl, fxh;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     6. 调用 / 计算 / 写入：fxl = __low2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     7. 调用 / 计算 / 写入：fxh = __high2float(x);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     8. 函数返回：return __floats2bfloat162_rn(fxl * scale, fxh * scale);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0365
+ */
+/* 中文逐项-函数 F0365：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 x（__nv_bfloat162 x）：本次数值运算的输入值或打包寄存器，所属T/模板决定元素类型与归约语义。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1815,6 +2491,11 @@ struct FuncTraits<FuncPreMulSum<T>> {
  */
   static constexpr bool IsPostOpIdentity = FuncPreMulSum<T>::IsPostOpIdentity;
 
+/* 中文内部逻辑 F0366：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fn.preOp(x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0366
+ */
 /* 中文逐项-函数 F0366：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 fn（FuncPreMulSum<T> fn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1827,6 +2508,11 @@ struct FuncTraits<FuncPreMulSum<T>> {
   __device__ static U preOp(FuncPreMulSum<T> fn, U x) {
     return fn.preOp(x);
   }
+/* 中文内部逻辑 F0367：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fn.postOp(x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0367
+ */
 /* 中文逐项-函数 F0367：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 fn（FuncPreMulSum<T> fn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1855,6 +2541,11 @@ struct FuncTraits<FuncSumPostDiv<T>> {
  */
   static constexpr bool IsPostOpIdentity = FuncSumPostDiv<T>::IsPostOpIdentity;
 
+/* 中文内部逻辑 F0368：preOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fn.preOp(x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0368
+ */
 /* 中文逐项-函数 F0368：preOp
  * 用途与位置：对原始输入应用本归约类型的预处理；普通归约为恒等，PreMulSum 为乘标量。
  * 参数 fn（FuncSumPostDiv<T> fn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1867,6 +2558,11 @@ struct FuncTraits<FuncSumPostDiv<T>> {
   __device__ static U preOp(FuncSumPostDiv<T> fn, U x) {
     return fn.preOp(x);
   }
+/* 中文内部逻辑 F0369：postOp
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return fn.postOp(x);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__reduce_kernel_h.md#f0369
+ */
 /* 中文逐项-函数 F0369：postOp
  * 用途与位置：对完整结果应用本归约类型的后处理；普通归约为恒等，整数 Avg 的 SumPostDiv 在这里做最终除法。
  * 参数 fn（FuncSumPostDiv<T> fn）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。

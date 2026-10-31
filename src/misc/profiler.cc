@@ -91,6 +91,41 @@ double profilingStart = 0;
  */
 #define MAX_EVENTS 200000
 
+/* 中文内部逻辑 F0961：ncclProfilingRecord
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(profilingEvents == NULL)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：NCCLCHECK(ncclCalloc(&profilingEvents, MAX_EVENTS));；执行被包装调用并检查返回；失败可能提前return，不能把后续项当成无条件执行。
+ *     4. 调用 / 计算 / 写入：profilingStart = gettime();；读取本平台的轻量时间源/计数器并转成 profiling 需要的时间表示。
+ * 5. 准备局部状态：struct ncclProxyProfileEvent* event = NULL;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 条件判断：(state%8 == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   7. 真分支：；仅条件为真执行以下子项。
+ *     8. 条件判断：(profilingIndex == MAX_EVENTS)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       9. 真分支：；仅条件为真执行以下子项。
+ *         10. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ *     11. 调用 / 计算 / 写入：args->subs[sub].profilingEvents[step%NCCL_STEPS] = event = profilingEvents+profilingIndex++;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     12. 条件判断：(state == ncclProxyProfileBegin)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       13. 真分支：；仅条件为真执行以下子项。
+ *         14. 调用 / 计算 / 写入：event->opCount = args->opCount;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         15. 调用 / 计算 / 写入：event->channel = args->subs[sub].channelId;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         16. 调用 / 计算 / 写入：event->peer = args->subs[sub].peer;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         17. 调用 / 计算 / 写入：event->type = args->pattern;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         18. 调用 / 计算 / 写入：event->step = step;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         19. 调用 / 计算 / 写入：event->opIndex = (((uint64_t)args)/sizeof(struct ncclProxyArgs))%256;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       20. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         21. 调用 / 计算 / 写入：event->peer = -state;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   22. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     23. 调用 / 计算 / 写入：event = (struct ncclProxyProfileEvent*)args->subs[sub].profilingEvents[step%NCCL_STEPS];；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     24. 条件判断：(state == ncclProxyProfileEnd)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       25. 真分支：；仅条件为真执行以下子项。
+ *         26. 调用 / 计算 / 写入：args->subs[sub].profilingEvents[step%NCCL_STEPS] = NULL;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     27. 条件判断：(state == ncclProxyProfileAppendEnd)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       28. 真分支：；仅条件为真执行以下子项。
+ *         29. 调用 / 计算 / 写入：event->opCount = args->opCount;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 30. 调用 / 计算 / 写入：event->timestamp[state%8] = gettime()-profilingStart;；读取本平台的轻量时间源/计数器并转成 profiling 需要的时间表示。
+ * 31. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__profiler_cc.md#f0961
+ */
 /* 中文逐项-函数 F0961：ncclProfilingRecord
  * 用途与位置：若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
  * 参数 args（struct ncclProxyArgs* args）：代理聚合运行态，保存各连接子任务的posted/received/transmitted/done进度和回调。
@@ -135,6 +170,54 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0962：ncclProfilingDump
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：static int dumpDone = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 条件判断：(dumpDone)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 函数返回：return;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 5. 调用 / 计算 / 写入：dumpDone = 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 准备局部状态：const char* str = getenv("NCCL_PROXY_PROFILE");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 条件判断：(!str)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：free(profilingEvents);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *     10. 函数返回：return;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 11. 准备局部状态：FILE* f = fopen(str, "w");；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 调用 / 计算 / 写入：fprintf(f, "[\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 13. 循环：初始 int i=0;；继续条件 i<profilingIndex；每轮更新 i++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   14. 准备局部状态：struct ncclProxyProfileEvent* e = profilingEvents+i;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   15. 准备局部状态：const int sendrecv = e->peer >= 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   16. 准备局部状态：const char* typeStr = sendrecv ? (e->type == ncclPatternSend ? "Send" : "Recv") : profilingEventStr[-(e->peer/8)];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   17. 条件判断：(sendrecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     18. 真分支：；仅条件为真执行以下子项。
+ *       19. 准备局部状态：int state = ncclProxyProfileBegin;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       20. 准备局部状态：const char** stateStr = e->type == ncclPatternSend ? profilingStateSendStr : profilingStateRecvStr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *       21. 调用 / 计算 / 写入：fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"opCount\": %ld, \"proxyOpIndex\":%d } },\n", typeStr, e->peer, e->s …（完整代码见函数体）；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *       22. 循环：初始 ；继续条件 (state<ncclProxyProfileEnd)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *         23. 条件判断：(e->timestamp[state])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           24. 真分支：；仅条件为真执行以下子项。
+ *             25. 准备局部状态：const char* name = stateStr[state];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             26. 调用 / 计算 / 写入：fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n", name, i, e->channel, e->timestamp[state]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *             27. 调用 / 计算 / 写入：state++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             28. 循环：初始 ；继续条件 (e->timestamp[state] == 0)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *               29. 调用 / 计算 / 写入：state++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             30. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *             31. 调用 / 计算 / 写入：fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n", name, i, e->channel, e->timestamp[state]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       32. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *       33. 调用 / 计算 / 写入：fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n", typeStr, e->peer, e->step, i, e->channel, e->timestamp[state]);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     34. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *       35. 条件判断：(e->peer == -ncclProxyProfileAppend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         36. 真分支：；仅条件为真执行以下子项。
+ *           37. 调用 / 计算 / 写入：fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": -1, \"tid\": 1, \"ts\": %f, \"args\": { \"added\": %ld } },\n", typeStr, i, e->timestamp[0], e->opCount);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *         38. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           39. 调用 / 计算 / 写入：fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": -1, \"tid\": 1, \"ts\": %f },\n", typeStr, i, e->timestamp[0]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       40. 调用 / 计算 / 写入：fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": -1, \"tid\": 1, \"ts\": %f },\n", typeStr, i, e->timestamp[1]);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 41. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 42. 调用 / 计算 / 写入：fprintf(f, "{} ]\n");；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 43. 调用 / 计算 / 写入：fclose(f);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 44. 调用 / 计算 / 写入：free(profilingEvents);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__profiler_cc.md#f0962
+ */
 /* 中文逐项-函数 F0962：ncclProfilingDump
  * 用途与位置：导出代理阶段耗时记录，帮助区分 GPU 等待、网络等待和 flush；禁用分支无操作。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -238,6 +321,11 @@ void ncclProfilingDump() {
   free(profilingEvents);
 }
 #else
+/* 中文内部逻辑 F0963：ncclProfilingRecord
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__profiler_cc.md#f0963
+ */
 /* 中文逐项-函数 F0963：ncclProfilingRecord
  * 用途与位置：若编译启用 profiling，记录 Proxy 子步骤在当前阶段的时间点；禁用分支为空实现。
  * 参数 args（struct ncclProxyArgs* args）：代理聚合运行态，保存各连接子任务的posted/received/transmitted/done进度和回调。
@@ -249,6 +337,10 @@ void ncclProfilingDump() {
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
  */
 ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) { return ncclSuccess; }
+/* 中文内部逻辑 F0964：ncclProfilingDump
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__misc__profiler_cc.md#f0964
+ */
 /* 中文逐项-函数 F0964：ncclProfilingDump
  * 用途与位置：导出代理阶段耗时记录，帮助区分 GPU 等待、网络等待和 flush；禁用分支无操作。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。

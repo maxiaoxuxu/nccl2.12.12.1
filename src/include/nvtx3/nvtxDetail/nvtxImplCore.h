@@ -6,7 +6,16 @@
 * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 */
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0678：nvtxMarkEx
+NVTX_DECLSPEC /* 中文内部逻辑 F0678：nvtxMarkEx
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxMarkEx_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxMarkEx_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(eventAttrib);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0678
+ */
+/* 中文逐项-函数 F0678：nvtxMarkEx
  * 用途与位置：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 eventAttrib（const nvtxEventAttributes_t* eventAttrib）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxMarkEx_impl_init。
@@ -25,7 +34,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0678：nvtxMarkEx
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0679：nvtxMarkA
+NVTX_DECLSPEC /* 中文内部逻辑 F0679：nvtxMarkA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxMarkA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxMarkA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(message);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0679
+ */
+/* 中文逐项-函数 F0679：nvtxMarkA
  * 用途与位置：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const char* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxMarkA_impl_init。
@@ -44,7 +62,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0679：nvtxMarkA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0680：nvtxMarkW
+NVTX_DECLSPEC /* 中文内部逻辑 F0680：nvtxMarkW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxMarkW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxMarkW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(message);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0680
+ */
+/* 中文逐项-函数 F0680：nvtxMarkW
  * 用途与位置：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const wchar_t* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxMarkW_impl_init。
@@ -63,7 +90,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0680：nvtxMarkW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0681：nvtxRangeStartEx
+NVTX_DECLSPEC /* 中文内部逻辑 F0681：nvtxRangeStartEx
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangeStartEx_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangeStartEx_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(eventAttrib);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxRangeId_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0681
+ */
+/* 中文逐项-函数 F0681：nvtxRangeStartEx
  * 用途与位置：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 eventAttrib（const nvtxEventAttributes_t* eventAttrib）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangeStartEx_impl_init。
@@ -85,7 +122,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0681：nvtxRangeStartEx
         return (nvtxRangeId_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0682：nvtxRangeStartA
+NVTX_DECLSPEC /* 中文内部逻辑 F0682：nvtxRangeStartA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangeStartA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangeStartA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(message);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxRangeId_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0682
+ */
+/* 中文逐项-函数 F0682：nvtxRangeStartA
  * 用途与位置：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const char* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangeStartA_impl_init。
@@ -107,7 +154,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0682：nvtxRangeStartA
         return (nvtxRangeId_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0683：nvtxRangeStartW
+NVTX_DECLSPEC /* 中文内部逻辑 F0683：nvtxRangeStartW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangeStartW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangeStartW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(message);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxRangeId_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0683
+ */
+/* 中文逐项-函数 F0683：nvtxRangeStartW
  * 用途与位置：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const wchar_t* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangeStartW_impl_init。
@@ -129,7 +186,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0683：nvtxRangeStartW
         return (nvtxRangeId_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0684：nvtxRangeEnd
+NVTX_DECLSPEC /* 中文内部逻辑 F0684：nvtxRangeEnd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangeEnd_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangeEnd_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(id);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0684
+ */
+/* 中文逐项-函数 F0684：nvtxRangeEnd
  * 用途与位置：按id结束显式NVTX时间范围。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 id（nvtxRangeId_t id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangeEnd_impl_init；src/include/nvtx3.hpp::end_range。
@@ -148,7 +214,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0684：nvtxRangeEnd
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0685：nvtxRangePushEx
+NVTX_DECLSPEC /* 中文内部逻辑 F0685：nvtxRangePushEx
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangePushEx_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangePushEx_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(eventAttrib);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (int)NVTX_NO_PUSH_POP_TRACKING;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0685
+ */
+/* 中文逐项-函数 F0685：nvtxRangePushEx
  * 用途与位置：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 eventAttrib（const nvtxEventAttributes_t* eventAttrib）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangePushEx_impl_init。
@@ -170,7 +246,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0685：nvtxRangePushEx
         return (int)NVTX_NO_PUSH_POP_TRACKING;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0686：nvtxRangePushA
+NVTX_DECLSPEC /* 中文内部逻辑 F0686：nvtxRangePushA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangePushA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangePushA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(message);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (int)NVTX_NO_PUSH_POP_TRACKING;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0686
+ */
+/* 中文逐项-函数 F0686：nvtxRangePushA
  * 用途与位置：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const char* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangePushA_impl_init。
@@ -192,7 +278,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0686：nvtxRangePushA
         return (int)NVTX_NO_PUSH_POP_TRACKING;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0687：nvtxRangePushW
+NVTX_DECLSPEC /* 中文内部逻辑 F0687：nvtxRangePushW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangePushW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangePushW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(message);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (int)NVTX_NO_PUSH_POP_TRACKING;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0687
+ */
+/* 中文逐项-函数 F0687：nvtxRangePushW
  * 用途与位置：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const wchar_t* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangePushW_impl_init。
@@ -214,7 +310,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0687：nvtxRangePushW
         return (int)NVTX_NO_PUSH_POP_TRACKING;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0688：nvtxRangePop
+NVTX_DECLSPEC /* 中文内部逻辑 F0688：nvtxRangePop
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxRangePop_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxRangePop_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)();；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (int)NVTX_NO_PUSH_POP_TRACKING;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0688
+ */
+/* 中文逐项-函数 F0688：nvtxRangePop
  * 用途与位置：从当前线程NVTX范围栈pop结束最近区间。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 <未命名参数>（void）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxRangePop_impl_init。
@@ -236,7 +342,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0688：nvtxRangePop
         return (int)NVTX_NO_PUSH_POP_TRACKING;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0689：nvtxNameCategoryA
+NVTX_DECLSPEC /* 中文内部逻辑 F0689：nvtxNameCategoryA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameCategoryA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameCategoryA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(category, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0689
+ */
+/* 中文逐项-函数 F0689：nvtxNameCategoryA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 category（uint32_t category）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -256,7 +371,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0689：nvtxNameCategoryA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0690：nvtxNameCategoryW
+NVTX_DECLSPEC /* 中文内部逻辑 F0690：nvtxNameCategoryW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameCategoryW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameCategoryW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(category, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0690
+ */
+/* 中文逐项-函数 F0690：nvtxNameCategoryW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 category（uint32_t category）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -276,7 +400,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0690：nvtxNameCategoryW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0691：nvtxNameOsThreadA
+NVTX_DECLSPEC /* 中文内部逻辑 F0691：nvtxNameOsThreadA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameOsThreadA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameOsThreadA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(threadId, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0691
+ */
+/* 中文逐项-函数 F0691：nvtxNameOsThreadA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 threadId（uint32_t threadId）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const char* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -296,7 +429,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0691：nvtxNameOsThreadA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0692：nvtxNameOsThreadW
+NVTX_DECLSPEC /* 中文内部逻辑 F0692：nvtxNameOsThreadW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxNameOsThreadW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxNameOsThreadW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(threadId, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0692
+ */
+/* 中文逐项-函数 F0692：nvtxNameOsThreadW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 threadId（uint32_t threadId）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 参数 name（const wchar_t* name）：设备/属性/操作/参数的诊断名字，用于筛选、查找或报错。
@@ -316,7 +458,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0692：nvtxNameOsThreadW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0693：nvtxDomainMarkEx
+NVTX_DECLSPEC /* 中文内部逻辑 F0693：nvtxDomainMarkEx
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainMarkEx_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainMarkEx_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(domain, eventAttrib);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0693
+ */
+/* 中文逐项-函数 F0693：nvtxDomainMarkEx
  * 用途与位置：向性能工具记录一个瞬时标记。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 eventAttrib（const nvtxEventAttributes_t* eventAttrib）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -336,7 +487,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0693：nvtxDomainMarkEx
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0694：nvtxDomainRangeStartEx
+NVTX_DECLSPEC /* 中文内部逻辑 F0694：nvtxDomainRangeStartEx
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainRangeStartEx_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainRangeStartEx_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(domain, eventAttrib);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxRangeId_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0694
+ */
+/* 中文逐项-函数 F0694：nvtxDomainRangeStartEx
  * 用途与位置：建立显式NVTX时间范围并返回id，之后可用RangeEnd配对结束。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 eventAttrib（const nvtxEventAttributes_t* eventAttrib）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -360,7 +521,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0694：nvtxDomainRangeStartEx
         return (nvtxRangeId_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0695：nvtxDomainRangeEnd
+NVTX_DECLSPEC /* 中文内部逻辑 F0695：nvtxDomainRangeEnd
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainRangeEnd_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainRangeEnd_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(domain, id);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0695
+ */
+/* 中文逐项-函数 F0695：nvtxDomainRangeEnd
  * 用途与位置：按id结束显式NVTX时间范围。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 id（nvtxRangeId_t id）：对象身份和类别编号，硬件节点id、通信图id、工作类型等作用域不同。
@@ -380,7 +550,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0695：nvtxDomainRangeEnd
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0696：nvtxDomainRangePushEx
+NVTX_DECLSPEC /* 中文内部逻辑 F0696：nvtxDomainRangePushEx
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainRangePushEx_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainRangePushEx_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(domain, eventAttrib);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (int)NVTX_NO_PUSH_POP_TRACKING;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0696
+ */
+/* 中文逐项-函数 F0696：nvtxDomainRangePushEx
  * 用途与位置：在当前线程的NVTX范围栈push一项，嵌套区间需与pop配对。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 eventAttrib（const nvtxEventAttributes_t* eventAttrib）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -404,7 +584,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0696：nvtxDomainRangePushEx
         return (int)NVTX_NO_PUSH_POP_TRACKING;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0697：nvtxDomainRangePop
+NVTX_DECLSPEC /* 中文内部逻辑 F0697：nvtxDomainRangePop
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainRangePop_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainRangePop_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(domain);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (int)NVTX_NO_PUSH_POP_TRACKING;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0697
+ */
+/* 中文逐项-函数 F0697：nvtxDomainRangePop
  * 用途与位置：从当前线程NVTX范围栈pop结束最近区间。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxDomainRangePop_impl_init；src/include/nvtx3.hpp::~domain_thread_range。
@@ -426,7 +616,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0697：nvtxDomainRangePop
         return (int)NVTX_NO_PUSH_POP_TRACKING;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0698：nvtxDomainResourceCreate
+NVTX_DECLSPEC /* 中文内部逻辑 F0698：nvtxDomainResourceCreate
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainResourceCreate_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainResourceCreate_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(domain, attribs);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxResourceHandle_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0698
+ */
+/* 中文逐项-函数 F0698：nvtxDomainResourceCreate
  * 用途与位置：在NVTX域中登记一个可被工具识别的资源属性对象。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 attribs（nvtxResourceAttributes_t* attribs）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -450,7 +650,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0698：nvtxDomainResourceCreate
         return (nvtxResourceHandle_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0699：nvtxDomainResourceDestroy
+NVTX_DECLSPEC /* 中文内部逻辑 F0699：nvtxDomainResourceDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainResourceDestroy_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainResourceDestroy_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(resource);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0699
+ */
+/* 中文逐项-函数 F0699：nvtxDomainResourceDestroy
  * 用途与位置：结束域内资源标记的生命周期。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 resource（nvtxResourceHandle_t resource）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxDomainResourceDestroy_impl_init。
@@ -470,7 +679,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0699：nvtxDomainResourceDestroy
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0700：nvtxDomainNameCategoryA
+NVTX_DECLSPEC /* 中文内部逻辑 F0700：nvtxDomainNameCategoryA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainNameCategoryA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainNameCategoryA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(domain, category, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0700
+ */
+/* 中文逐项-函数 F0700：nvtxDomainNameCategoryA
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 category（uint32_t category）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -492,7 +710,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0700：nvtxDomainNameCategoryA
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0701：nvtxDomainNameCategoryW
+NVTX_DECLSPEC /* 中文内部逻辑 F0701：nvtxDomainNameCategoryW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainNameCategoryW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainNameCategoryW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(domain, category, name);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0701
+ */
+/* 中文逐项-函数 F0701：nvtxDomainNameCategoryW
  * 用途与位置：为该API名字指定的类别、线程、CUDA/OpenCL资源登记可读名字，A/W分别接收窄/宽字符串。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 category（uint32_t category）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -514,7 +741,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0701：nvtxDomainNameCategoryW
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0702：nvtxDomainRegisterStringA
+NVTX_DECLSPEC /* 中文内部逻辑 F0702：nvtxDomainRegisterStringA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainRegisterStringA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainRegisterStringA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(domain, string);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxStringHandle_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0702
+ */
+/* 中文逐项-函数 F0702：nvtxDomainRegisterStringA
  * 用途与位置：注册域内可复用字符串并返回句柄，降低重复消息处理开销。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 string（const char* string）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -538,7 +775,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0702：nvtxDomainRegisterStringA
         return (nvtxStringHandle_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0703：nvtxDomainRegisterStringW
+NVTX_DECLSPEC /* 中文内部逻辑 F0703：nvtxDomainRegisterStringW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainRegisterStringW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainRegisterStringW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(domain, string);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxStringHandle_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0703
+ */
+/* 中文逐项-函数 F0703：nvtxDomainRegisterStringW
  * 用途与位置：注册域内可复用字符串并返回句柄，降低重复消息处理开销。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 参数 string（const wchar_t* string）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
@@ -562,7 +809,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0703：nvtxDomainRegisterStringW
         return (nvtxStringHandle_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0704：nvtxDomainCreateA
+NVTX_DECLSPEC /* 中文内部逻辑 F0704：nvtxDomainCreateA
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainCreateA_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainCreateA_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(message);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxDomainHandle_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0704
+ */
+/* 中文逐项-函数 F0704：nvtxDomainCreateA
  * 用途与位置：创建带名字的NVTX标记域，隔离不同组件的事件/类别。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const char* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxDomainCreateA_impl_init。
@@ -584,7 +841,17 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0704：nvtxDomainCreateA
         return (nvtxDomainHandle_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0705：nvtxDomainCreateW
+NVTX_DECLSPEC /* 中文内部逻辑 F0705：nvtxDomainCreateW
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainCreateW_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainCreateW_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 函数返回：return (*local)(message);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 6. 函数返回：return (nvtxDomainHandle_t)0;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0705
+ */
+/* 中文逐项-函数 F0705：nvtxDomainCreateW
  * 用途与位置：创建带名字的NVTX标记域，隔离不同组件的事件/类别。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 message（const wchar_t* message）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxDomainCreateW_impl_init。
@@ -606,7 +873,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0705：nvtxDomainCreateW
         return (nvtxDomainHandle_t)0;
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0706：nvtxDomainDestroy
+NVTX_DECLSPEC /* 中文内部逻辑 F0706：nvtxDomainDestroy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxDomainDestroy_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxDomainDestroy_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0706
+ */
+/* 中文逐项-函数 F0706：nvtxDomainDestroy
  * 用途与位置：释放NVTX域句柄及工具相关引用。这些调用只提供观测标记，不构成CUDA stream同步，也不负责NCCL通信进度。
  * 参数 domain（nvtxDomainHandle_t domain）：NVML报告的PCI总线/域及设备/子系统标识，结合busId匹配CUDA设备。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxDomainDestroy_impl_init。
@@ -625,7 +901,16 @@ NVTX_DECLSPEC /* 中文逐项-函数 F0706：nvtxDomainDestroy
 #endif /*NVTX_DISABLE*/
 }
 
-NVTX_DECLSPEC /* 中文逐项-函数 F0707：nvtxInitialize
+NVTX_DECLSPEC /* 中文内部逻辑 F0707：nvtxInitialize
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 编译期分支/指令：#ifndef NVTX_DISABLE；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *   2. 准备局部状态：nvtxInitialize_impl_fntype local = NVTX_VERSIONED_IDENTIFIER(nvtxGlobals).nvtxInitialize_impl_fnptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *   3. 条件判断：(local!=0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     4. 真分支：；仅条件为真执行以下子项。
+ *       5. 调用 / 计算 / 写入：(*local)(reserved);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__nvtx3__nvtxDetail__nvtxImplCore_h.md#f0707
+ */
+/* 中文逐项-函数 F0707：nvtxInitialize
  * 用途与位置：显式触发NVTX工具初始化，通常API首次调用也能惰性触发；不创建NCCL通信资源。
  * 参数 reserved（const void* reserved）：布局保留/填充空间，保证缓存行或固定大小ABI；不承载算法有效数据。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/include/nvtx3/nvtxDetail/nvtxInitDefs.h::nvtxInitialize_impl_init。

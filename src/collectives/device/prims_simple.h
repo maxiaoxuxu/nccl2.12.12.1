@@ -161,6 +161,16 @@ class Primitives<
   uint64_t connStepCache; // Cache last seen value of (*connStepPtr)
 
   // Don't use barrier 0 as it's used by the final sync
+/* 中文内部逻辑 F0227：barrier
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(nthreads == WARP_SIZE)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：__syncwarp();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 调用 / 计算 / 写入：asm volatile("bar.sync %0, %1;" :: "r"(15-group), "r"(nthreads));；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ * 6. 调用 / 计算 / 写入：flags |= ThreadsSynced;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0227
+ */
 /* 中文逐项-函数 F0227：barrier
  * 用途与位置：同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -175,6 +185,15 @@ class Primitives<
       asm volatile("bar.sync %0, %1;" :: "r"(15-group), "r"(nthreads));
     flags |= ThreadsSynced;
   }
+/* 中文内部逻辑 F0228：subBarrier
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(nworkers == nthreads)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：barrier();；同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
+ *   4. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     5. 调用 / 计算 / 写入：asm volatile("bar.sync %0, %1;" :: "r"(8-group), "r"(nworkers));；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0228
+ */
 /* 中文逐项-函数 F0228：subBarrier
  * 用途与位置：只同步负责数据搬运的 worker 子组，配合同步 warp 让复制与进度发布流水重叠。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -190,6 +209,16 @@ class Primitives<
       asm volatile("bar.sync %0, %1;" :: "r"(8-group), "r"(nworkers));
   }
 
+/* 中文内部逻辑 F0229：checkAbort
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：spins++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 条件判断：(!(flags & Aborted) && spins == NCCL_SPINS_BEFORE_CHECK_ABORT)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   3. 真分支：；仅条件为真执行以下子项。
+ *     4. 调用 / 计算 / 写入：flags |= *ncclShmem.comm.abortFlag ? Aborted : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     5. 调用 / 计算 / 写入：spins = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 函数返回：return flags & Aborted;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0229
+ */
 /* 中文逐项-函数 F0229：checkAbort
  * 用途与位置：自旋达到检查间隔时读取 communicator 中止标志，使异常情况下的协议等待可以退出。
  * 参数 <未命名参数>（int &spins）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -207,6 +236,61 @@ class Primitives<
     return flags & Aborted;
   }
 
+/* 中文内部逻辑 F0230：waitPeer
+ * 精读：先辨认当前线程负责发送还是接收，并按具体direct谓词决定可省去哪些等待。
+ * 精读：发送等head+8足够覆盖目标step，接收等tail达到目标step；等待中刷新进度缓存并查abort。
+ * 精读：随后按shared偏移、直接用户缓冲或固定FIFO槽装配实际srcs/dsts，Wait角色更新自己的寄存器step。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：const bool isSendNotRecv = (Send && Recv) ? (flags & RoleWaitSend) : Send;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：const bool noRecvWait = DirectRecv && Src && (flags & DirectRead);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：const bool noSendWait = DirectSend && (flags & (DirectRead|DirectWrite));；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 条件判断：(((flags & (Recv*RoleWaitRecv)) && !noRecvWait) || ((flags & (Send*RoleWaitSend)) && !noSendWait))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 准备局部状态：int spins = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 循环：初始 ；继续条件 (connStepCache + (isSendNotRecv ? NCCL_STEPS : 0) < step + StepPerSlice)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       8. 调用 / 计算 / 写入：connStepCache = *connStepPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       9. 条件判断：(checkAbort(spins))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         10. 真分支：；仅条件为真执行以下子项。
+ *           11. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *     12. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 13. 条件判断：(flags & (Recv*RoleWaitRecv | Send*RoleWaitSend))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 条件判断：(isSendNotRecv && (flags & SizesFifoEnabled))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       16. 真分支：；仅条件为真执行以下子项。
+ *         17. 调用 / 计算 / 写入：connSizesFifoPtr[step%NCCL_STEPS] = nelts*sizeof(T);；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     18. 准备局部状态：void **ptrs = isSendNotRecv ? (ncclShmem.groups[group].dsts + Dst) : (ncclShmem.groups[group].srcs + Src);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     19. 条件判断：(flags & OffsFifoEnabled)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       20. 真分支：；仅条件为真执行以下子项。
+ *         21. 调用 / 计算 / 写入：ptrs[index] = connEltsFifo + loadInt(connOffsFifoPtr + (step%NCCL_STEPS))/sizeof(T);；用 volatile 全局加载读取协议偏移/控制值，防止编译器把动态变化值长久缓存在寄存器。
+ *       22. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         23. 条件判断：(isSendNotRecv && DirectSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           24. 真分支：；仅条件为真执行以下子项。
+ *             25. 条件判断：(flags & DirectWrite)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               26. 真分支：；仅条件为真执行以下子项。
+ *                 27. 调用 / 计算 / 写入：ptrs[index] = directBuff + remoteIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               28. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                 29. 条件判断：(flags & DirectRead)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   30. 真分支：；仅条件为真执行以下子项。
+ *                     31. 调用 / 计算 / 写入：ptrs[index] = nullptr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   32. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                     33. 调用 / 计算 / 写入：ptrs[index] = connEltsFifo + (step%NCCL_STEPS)*stepSize;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *           34. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             35. 条件判断：(!isSendNotRecv && DirectRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               36. 真分支：；仅条件为真执行以下子项。
+ *                 37. 条件判断：(flags & DirectRead)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   38. 真分支：；仅条件为真执行以下子项。
+ *                     39. 调用 / 计算 / 写入：ptrs[index] = directBuff + remoteIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   40. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                     41. 条件判断：(flags & DirectWrite)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                       42. 真分支：；仅条件为真执行以下子项。
+ *                         43. 调用 / 计算 / 写入：ptrs[index] = directBuff + dstIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                       44. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                         45. 调用 / 计算 / 写入：ptrs[index] = connEltsFifo + (step%NCCL_STEPS)*stepSize;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *               46. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                 47. 调用 / 计算 / 写入：ptrs[index] = connEltsFifo + (step%NCCL_STEPS)*stepSize;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     48. 调用 / 计算 / 写入：step += StepPerSlice;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0230
+ */
 /* 中文逐项-函数 F0230：waitPeer
  * 用途与位置：发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
  * 参数 dstIx（intptr_t dstIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -297,6 +381,16 @@ class Primitives<
     }
   }
 
+/* 中文内部逻辑 F0231：postPeer
+ * 精读：只有Post角色写共享进度；其本地step与Wait角色的寄存器副本独立，不是同一变量重复加步数。
+ * 精读：调用者在此前完成对应barrier/fence；本函数只是推进并发布控制值。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(flags & (Recv*RolePostRecv | Send*RolePostSend))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：step += StepPerSlice;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     4. 调用 / 计算 / 写入：*connStepPtr = step;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0231
+ */
 /* 中文逐项-函数 F0231：postPeer
  * 用途与位置：发布本 slice 完成后的连接进度，让消费者能读或生产者能回收空间。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
@@ -316,6 +410,71 @@ class Primitives<
     }
   }
 
+/* 中文内部逻辑 F0232：genericOp
+ * 精读：把非正nelem归零后仍保留约定SlicePerChunk；空数据不等于可跳过协议。
+ * 精读：worker路径设置本地指针、waitPeer选邻居指针、subBarrier同步，再选择direct特例或融合搬运。
+ * 精读：非worker在另一循环参加同一barrier；发布角色先满足fence，再postPeer推进连接。
+ * 精读：两个循环共同保证有效与空slice的屏障次数一致；不是两个线程集合各自任意结束。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：constexpr int DirectRecv = 1 && Direct && DirectRecv1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：constexpr int DirectSend = 1 && Direct && DirectSend1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：constexpr int Src = SrcBuf != -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：constexpr int Dst = DstBuf != -1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 调用 / 计算 / 写入：nelem = nelem < 0 ? 0 : nelem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 6. 准备局部状态：int sliceSize = stepSize*StepPerSlice;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 7. 调用 / 计算 / 写入：sliceSize = max(divUp(nelem, 16*SlicePerChunk)*16, sliceSize/32);；计算整数向上取整的商，避免尾数不整除时少覆盖最后一块。
+ * 8. 准备局部状态：int slice = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：int offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 条件判断：(tid < nworkers && offset < nelem)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   11. 真分支：；仅条件为真执行以下子项。
+ *     12. 编译期分支/指令：#if __CUDA_ARCH__ < 700；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *       13. 编译期分支/指令：#else；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *     14. 先执行一次的循环：初始 ；继续条件 (slice < SlicePerChunk && offset < nelem)；每轮更新；do-while先执行body再检查；其他循环先按继续条件决定是否进入。break/return/abort可改变出口。
+ *       15. 调用 / 计算 / 写入：sliceSize = sliceSize < nelem-offset ? sliceSize : nelem-offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       16. 条件判断：(Src && (flags & (SrcBuf==Input ? RoleInput : RoleOutput)))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         17. 真分支：；仅条件为真执行以下子项。
+ *           18. 调用 / 计算 / 写入：ncclShmem.groups[group].srcs[0] = userBuff + srcIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       19. 条件判断：(Dst && (flags & (DstBuf==Input ? RoleInput : RoleOutput)))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         20. 真分支：；仅条件为真执行以下子项。
+ *           21. 调用 / 计算 / 写入：ncclShmem.groups[group].dsts[0] = userBuff + dstIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       22. 调用 / 计算 / 写入：waitPeer<DirectRecv, DirectSend, Recv, Send, Src, Dst>(dstIx, remoteIx, offset, sliceSize);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *       23. 调用 / 计算 / 写入：subBarrier();；只同步负责数据搬运的 worker 子组，配合同步 warp 让复制与进度发布流水重叠。
+ *       24. 条件判断：(DirectRecv && ncclShmem.groups[group].srcs[0] == ncclShmem.groups[group].dsts[0])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         25. 真分支：；仅条件为真执行以下子项。
+ *           26. 条件判断：(Send)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             27. 真分支：；仅条件为真执行以下子项。
+ *               28. 调用 / 计算 / 写入：ReduceOrCopyMulti<Unroll, RedOp, T, 1, 1, 1, (1-Send)+MaxSend, 0> (tid, nworkers, nullptr, false, 1, (T const**)ncclShmem.groups[group].srcs, fan.nsend(), (T**)ncclShmem.groups[group].dsts+1, sliceSiz …（完整代码见函数体）；统一选择 128-bit 对齐主路径与逐类型尾部路径，融合多源归约及多目标复制。
+ *         29. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           30. 条件判断：(DirectSend && !DirectRecv && SrcBuf != Input && ncclShmem.groups[group].dsts[Dst] == nullptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             31. 真分支：；仅条件为真执行以下子项。
+ *               32. 调用 / 计算 / 写入：ReduceOrCopyMulti<Unroll, RedOp, T, 1, 1, 1, 1, 0> (tid, nworkers, ncclShmem.redOpArgs, postOp, Recv, (T const**)ncclShmem.groups[group].srcs, Dst, (T**)ncclShmem.groups[group].dsts, sliceSize);；统一选择 128-bit 对齐主路径与逐类型尾部路径，融合多源归约及多目标复制。
+ *             33. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *               34. 准备局部状态：constexpr int PreOpN = SrcBuf != Input ? 0 : DirectRecv*MaxRecv == NCCL_MAX_DIRECT_ARITY ? (1+NCCL_MAX_DIRECT_ARITY) : 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               35. 调用 / 计算 / 写入：ReduceOrCopyMulti<Unroll, RedOp, T, Recv+Src, Recv*MaxRecv+Src, Send+Dst, Send*MaxSend+Dst, PreOpN> (tid, nworkers, ncclShmem.redOpArgs, postOp, Recv*fan.nrecv()+Src, (T const**)ncclShmem.groups[group …（完整代码见函数体）；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
+ *       36. 调用 / 计算 / 写入：barrier();；同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
+ *       37. 条件判断：(Send && (flags & RolePostSend) && index == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         38. 真分支：；仅条件为真执行以下子项。
+ *           39. 调用 / 计算 / 写入：__threadfence_system();；约束先前数据写与随后进度发布的可见性顺序；这不是等待所有rank完成。
+ *       40. 调用 / 计算 / 写入：__syncwarp();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ *       41. 调用 / 计算 / 写入：postPeer<Recv, Send>();；发布本 slice 完成后的连接进度，让消费者能读或生产者能回收空间。
+ *       42. 调用 / 计算 / 写入：offset += sliceSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       43. 调用 / 计算 / 写入：slice += 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     44. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 45. 编译期分支/指令：#pragma unroll 1；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ * 46. 循环：初始 ；继续条件 (slice < SlicePerChunk)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   47. 调用 / 计算 / 写入：sliceSize = sliceSize < nelem-offset ? sliceSize : nelem-offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   48. 调用 / 计算 / 写入：waitPeer<DirectRecv, DirectSend, Recv, Send, Src, Dst>(0, 0, 0, 0);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *   49. 调用 / 计算 / 写入：barrier();；同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
+ *   50. 条件判断：(Send && (flags & RolePostSend) && sliceSize > 0 && index == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     51. 真分支：；仅条件为真执行以下子项。
+ *       52. 调用 / 计算 / 写入：__threadfence_system();；约束先前数据写与随后进度发布的可见性顺序；这不是等待所有rank完成。
+ *   53. 调用 / 计算 / 写入：__syncwarp();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ *   54. 调用 / 计算 / 写入：postPeer<Recv, Send>();；发布本 slice 完成后的连接进度，让消费者能读或生产者能回收空间。
+ *   55. 调用 / 计算 / 写入：offset += sliceSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   56. 调用 / 计算 / 写入：slice += 1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 57. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0232
+ */
 /* 中文逐项-函数 F0232：genericOp
  * 用途与位置：Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
  * 参数 srcIx（intptr_t srcIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -499,6 +658,85 @@ class Primitives<
   // Scatter/Gather generic op
   // skip: my own rank order in the buffer chunks
   // shift: peer offset to avoid all ranks sending to or receiving from same peer
+/* 中文内部逻辑 F0233：ScatterGatherOp
+ * 精读：每slice先算有效peer范围，再按shift轮转peer次序，skip跳过自己负责的段。
+ * 精读：Scatter与Gather使用不同源目标组合；direct重合地址可以省复制，但仍保留屏障和进度发布。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：constexpr int DirectRecv = 1 && Direct && DirectRecv1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：constexpr int DirectSend = 1 && Direct && DirectSend1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：int offset = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int sliceSize = stepSize*StepPerSlice;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：int dataSize = max(DIVUP(peerElem, 16*SlicePerChunk)*16, sliceSize/32);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ * 7. 循环：初始 int slice=0;；继续条件 slice<SlicePerChunk；每轮更新 ++slice；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   8. 准备局部状态：int realSize = max(0, min(dataSize, peerElem-offset));；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *   9. 条件判断：(tid < nworkers)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     10. 真分支：；仅条件为真执行以下子项。
+ *       11. 条件判断：(Send)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         12. 真分支：；仅条件为真执行以下子项。
+ *           13. 准备局部状态：constexpr int PreOpN = DirectSend ? 0 : 1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *           14. 条件判断：(flags & RoleInput)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             15. 真分支：；仅条件为真执行以下子项。
+ *               16. 调用 / 计算 / 写入：ncclShmem.groups[group].srcs[0] = userBuff + inpIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           17. 条件判断：(tid == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             18. 真分支：；仅条件为真执行以下子项。
+ *               19. 调用 / 计算 / 写入：ncclShmem.groups[group].totalSendSize[slice] = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           20. 调用 / 计算 / 写入：waitPeer<0, DirectSend, 0, 1, 1, 0>(0, inpIx, offset, realSize);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *           21. 调用 / 计算 / 写入：subBarrier();；只同步负责数据搬运的 worker 子组，配合同步 warp 让复制与进度发布流水重叠。
+ *           22. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *           23. 循环：初始 int j=0;；继续条件 j<fan.nsend()；每轮更新 j++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *             24. 准备局部状态：int i = (j+shift)%fan.nsend();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             25. 准备局部状态：int peerOffset = i*peerElem;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             26. 条件判断：(skip >= 0 && i >= skip)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               27. 真分支：；仅条件为真执行以下子项。
+ *                 28. 调用 / 计算 / 写入：peerOffset += peerElem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             29. 准备局部状态：const T* src0 = (T*)ncclShmem.groups[group].srcs[0] + peerOffset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *             30. 准备局部状态：int realPeerSize = min(realSize, totalElem-peerOffset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *             31. 条件判断：(realPeerSize > 0 && ncclShmem.groups[group].dsts[i] != nullptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               32. 真分支：；仅条件为真执行以下子项。
+ *                 33. 调用 / 计算 / 写入：ReduceOrCopyMulti<Unroll, RedOp, T, 1, 1, 1, 1, PreOpN>(tid, nworkers, ncclShmem.redOpArgs, false, 1, &src0, 1, (T**)ncclShmem.groups[group].dsts+i, realPeerSize);；统一选择 128-bit 对齐主路径与逐类型尾部路径，融合多源归约及多目标复制。
+ *                 34. 条件判断：(tid == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   35. 真分支：；仅条件为真执行以下子项。
+ *                     36. 调用 / 计算 / 写入：ncclShmem.groups[group].totalSendSize[slice] += realPeerSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           37. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *         38. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *           39. 条件判断：(Recv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             40. 真分支：；仅条件为真执行以下子项。
+ *               41. 条件判断：(flags & RoleOutput)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 42. 真分支：；仅条件为真执行以下子项。
+ *                   43. 调用 / 计算 / 写入：ncclShmem.groups[group].dsts[0] = userBuff + outIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               44. 准备局部状态：int peerOffset = index*peerElem;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *               45. 条件判断：(skip >= 0 && index >= skip)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 46. 真分支：；仅条件为真执行以下子项。
+ *                   47. 调用 / 计算 / 写入：peerOffset += peerElem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               48. 调用 / 计算 / 写入：waitPeer<DirectRecv, 0, 1, 0, 0, 1>(outIx, outIx+peerOffset, offset, realSize);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *               49. 调用 / 计算 / 写入：subBarrier();；只同步负责数据搬运的 worker 子组，配合同步 warp 让复制与进度发布流水重叠。
+ *               50. 条件判断：(DirectRecv && ncclShmem.groups[group].srcs[0] == ncclShmem.groups[group].dsts[0])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                 51. 真分支：；仅条件为真执行以下子项。
+ *                 52. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                   53. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
+ *                   54. 循环：初始 int j=0;；继续条件 j<fan.nrecv()；每轮更新 j++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *                     55. 准备局部状态：int i = (j+shift)%fan.nrecv();；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                     56. 调用 / 计算 / 写入：peerOffset = i*peerElem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                     57. 条件判断：(skip >= 0 && i >= skip)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                       58. 真分支：；仅条件为真执行以下子项。
+ *                         59. 调用 / 计算 / 写入：peerOffset += peerElem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                     60. 准备局部状态：T* dst0 = (T*)ncclShmem.groups[group].dsts[0] + peerOffset;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *                     61. 准备局部状态：int realPeerSize = min(realSize, totalElem-peerOffset);；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。
+ *                     62. 条件判断：(realPeerSize > 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                       63. 真分支：；仅条件为真执行以下子项。
+ *                         64. 调用 / 计算 / 写入：ReduceOrCopyMulti<Unroll, RedOp, T, 1, 1, 1, 1, 0>(tid, nworkers, ncclShmem.redOpArgs, postOp, 1, (const T**)ncclShmem.groups[group].srcs+i, 1, &dst0, realPeerSize);；统一选择 128-bit 对齐主路径与逐类型尾部路径，融合多源归约及多目标复制。
+ *                   65. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *   66. 调用 / 计算 / 写入：barrier();；同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
+ *   67. 条件判断：(Send && (flags & RolePostSend) && ncclShmem.groups[group].totalSendSize[slice] > 0 && index == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *     68. 真分支：；仅条件为真执行以下子项。
+ *       69. 调用 / 计算 / 写入：__threadfence_system();；约束先前数据写与随后进度发布的可见性顺序；这不是等待所有rank完成。
+ *   70. 调用 / 计算 / 写入：__syncwarp();；让当前参与线程/warp按此同步点会合；参与范围由该屏障接口决定。
+ *   71. 调用 / 计算 / 写入：postPeer<Recv, Send>();；发布本 slice 完成后的连接进度，让消费者能读或生产者能回收空间。
+ *   72. 调用 / 计算 / 写入：offset += realSize;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 73. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0233
+ */
 /* 中文逐项-函数 F0233：ScatterGatherOp
  * 用途与位置：按 peer 分配或收集不同数据段，支持 CollNet 多 head 的分散/汇集以及直接缓冲访问优化。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -662,7 +900,47 @@ class Primitives<
  * 接收一侧读 tail 等生产，写 head 释放消费；发送一侧读 head 等空间，写 tail 发布生产。
  * 这里的 head/tail 是连接视图，具体位于哪一侧 CPU/GPU 内存由 transport connect 填好。
  */
-  __device__ __forceinline__ /* 中文逐项-函数 F0234：loadRecvConn
+  __device__ __forceinline__ /* 中文内部逻辑 F0234：loadRecvConn
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(flags & (RoleWaitRecv|RolePostRecv))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 准备局部状态：auto *conn = &peer->recv[connIndex].conn;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     4. 调用 / 计算 / 写入：step = conn->step;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     5. 调用 / 计算 / 写入：step = roundUp(step, SlicePerChunk*StepPerSlice);；把尺寸/偏移向上对齐到指定粒度，满足向量访存、页或协议槽位契约。
+ *     6. 条件判断：(flags & RolePostRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 调用 / 计算 / 写入：connStepPtr = conn->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         9. 调用 / 计算 / 写入：*connStepPtr = step;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     10. 条件判断：(flags & RoleWaitRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       11. 真分支：；仅条件为真执行以下子项。
+ *         12. 调用 / 计算 / 写入：ncclShmem.groups[group].recvConns[index] = conn;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         13. 调用 / 计算 / 写入：connStepPtr = conn->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         14. 调用 / 计算 / 写入：connStepCache = *connStepPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         15. 调用 / 计算 / 写入：flags |= (conn->offsFifo != nullptr) ? OffsFifoEnabled : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         16. 条件判断：(Direct)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           17. 真分支：；仅条件为真执行以下子项。
+ *             18. 条件判断：((conn->direct & (NCCL_IPC_READ|NCCL_IPC_WRITE)) && e != nullptr && e->regUsed)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               19. 真分支：；仅条件为真执行以下子项。
+ *                 20. 条件判断：(connIndex == 1 && P2p == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   21. 真分支：；仅条件为真执行以下子项。
+ *                     22. 调用 / 计算 / 写入：flags |= DirectRead;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   23. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                     24. 调用 / 计算 / 写入：flags |= (e->direct & NCCL_DIRECT_WRITE) ? DirectWrite : (e->direct & NCCL_DIRECT_READ) ? DirectRead : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *               25. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                 26. 条件判断：(conn->direct & (NCCL_DIRECT_WRITE|NCCL_DIRECT_READ))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   27. 真分支：；仅条件为真执行以下子项。
+ *                     28. 条件判断：(connIndex == 1 && P2p == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                       29. 真分支：；仅条件为真执行以下子项。
+ *                         30. 调用 / 计算 / 写入：flags |= DirectRead;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                       31. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                         32. 调用 / 计算 / 写入：flags |= (conn->direct & NCCL_DIRECT_WRITE) ? DirectWrite : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         33. 条件判断：(flags & OffsFifoEnabled)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           34. 真分支：；仅条件为真执行以下子项。
+ *             35. 调用 / 计算 / 写入：connOffsFifoPtr = conn->offsFifo;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         36. 调用 / 计算 / 写入：connEltsFifo = (T*)conn->buffs[NCCL_PROTO_SIMPLE];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0234
+ */
+/* 中文逐项-函数 F0234：loadRecvConn
  * 用途与位置：从指定 peer/连接索引读取原语所需缓冲、进度和 direct/shared 能力，建立线程局部连接视图。
  * 参数 peer（ncclPeer *peer）：通信对端的用户 rank，决定在 channel.peers 中选择哪个连接槽。
  * 参数 connIndex（int connIndex）：同一 peer/方向内的连接槽编号；本版普通集合用0，常规 P2P 用1。
@@ -714,7 +992,51 @@ class Primitives<
     }
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0235：loadSendConn
+  __device__ __forceinline__ /* 中文内部逻辑 F0235：loadSendConn
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(flags & (RoleWaitSend|RolePostSend))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 准备局部状态：auto *conn = &peer->send[connIndex].conn;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     4. 调用 / 计算 / 写入：step = conn->step;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     5. 调用 / 计算 / 写入：step = roundUp(step, SlicePerChunk*StepPerSlice);；把尺寸/偏移向上对齐到指定粒度，满足向量访存、页或协议槽位契约。
+ *     6. 条件判断：(flags & RolePostSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       7. 真分支：；仅条件为真执行以下子项。
+ *         8. 调用 / 计算 / 写入：connStepPtr = conn->tail;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     9. 条件判断：(flags & RoleWaitSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       10. 真分支：；仅条件为真执行以下子项。
+ *         11. 调用 / 计算 / 写入：ncclShmem.groups[group].sendConns[index] = conn;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         12. 调用 / 计算 / 写入：connStepPtr = conn->head;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         13. 调用 / 计算 / 写入：connStepCache = *connStepPtr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         14. 调用 / 计算 / 写入：flags |= (conn->offsFifo != nullptr) ? OffsFifoEnabled : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         15. 条件判断：(flags & OffsFifoEnabled)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           16. 真分支：；仅条件为真执行以下子项。
+ *             17. 调用 / 计算 / 写入：connOffsFifoPtr = conn->offsFifo;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         18. 调用 / 计算 / 写入：connEltsFifo = (T*)conn->buffs[NCCL_PROTO_SIMPLE];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         19. 条件判断：(conn->sizesFifo != nullptr)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           20. 真分支：；仅条件为真执行以下子项。
+ *             21. 调用 / 计算 / 写入：flags |= SizesFifoEnabled;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *             22. 调用 / 计算 / 写入：connSizesFifoPtr = conn->sizesFifo;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           23. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             24. 条件判断：(Direct)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               25. 真分支：；仅条件为真执行以下子项。
+ *                 26. 条件判断：((conn->direct & (NCCL_IPC_READ|NCCL_IPC_WRITE)) && e != nullptr && e->regUsed)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   27. 真分支：；仅条件为真执行以下子项。
+ *                     28. 条件判断：(connIndex == 1 && P2p == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                       29. 真分支：；仅条件为真执行以下子项。
+ *                         30. 调用 / 计算 / 写入：flags |= DirectRead;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                       31. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                         32. 调用 / 计算 / 写入：flags |= (e->direct & NCCL_DIRECT_WRITE) ? DirectWrite : (e->direct & NCCL_DIRECT_READ) ? DirectRead : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                   33. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                     34. 条件判断：(conn->direct & (NCCL_DIRECT_WRITE|NCCL_DIRECT_READ))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                       35. 真分支：；仅条件为真执行以下子项。
+ *                         36. 条件判断：(connIndex == 1 && P2p == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                           37. 真分支：；仅条件为真执行以下子项。
+ *                             38. 调用 / 计算 / 写入：flags |= DirectRead;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *                           39. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *                             40. 调用 / 计算 / 写入：flags |= (conn->direct & NCCL_DIRECT_WRITE) ? DirectWrite : 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0235
+ */
+/* 中文逐项-函数 F0235：loadSendConn
  * 用途与位置：从指定 peer/连接索引读取原语所需缓冲、进度和 direct/shared 能力，建立线程局部连接视图。
  * 参数 peer（ncclPeer *peer）：通信对端的用户 rank，决定在 channel.peers 中选择哪个连接槽。
  * 参数 connIndex（int connIndex）：同一 peer/方向内的连接槽编号；本版普通集合用0，常规 P2P 用1。
@@ -777,7 +1099,71 @@ class Primitives<
  * group 的低位区分共享内存/命名 barrier 组，高位携带 connIndex，P2P 使用索引 1。
  * 最后装载连接并交换 direct 指针；匹配双方必须执行相容构造路径，否则可能在交换阶段等待。
  */
-  __device__ /* 中文逐项-函数 F0236：Primitives
+  __device__ /* 中文内部逻辑 F0236：Primitives
+ * 精读：从邻居列表计算实际收发数并确定worker和额外同步warp。
+ * 精读：按8线程角色分组设置Wait/Input/Output/Post位，再加载对应方向的连接视图。
+ * 精读：最后交换用户缓冲指针/缩放参数；构造过程可能等待配对方，不只是赋几个普通字段。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：this->nthreads = nthreads;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 调用 / 计算 / 写入：this->nworkers = nthreads - (MaxSend > 0 && nthreads-WARP_SIZE >= 64 ? WARP_SIZE : 0);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 3. 调用 / 计算 / 写入：this->group = group & (uint16_t)0xFFFF;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 4. 准备局部状态：int connIndex = group >> 16;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：int nrecv=0, nsend=0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 循环：初始 ；继续条件 (nrecv < MaxRecv && recvPeers[nrecv] != -1)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   7. 调用 / 计算 / 写入：nrecv++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 9. 循环：初始 ；继续条件 (nsend < MaxSend && sendPeers[nsend] != -1)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *   10. 调用 / 计算 / 写入：nsend++;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 11. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ * 12. 调用 / 计算 / 写入：this->fan = Fan(nrecv, nsend);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 13. 准备局部状态：constexpr int ThreadPerSync = 8;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 14. 源码语法片段：static_assert(MaxSend < ThreadPerSync && MaxRecv < ThreadPerSync, "Not enough threads to cover all peers");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
+ * 15. 准备局部状态：int g = tid / ThreadPerSync;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 16. 准备局部状态：int ng = nthreads / ThreadPerSync;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 17. 调用 / 计算 / 写入：index = tid % ThreadPerSync;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 18. 调用 / 计算 / 写入：flags = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 19. 条件判断：(g == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   20. 真分支：；仅条件为真执行以下子项。
+ *     21. 条件判断：(index < nrecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       22. 真分支：；仅条件为真执行以下子项。
+ *         23. 调用 / 计算 / 写入：flags |= RoleWaitRecv;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     24. 条件判断：(index == nrecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       25. 真分支：；仅条件为真执行以下子项。
+ *         26. 调用 / 计算 / 写入：flags |= RoleInput;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   27. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     28. 条件判断：(g == 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       29. 真分支：；仅条件为真执行以下子项。
+ *         30. 条件判断：(index < nsend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           31. 真分支：；仅条件为真执行以下子项。
+ *             32. 调用 / 计算 / 写入：flags |= RoleWaitSend;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *         33. 条件判断：(index == nsend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           34. 真分支：；仅条件为真执行以下子项。
+ *             35. 调用 / 计算 / 写入：flags |= RoleOutput;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       36. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         37. 条件判断：(g == ng - 2)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *           38. 真分支：；仅条件为真执行以下子项。
+ *             39. 条件判断：(index < nrecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               40. 真分支：；仅条件为真执行以下子项。
+ *                 41. 调用 / 计算 / 写入：flags |= RolePostRecv;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           42. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *             43. 条件判断：(g == ng - 1)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *               44. 真分支：；仅条件为真执行以下子项。
+ *                 45. 条件判断：(index < nsend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *                   46. 真分支：；仅条件为真执行以下子项。
+ *                     47. 调用 / 计算 / 写入：flags |= RolePostSend;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 48. 准备局部状态：int peer = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 49. 条件判断：(flags & (RoleWaitRecv|RolePostRecv))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   50. 真分支：；仅条件为真执行以下子项。
+ *     51. 调用 / 计算 / 写入：peer = recvPeers[index];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 52. 条件判断：(flags & (RoleWaitSend|RolePostSend))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   53. 真分支：；仅条件为真执行以下子项。
+ *     54. 调用 / 计算 / 写入：peer = sendPeers[index];；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 55. 调用 / 计算 / 写入：loadRecvConn(&ncclShmem.channel.devPeers[peer], connIndex, e);；从指定 peer/连接索引读取原语所需缓冲、进度和 direct/shared 能力，建立线程局部连接视图。
+ * 56. 调用 / 计算 / 写入：loadSendConn(&ncclShmem.channel.devPeers[peer], connIndex, e);；从指定 peer/连接索引读取原语所需缓冲、进度和 direct/shared 能力，建立线程局部连接视图。
+ * 57. 调用 / 计算 / 写入：setDataPtrs(inputBuf, outputBuf, redOpArg, (struct ncclWorkElemReg*)e);；更新本原语的本地输入和输出缓冲指针；Simple 的 direct 路径还需完成对应地址交换。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0236
+ */
+/* 中文逐项-函数 F0236：Primitives
  * 用途与位置：为一个线程组建立原语上下文：实际邻居度、协议缓冲、线程角色、同步编号及用户数据指针。
  * 参数 tid（int tid）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
  * 参数 nthreads（int nthreads）：当前原语/任务参与线程数；原语子组可能只占整个 block 的一部分。
@@ -871,7 +1257,19 @@ class Primitives<
  * 析构还要保证线程同步满足协议要求，不仅仅是 C++ 对象释放内存。
  * 这也是不能把一次原语调用解释为“重新创建一条连接”的原因。
  */
-  __device__ /* 中文逐项-函数 F0237：~Primitives
+  __device__ /* 中文内部逻辑 F0237：~Primitives
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(!(flags & ThreadsSynced))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：barrier();；同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
+ * 4. 条件判断：(flags & (RolePostSend|RolePostRecv))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   5. 真分支：；仅条件为真执行以下子项。
+ *     6. 准备局部状态：auto *conns = (flags & RolePostSend) ? ncclShmem.groups[group].sendConns : ncclShmem.groups[group].recvConns;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     7. 调用 / 计算 / 写入：conns[index]->step = step;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 8. 调用 / 计算 / 写入：barrier();；同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0237
+ */
+/* 中文逐项-函数 F0237：~Primitives
  * 用途与位置：把本次推进后的 step 写回长期连接并按协议要求同步，后续操作继续复用同一连接。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -897,7 +1295,89 @@ class Primitives<
     barrier();
   }
 
-  __device__ /* 中文逐项-函数 F0238：setDataPtrs
+  __device__ /* 中文内部逻辑 F0238：setDataPtrs
+ * 精读：普通路径只设置本地Input/Output；direct路径再分提供者和接收者。
+ * 精读：直接写由接收方提供output，直接读由发送方提供input或output；指针槽以nullptr表示空，所以传输时采用异或编码。
+ * 精读：直接读还分两段交换标量，每段加有效标记，支持数值本身为零；取走后清槽避免覆盖上一轮。
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(flags & RoleInput)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：userBuff = (T*)inputBuf;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     4. 调用 / 计算 / 写入：ncclShmem.redOpArgs[0] = redOpArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 5. 条件判断：(flags & RoleOutput)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   6. 真分支：；仅条件为真执行以下子项。
+ *     7. 调用 / 计算 / 写入：userBuff = (T*)outputBuf;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 8. 准备局部状态：bool recvProvider = flags == (flags|RoleWaitRecv|DirectWrite);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 9. 准备局部状态：bool sendAcceptor = flags == (flags|RoleWaitSend|DirectWrite);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 10. 准备局部状态：bool sendProvider = flags == (flags|RoleWaitSend|DirectRead);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 11. 准备局部状态：bool recvAcceptor = flags == (flags|RoleWaitRecv|DirectRead);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 12. 准备局部状态：int regUsed = e != nullptr ? e->elem.regUsed : 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 13. 条件判断：(Direct && recvProvider)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   14. 真分支：；仅条件为真执行以下子项。
+ *     15. 准备局部状态：int spins = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     16. 准备局部状态：void *volatile *slot = ncclShmem.groups[group].recvConns[index]->ptrExchange;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     17. 循环：初始 ；继续条件 (*slot != nullptr && !checkAbort(spins))；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       18. 调用 / 计算 / 写入：;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     19. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     20. 调用 / 计算 / 写入：directBuff = (T*)outputBuf;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     21. 调用 / 计算 / 写入：*slot = reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(directBuff) ^ reinterpret_cast<uintptr_t>(slot));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 22. 条件判断：(Direct && sendAcceptor)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   23. 真分支：；仅条件为真执行以下子项。
+ *     24. 准备局部状态：int spins = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     25. 准备局部状态：void *volatile *slot = ncclShmem.groups[group].sendConns[index]->ptrExchange;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     26. 准备局部状态：void *ptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     27. 循环：初始 ；继续条件 (true)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       28. 调用 / 计算 / 写入：ptr = *slot;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       29. 条件判断：(ptr != nullptr || checkAbort(spins))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         30. 真分支：；仅条件为真执行以下子项。
+ *           31. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *     32. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     33. 调用 / 计算 / 写入：directBuff = regUsed ? (T*)(e->dnOutputs[index]) : reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(ptr) ^ reinterpret_cast<uintptr_t>(slot));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     34. 调用 / 计算 / 写入：*slot = nullptr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 35. 条件判断：(Direct && sendProvider)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   36. 真分支：；仅条件为真执行以下子项。
+ *     37. 准备局部状态：int spins = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     38. 准备局部状态：void *volatile *slot = ncclShmem.groups[group].sendConns[index]->ptrExchange;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     39. 准备局部状态：volatile uint64_t* argSlot0 = ncclShmem.groups[group].sendConns[index]->redOpArgExchange;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     40. 准备局部状态：volatile uint64_t* argSlot1 = ncclShmem.groups[group].sendConns[index]->redOpArgExchange+1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     41. 循环：初始 ；继续条件 ((*slot != nullptr || *argSlot0 != 0 || *argSlot1 !=0) && !checkAbort(spins))；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       42. 调用 / 计算 / 写入：;；执行这段本地计算/控制片段；保持源码表达式的求值顺序与类型/单位。
+ *     43. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     44. 调用 / 计算 / 写入：directBuff = MaxRecv == 0 ? (T*)inputBuf : (T*)outputBuf;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     45. 调用 / 计算 / 写入：*argSlot0 = (uint64_t(1)<<32) | (uint32_t)redOpArg;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     46. 调用 / 计算 / 写入：*argSlot1 = (uint64_t(1)<<32) | (uint32_t)(redOpArg>>32);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     47. 调用 / 计算 / 写入：*slot = reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(directBuff) ^ reinterpret_cast<uintptr_t>(slot));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 48. 条件判断：(Direct && recvAcceptor)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   49. 真分支：；仅条件为真执行以下子项。
+ *     50. 准备局部状态：int spins = 0;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     51. 准备局部状态：void *volatile *slot = ncclShmem.groups[group].recvConns[index]->ptrExchange;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     52. 准备局部状态：volatile uint64_t* argSlot0 = ncclShmem.groups[group].recvConns[index]->redOpArgExchange;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     53. 准备局部状态：volatile uint64_t* argSlot1 = ncclShmem.groups[group].recvConns[index]->redOpArgExchange+1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     54. 准备局部状态：void *ptr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *     55. 循环：初始 ；继续条件 (true)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *       56. 调用 / 计算 / 写入：ptr = *slot;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       57. 条件判断：(ptr != nullptr || checkAbort(spins))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *         58. 真分支：；仅条件为真执行以下子项。
+ *           59. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *     60. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *     61. 调用 / 计算 / 写入：directBuff = regUsed ? (T*)(MaxSend == 0 ? e->upOutputs[index] : e->dnInputs[index]) : reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(ptr) ^ reinterpret_cast<uintptr_t>(slot));；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     62. 条件判断：(MaxSend != 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       63. 真分支：；仅条件为真执行以下子项。
+ *         64. 准备局部状态：uint64_t arg0, arg1;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ *         65. 循环：初始 ；继续条件 (true)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
+ *           66. 调用 / 计算 / 写入：arg0 = *argSlot0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           67. 调用 / 计算 / 写入：arg1 = *argSlot1;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *           68. 条件判断：((arg0 != 0 && arg1 != 0) || checkAbort(spins))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *             69. 真分支：；仅条件为真执行以下子项。
+ *               70. 控制转移：break;；退出当前最内层循环或switch，继续其后；并非结束整个函数。
+ *         71. 循环出口：；条件不再满足或遇break后继续循环后代码；遇return/goto则转到对应出口。
+ *         72. 调用 / 计算 / 写入：ncclShmem.redOpArgs[1+index] = ((arg1 & 0xffffffff)<<32) | (arg0 & 0xffffffff);；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     73. 调用 / 计算 / 写入：*argSlot0 = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     74. 调用 / 计算 / 写入：*argSlot1 = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *     75. 调用 / 计算 / 写入：*slot = nullptr;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0238
+ */
+/* 中文逐项-函数 F0238：setDataPtrs
  * 用途与位置：更新本原语的本地输入和输出缓冲指针；Simple 的 direct 路径还需完成对应地址交换。
  * 参数 inputBuf（void const *inputBuf）：输入数据地址，偏移单位由实际指针元素类型和当前 API 的归一化结果决定。
  * 参数 outputBuf（void *outputBuf）：输出数据地址，必须容纳当前 API 语义所需结果；AG 是多 rank 拼接，RS 只保留本段。
@@ -1069,7 +1549,14 @@ class Primitives<
     }
   }
 
-  __device__ /* 中文逐项-函数 F0239：moveDataPtrs
+  __device__ /* 中文内部逻辑 F0239：moveDataPtrs
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 条件判断：(flags & (RoleInput|RoleOutput))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   2. 真分支：；仅条件为真执行以下子项。
+ *     3. 调用 / 计算 / 写入：userBuff += delta;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0239
+ */
+/* 中文逐项-函数 F0239：moveDataPtrs
  * 用途与位置：按元素偏移移动本原语的用户输入/输出指针，复用连接与协议状态处理另一段数据。
  * 参数 delta（intptr_t delta）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
@@ -1087,7 +1574,12 @@ class Primitives<
  * 下面每个包装仅选择 genericOp 的模板位，不会每次单独发射 CUDA kernel。
  * Input/Output 下标都是 T 元素偏移；remoteOutIx 只在 direct 访问远端用户缓冲时需要。
  */
-  __device__ __forceinline__ /* 中文逐项-函数 F0240：send
+  __device__ __forceinline__ /* 中文内部逻辑 F0240：send
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 0, 1, Input, -1>(inpIx, -1, -1, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0240
+ */
+/* 中文逐项-函数 F0240：send
  * 用途与位置：从本地输入读取并发送到原语的发送邻居，不要求写本地输出。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 eltN（int eltN）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
@@ -1096,7 +1588,12 @@ class Primitives<
  */void send(intptr_t inpIx, int eltN) {
     genericOp<0, 0, 0, 1, Input, -1>(inpIx, -1, -1, eltN, false);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0241：sendFromOutput
+  __device__ __forceinline__ /* 中文内部逻辑 F0241：sendFromOutput
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 0, 1, Output, -1>(outIx, -1, -1, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0241
+ */
+/* 中文逐项-函数 F0241：sendFromOutput
  * 用途与位置：从已生成的本地输出读数据并发送，避免错误地重新读取原始输入。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 eltN（int eltN）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
@@ -1105,7 +1602,12 @@ class Primitives<
  */void sendFromOutput(intptr_t outIx, int eltN) {
     genericOp<0, 0, 0, 1, Output, -1>(outIx, -1, -1, eltN, false);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0242：directSend
+  __device__ __forceinline__ /* 中文内部逻辑 F0242：directSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 1, 0, 1, Input, -1>(inpIx, -1, remoteOutIx, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0242
+ */
+/* 中文逐项-函数 F0242：directSend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteOutIx（intptr_t remoteOutIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1115,7 +1617,12 @@ class Primitives<
  */void directSend(intptr_t inpIx, intptr_t remoteOutIx, int eltN) {
     genericOp<0, 1, 0, 1, Input, -1>(inpIx, -1, remoteOutIx, eltN, false);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0243：directSendFromOutput
+  __device__ __forceinline__ /* 中文内部逻辑 F0243：directSendFromOutput
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 1, 0, 1, Output, -1>(outIx, -1, remoteOutIx, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0243
+ */
+/* 中文逐项-函数 F0243：directSendFromOutput
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteOutIx（intptr_t remoteOutIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1126,7 +1633,12 @@ class Primitives<
     genericOp<0, 1, 0, 1, Output, -1>(outIx, -1, remoteOutIx, eltN, false);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0244：recv
+  __device__ __forceinline__ /* 中文内部逻辑 F0244：recv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0244
+ */
+/* 中文逐项-函数 F0244：recv
  * 用途与位置：接收上游数据并写本地输出，本动作不加上本地输入。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 eltN（int eltN）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
@@ -1136,7 +1648,12 @@ class Primitives<
  */void recv(intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, postOp);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0245：directRecv
+  __device__ __forceinline__ /* 中文内部逻辑 F0245：directRecv
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<1, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0245
+ */
+/* 中文逐项-函数 F0245：directRecv
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 eltN（int eltN）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
@@ -1146,7 +1663,12 @@ class Primitives<
     genericOp<1, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, /*postOp=*/false);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0246：copySend
+  __device__ __forceinline__ /* 中文内部逻辑 F0246：copySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 0, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0246
+ */
+/* 中文逐项-函数 F0246：copySend
  * 用途与位置：把本地输入同时写本地输出并发下游，把本地保存和转发合并一次数据加载。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1157,7 +1679,12 @@ class Primitives<
  */void copySend(intptr_t inpIx, intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 0, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0247：directCopySend
+  __device__ __forceinline__ /* 中文内部逻辑 F0247：directCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 1, 0, 1, Input, Output>(inpIx, outIx, remoteOutIx, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0247
+ */
+/* 中文逐项-函数 F0247：directCopySend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1170,7 +1697,12 @@ class Primitives<
     genericOp<0, 1, 0, 1, Input, Output>(inpIx, outIx, remoteOutIx, eltN, postOp);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0248：recvCopySend
+  __device__ __forceinline__ /* 中文内部逻辑 F0248：recvCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 1, -1, Output>(-1, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0248
+ */
+/* 中文逐项-函数 F0248：recvCopySend
  * 用途与位置：把已接收结果同时保存本地输出并转发下游，不再加入本地输入做归约。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 eltN（int eltN）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
@@ -1180,7 +1712,12 @@ class Primitives<
  */void recvCopySend(intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 1, -1, Output>(-1, outIx, -1, eltN, postOp);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0249：directRecvCopySend
+  __device__ __forceinline__ /* 中文内部逻辑 F0249：directRecvCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<1, 1, 1, 1, -1, Output>(-1, outIx, remoteOutIx, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0249
+ */
+/* 中文逐项-函数 F0249：directRecvCopySend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteOutIx（intptr_t remoteOutIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1190,7 +1727,12 @@ class Primitives<
  */void directRecvCopySend(intptr_t outIx, intptr_t remoteOutIx, int eltN) {
     genericOp<1, 1, 1, 1, -1, Output>(-1, outIx, remoteOutIx, eltN, false);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0250：recvCopyDirectSend
+  __device__ __forceinline__ /* 中文内部逻辑 F0250：recvCopyDirectSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 1, 1, 1, -1, Output>(-1, outIx, remoteOutIx, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0250
+ */
+/* 中文逐项-函数 F0250：recvCopyDirectSend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteOutIx（intptr_t remoteOutIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1202,7 +1744,12 @@ class Primitives<
     genericOp<0, 1, 1, 1, -1, Output>(-1, outIx, remoteOutIx, eltN, postOp);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0251：recvReduceCopy
+  __device__ __forceinline__ /* 中文内部逻辑 F0251：recvReduceCopy
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 0, Input, Output>(inpIx, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0251
+ */
+/* 中文逐项-函数 F0251：recvReduceCopy
  * 用途与位置：把接收数据与本地输入归约后写本地输出，可在结果完成时执行 postOp。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1214,7 +1761,12 @@ class Primitives<
     genericOp<0, 0, 1, 0, Input, Output>(inpIx, outIx, -1, eltN, postOp);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0252：recvReduceSend
+  __device__ __forceinline__ /* 中文内部逻辑 F0252：recvReduceSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 1, Input, -1>(inpIx, -1, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0252
+ */
+/* 中文逐项-函数 F0252：recvReduceSend
  * 用途与位置：把上游部分结果与本地输入归约后发下游，不要求保留本地最终输出。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 eltN（int eltN）：本轮有效数据元素数，尾块可小于对齐后的 chunk 容量。
@@ -1224,7 +1776,12 @@ class Primitives<
  */void recvReduceSend(intptr_t inpIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 1, Input, -1>(inpIx, -1, -1, eltN, postOp);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0253：directRecvReduceSend
+  __device__ __forceinline__ /* 中文内部逻辑 F0253：directRecvReduceSend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<1, 0, 1, 1, Input, -1>(inpIx, -1, remoteInpIx, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0253
+ */
+/* 中文逐项-函数 F0253：directRecvReduceSend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteInpIx（intptr_t remoteInpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1236,7 +1793,12 @@ class Primitives<
     genericOp<1, 0, 1, 1, Input, -1>(inpIx, -1, remoteInpIx, eltN, postOp);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0254：recvReduceCopySend
+  __device__ __forceinline__ /* 中文内部逻辑 F0254：recvReduceCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0254
+ */
+/* 中文逐项-函数 F0254：recvReduceCopySend
  * 用途与位置：把接收与本地输入融合归约，同时保存输出并转发，衔接归约与结果传播阶段。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1247,7 +1809,12 @@ class Primitives<
  */void recvReduceCopySend(intptr_t inpIx, intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0255：directRecvReduceCopySend
+  __device__ __forceinline__ /* 中文内部逻辑 F0255：directRecvReduceCopySend
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：genericOp<0, 1, 1, 1, Input, Output>(inpIx, outIx, remoteOutIx, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0255
+ */
+/* 中文逐项-函数 F0255：directRecvReduceCopySend
  * 用途与位置：在连接与协议支持时使用直接用户缓冲访问来完成对应收发/复制/归约动作，否则按实现退回协议缓冲。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
@@ -1261,7 +1828,12 @@ class Primitives<
     genericOp<0, 1, 1, 1, Input, Output>(inpIx, outIx, remoteOutIx, eltN, postOp);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0256：scatter
+  __device__ __forceinline__ /* 中文内部逻辑 F0256：scatter
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：ScatterGatherOp<0, 0, 0, 1>(inpIx, -1, totalElem, peerElem, skip, shift, false);；按 peer 分配或收集不同数据段，支持 CollNet 多 head 的分散/汇集以及直接缓冲访问优化。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0256
+ */
+/* 中文逐项-函数 F0256：scatter
  * 用途与位置：把当前输入范围按每 peer 的片段尺寸分散给多个上游 head，直接模式利用已交换的用户缓冲地址。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 totalElem（int totalElem）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1274,7 +1846,12 @@ class Primitives<
   scatter(intptr_t inpIx, int totalElem, int peerElem, int skip, int shift) {
     ScatterGatherOp<0, 0, 0, 1>(inpIx, -1, totalElem, peerElem, skip, shift, /*postOp=*/false);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0257：directScatter
+  __device__ __forceinline__ /* 中文内部逻辑 F0257：directScatter
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：ScatterGatherOp<0, 1, 0, 1>(inpIx, -1, totalElem, peerElem, skip, shift, false);；按 peer 分配或收集不同数据段，支持 CollNet 多 head 的分散/汇集以及直接缓冲访问优化。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0257
+ */
+/* 中文逐项-函数 F0257：directScatter
  * 用途与位置：把当前输入范围按每 peer 的片段尺寸分散给多个上游 head，直接模式利用已交换的用户缓冲地址。
  * 参数 inpIx（intptr_t inpIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 totalElem（int totalElem）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1288,7 +1865,12 @@ class Primitives<
     ScatterGatherOp<0, 1, 0, 1>(inpIx, -1, totalElem, peerElem, skip, shift, /*postOp=*/false);
   }
 
-  __device__ __forceinline__ /* 中文逐项-函数 F0258：gather
+  __device__ __forceinline__ /* 中文内部逻辑 F0258：gather
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：ScatterGatherOp<0, 0, 1, 0>(-1, outIx, totalElem, peerElem, skip, shift, postOp);；按 peer 分配或收集不同数据段，支持 CollNet 多 head 的分散/汇集以及直接缓冲访问优化。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0258
+ */
+/* 中文逐项-函数 F0258：gather
  * 用途与位置：从多个 head 收集各自负责的结果片段到本地输出，保持整体张量布局。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 totalElem（int totalElem）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
@@ -1302,7 +1884,12 @@ class Primitives<
   gather(intptr_t outIx, int totalElem, int peerElem, int skip, int shift, bool postOp=false) {
     ScatterGatherOp<0, 0, 1, 0>(-1, outIx, totalElem, peerElem, skip, shift, postOp);
   }
-  __device__ __forceinline__ /* 中文逐项-函数 F0259：directGather
+  __device__ __forceinline__ /* 中文内部逻辑 F0259：directGather
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：ScatterGatherOp<1, 0, 1, 0>(-1, outIx, totalElem, peerElem, skip, shift, false);；按 peer 分配或收集不同数据段，支持 CollNet 多 head 的分散/汇集以及直接缓冲访问优化。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0259
+ */
+/* 中文逐项-函数 F0259：directGather
  * 用途与位置：从多个 head 收集各自负责的结果片段到本地输出，保持整体张量布局。
  * 参数 outIx（intptr_t outIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 totalElem（int totalElem）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。

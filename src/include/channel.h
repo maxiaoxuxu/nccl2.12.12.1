@@ -26,6 +26,29 @@ ncclResult_t freeChannel(struct ncclChannel* channel, int nRanks);
  * 根据节点相对距离和节点内 rank 顺序计算 peer 的基准 channel。
  * Send 与 Recv 的相反方向公式保证两端为匹配的通信选出一致通道，而非按 peer 独占一个 channel。
  */
+/* 中文内部逻辑 F0610：ncclChannelComputeBase
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int p2pGroupSize = NCCL_MAX_WORK_ELEMENTS_P2P/2;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 准备局部状态：int peerNode = comm->rankToNode[peer];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 3. 准备局部状态：int peerIndex = comm->rankToLocalRank[peer];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 4. 准备局部状态：int nsteps = comm->maxLocalRanks;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 5. 准备局部状态：int rankIndex = comm->rankToLocalRank[comm->rank];；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 6. 准备局部状态：int step, delta;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 7. 条件判断：(coll == ncclFuncSend)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *   8. 真分支：；仅条件为真执行以下子项。
+ *     9. 调用 / 计算 / 写入：step = (nsteps + peerIndex - rankIndex)%nsteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *     10. 调用 / 计算 / 写入：delta = (comm->nNodes + peerNode - comm->node) % comm->nNodes;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *   11. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *     12. 条件判断：(coll == ncclFuncRecv)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
+ *       13. 真分支：；仅条件为真执行以下子项。
+ *         14. 调用 / 计算 / 写入：step = (nsteps + rankIndex - peerIndex)%nsteps;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ *         15. 调用 / 计算 / 写入：delta = (comm->nNodes + comm->node - peerNode) % comm->nNodes;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ *       16. 假分支：；仅前面条件为假时执行；else-if继续判断。
+ *         17. 函数返回：return ncclInternalError;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 18. 调用 / 计算 / 写入：*channelBase = comm->nNodes > 1 ? delta+(step/p2pGroupSize) : step;；读取或更新当前协议阶段的进度；结合字段所属对象区分寄存器计数、共享发布值和后端完成。
+ * 19. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__channel_h.md#f0610
+ */
 /* 中文逐项-函数 F0610：ncclChannelComputeBase
  * 用途与位置：由节点距离与节点内 rank 差计算 P2P 基准通道，Send/Recv 用相反公式确保两端匹配。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -87,6 +110,12 @@ static ncclResult_t ncclChannelComputeBase(struct ncclComm* comm, int peer, int 
  * 将基准值加上预先生成的 channel 偏移，再对 P2P 总 channel 数取模。
  * 不同 peer 可以映射到相同 channel；其连接仍通过 peers[peer] 分开。
  */
+/* 中文内部逻辑 F0611：ncclChannelComputeFromBase
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 调用 / 计算 / 写入：*channelId = (base+comm->p2pChannels[channelInc]) % comm->p2pnChannels;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
+ * 2. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__channel_h.md#f0611
+ */
 /* 中文逐项-函数 F0611：ncclChannelComputeFromBase
  * 用途与位置：将基准通道加位反转分散偏移，对全局 P2P 通道空间取模，多个 peer 可映射到同通道。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。
@@ -102,6 +131,14 @@ static ncclResult_t ncclChannelComputeFromBase(struct ncclComm* comm, int base, 
   return ncclSuccess;
 }
 
+/* 中文内部逻辑 F0612：ncclChannelCompute
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 1. 准备局部状态：int base;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
+ * 2. 调用 / 计算 / 写入：NCCLCHECK(ncclChannelComputeBase(comm, peer, coll, &base));；失败时可能提前return，成功才继续；由节点距离与节点内 rank 差计算 P2P 基准通道，Send/Recv 用相反公式确保两端匹配。
+ * 3. 调用 / 计算 / 写入：NCCLCHECK(ncclChannelComputeFromBase(comm, base, channelInc, channelId));；失败时可能提前return，成功才继续；将基准通道加位反转分散偏移，对全局 P2P 通道空间取模，多个 peer 可映射到同通道。
+ * 4. 函数返回：return ncclSuccess;；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__include__channel_h.md#f0612
+ */
 /* 中文逐项-函数 F0612：ncclChannelCompute
  * 用途与位置：组合基准计算和分散偏移，得到指定 peer/块号/方向的最终 P2P channelId。
  * 参数 comm（struct ncclComm* comm）：当前 rank 的通信上下文；保存拓扑、channel、排队和代理状态，不是整个集群共用的单个对象。

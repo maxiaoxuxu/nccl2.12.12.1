@@ -159,7 +159,11 @@ __device__ /* 中文逐项-变量 V0443：ncclFuncs
 };
 
 // Workaround for https://reviews.llvm.org/D55580
-__device__ /* 中文逐项-函数 F0128：ncclWorkaroundClangD55580
+__device__ /* 中文内部逻辑 F0128：ncclWorkaroundClangD55580
+ * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
+ * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__functions_cu.md#f0128
+ */
+/* 中文逐项-函数 F0128：ncclWorkaroundClangD55580
  * 用途与位置：保留空设备符号作为特定 clang 设备链接问题的变通，不承担通信逻辑。
  * 形参：没有显式形参；成员函数可使用this对象，设备代码还可读取线程编号/共享上下文。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
