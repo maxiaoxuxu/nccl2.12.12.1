@@ -59,7 +59,7 @@
     },
     {
       "path": "src/collectives/device/all_gather.h",
-      "annotated_sha256": "1d0bb5fe52f0cef5ab334740b16627e83587b260b6c973bd91d80808f894b084",
+      "annotated_sha256": "ed80ae38db5f6ecf7358d3f4366d8b8cabae84caec7d3348c1d8d36fab8a3131",
       "original_git_blob": "c86384cd0284d5d23afa7422416f8857af8c46d5"
     },
     {
@@ -79,7 +79,7 @@
     },
     {
       "path": "src/collectives/device/broadcast.h",
-      "annotated_sha256": "8b8f94ccd2cc9e5a5f4e9a501f98da528de318b5002e36784fdf9b67a11b0b4a",
+      "annotated_sha256": "5ebc2fc8d3c4c0465bcbb4fb8f0d4deca08b9901013c14ac24676683c0288b6e",
       "original_git_blob": "ba4ef56f12973856f02844c802e802d8cad2fff0"
     },
     {
@@ -139,7 +139,7 @@
     },
     {
       "path": "src/collectives/device/reduce.h",
-      "annotated_sha256": "147350748f8b8a7a976257be903b485712e79ae2a47a537e3eded06cc9e943c6",
+      "annotated_sha256": "6119c29db98c8295b371e4a80da5146e94ad5dde8b6354bd35508952ab1af32f",
       "original_git_blob": "8dc867b99942538eed9b0174bc3bf6745fda17ab"
     },
     {
@@ -154,7 +154,7 @@
     },
     {
       "path": "src/collectives/device/reduce_scatter.h",
-      "annotated_sha256": "6589a7799f9b690bd27061f216b95068a6db32a4da661c30ccbd729e01de8ffc",
+      "annotated_sha256": "d85cb82459dc969db8c7ae5c3f7fea23fed375f34c78153ff860678c265dfb7d",
       "original_git_blob": "3f38b1a185489aaad77ff438587da11f7c577890"
     },
     {
