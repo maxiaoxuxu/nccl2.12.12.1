@@ -4,6 +4,10 @@
 
 **本包识别标记：`NCCL-BEGINNER-ANNOTATED-V3`。** 如在代码中搜索不到 `中文逐项-函数`，说明打开了旧版文件或master原版。
 
+## V3.1续写：手工推导 Ring 集合通信与原语
+
+新增 [五类 Ring 集合通信、分片和同步的手工逐行精读](docs/zh_CN/ring-primitives-deep-dive.md)，包含 AllReduce、AllGather、ReduceScatter、Broadcast、Reduce 的真实设备分支、4 rank/不同 root 流向、Simple 原语的空 slice、同步与 RDMA 资源边界。源码 `all_gather.h`、`reduce_scatter.h`、`broadcast.h`、`reduce.h` 的 `runRing` 前已嵌入“中文精读V3.1”提示，可以直接在下载源码中搜索。Mermaid 图在 GitHub Markdown 页面可阅读（离线视图以原 V3 SVG 为主）。
+
 ## V3新增：图解与函数内部步骤
 
 双击打开 [visual-guide.html](docs/zh_CN/visual-guide.html)，即可离线阅读42张图，并逐轮查看Ring AllReduce、AllGather、ReduceScatter的块与贡献来源。GitHub网页不直接运行HTML，请下载解压后打开；在线可读 [Markdown图解](docs/zh_CN/visual-guide.md)。
