@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NCCL源码图解 使用方法与编号说明 V3.3.1</title><style>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NCCL源码图解 使用方法与编号说明 V3.3.2</title><style>
 *{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#172d43;font:17px/1.8 "Microsoft YaHei","Noto Sans SC",sans-serif}
 main{max-width:1160px;margin:auto;padding:28px}h1,h2,h3{line-height:1.45;color:#123b60;overflow-wrap:anywhere}
 h2{margin-top:44px;border-bottom:2px solid #c8d8e7;padding-bottom:10px}a{color:#1256a1;overflow-wrap:anywhere}
@@ -36,8 +36,10 @@ label{display:block}.tag,figcaption{color:#4b647c;font-size:14px}.step{border-le
 <div class="table-wrap"><table><thead><tr><th>图中记号</th><th>含义</th><th>容易混淆的地方</th></tr></thead><tbody><tr><td><code>rank 0</code>、<code>rank 1</code></td><td>本次communicator中参与者的编号</td><td>不一定等于本机CUDA设备序号；同一GPU在不同communicator中也可能有不同rank</td></tr><tr><td><code>C0</code>、<code>C1</code>、<code>C2</code></td><td>示例中的第0、1、2个数据块或逻辑段</td><td>C0不是channel 0；AR与AG/RS的分块归属须看对应图的说明</td></tr><tr><td><code>X0(C2)</code></td><td>rank 0输入中的第2块</td><td>前一个数字说明“谁贡献的”，括号里的数字说明“哪一块”</td></tr><tr><td>图里简写的<code>X0</code>、<code>X1</code></td><td>当前所画数据块来自rank 0、rank 1的贡献</td><td>和源码注释定位号X0221是两套记号，按上下文区分</td></tr><tr><td><code>P</code>、<code>C</code></td><td>本文分片公式中，P通常表示rank总数，C表示本次使用的channel数</td><td>以公式所在段落的定义为准，不是注释编号</td></tr><tr><td>模板里的<code>T</code></td><td>C++模板的数据元素类型，例如float</td><td>它和注释定位号T0181不同</td></tr><tr><td><code>tid</code></td><td>当前线程组中的线程编号</td><td>不是GPU rank；线程组拆分时需看该处的赋值</td></tr><tr><td><code>step</code></td><td>连接循环缓冲的协议进度</td><td>不是WQE数量、网络包数量或源码的步骤编号</td></tr><tr><td><code>slice</code>、<code>chunk</code></td><td>原语片段、算法分块</td><td>一个chunk可以继续分成slice；有效长度和协议进度跨度也不同</td></tr></tbody></table></div>
 <p>以4个rank对同一块C2做Sum为例，最终内容是 <code>X0(C2)+X1(C2)+X2(C2)+X3(C2)</code>。这里“四份贡献”和“第2块”是不同维度。AllGather只拼接各rank的段，不执行这个求和；不能把几段并排显示误读成归约。</p>
 <h2 id="usage-5">5. 在普通编辑器中怎么查图</h2>
-<p>普通<code>.cc/.h</code>文本注释不能直接显示SVG。源码中增加了“中文精读：图示绑定”说明，列出中文主题、B定位号和图名。</p>
-<p>读到想看图的地方，可以打开11对照页，搜索对应函数名或B编号。要源码和图并排阅读，直接使用11对照页最方便。IDE适合继续修改、调试或编译真实源码。</p>
+<p>V3.3.2提供编辑器到浏览器的离线跳转：在真实源码中放好光标，再执行命令，按当前文件和行号直接打开对应图与分析，不用手动输入编号。</p>
+<div class="table-wrap"><table><thead><tr><th>编辑器</th><th>怎么跳转</th></tr></thead><tbody><tr><td>VS Code</td><td>打开完整仓库文件夹，在命令面板运行任务“NCCL：查看当前代码图解”；可按说明设Ctrl+Alt+G</td></tr><tr><td>Source Insight</td><td>配置一次Custom Command，把当前文件<code>%f</code>和行号<code>%l</code>交给<code>tools/open_source_diagram.py</code>；可绑定快捷键</td></tr></tbody></table></div>
+<p>需要完整ZIP和Python 3.9或更新版本；具体配置、排错与验证范围见 <a href="https://github.com/maxiaoxuxu/nccl2.12.12.1/blob/codex/nccl-2.12.12-full-source-walkthrough/docs/zh_CN/13_SourceInsight%E4%B8%8EVSCode_%E6%BA%90%E7%A0%81%E5%9B%BE%E7%A4%BA%E8%B7%B3%E8%BD%AC_%E7%A6%BB%E7%BA%BF%E7%89%88.html">13_SourceInsight与VSCode_源码图示跳转</a>（完整ZIP）。普通<code>.cc/.h</code>注释不会自动内嵌SVG；本版任务打开浏览器，尚未提供编辑器内部原生图示侧栏。</p>
+<p>仍然可以直接打开11对照页搜索函数名或B编号；这种单HTML阅读方式不需要Python。</p>
 <h2 id="usage-6">6. 遇到这些情况怎么处理</h2>
 <div class="table-wrap"><table><thead><tr><th>现象</th><th>处理方法</th></tr></thead><tbody><tr><td>打开后满屏HTML标签</td><td>用浏览器打开<code>.html</code>，不要用记事本；确认文件没有被保存成<code>.html.txt</code></td></tr><tr><td>点击“在图解页打开”找不到文件</td><td>完整解压ZIP，保留<code>docs/zh_CN</code>下各HTML的相对位置；单独下载11页时用其内部图示即可</td></tr><tr><td>编号搜不到</td><td>输入完整编号并保留前导0；或者直接搜函数名。T/V/B/M/P/X请在11对照页查，05页主要搜索F函数</td></tr><tr><td>变量名出现很多结果</td><td>看文件路径和行号，再结合所在函数/结构体选择具体声明</td></tr><tr><td>右侧显示“暂无专属图示”</td><td>当前辅助函数或代码行尚无人工绑定；可选本文件的其他主题。未绑定不表示源码没有作用</td></tr><tr><td>滚动后图自动切换了</td><td>取消“滚动源码时跟随图示”，需要时再勾选</td></tr><tr><td>图里文字太小</td><td>点击“放大图示”，或用浏览器缩放</td></tr><tr><td>从GitHub下载后没有中文注释</td><td>选择<code>codex/nccl-2.12.12-full-source-walkthrough</code>分析分支或使用本次完整ZIP；原始master保留原版代码</td></tr></tbody></table></div>
 <h2 id="usage-7">7. 当前内容范围</h2>

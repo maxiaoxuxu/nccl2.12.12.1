@@ -1,12 +1,13 @@
 # 从这里开始：NCCL 2.12.12 中文源码与图解
 
-版本：V3.3.1（2026-11-01），标记 `NCCL-BEGINNER-ANNOTATED-V3`。分析分支：`codex/nccl-2.12.12-full-source-walkthrough`；源码基线：`04832308d0885226169b9376c1ba4f17b0cb6484`。
+版本：V3.3.2（2026-11-01），标记 `NCCL-BEGINNER-ANNOTATED-V3`。分析分支：`codex/nccl-2.12.12-full-source-walkthrough`；源码基线：`04832308d0885226169b9376c1ba4f17b0cb6484`。
 
 ## 下载后先打开哪一个
 
 | 文件 | 用途 | 下载方式 |
 | --- | --- | --- |
 | [12_使用方法与编号说明_离线版.html](docs/zh_CN/12_使用方法与编号说明_离线版.html) | **第一次使用：打开方法、操作步骤、F/T/V/B等定位号和C0/X0图示记号速查** | 单独下载也可离线阅读；11页内另有“使用方法/编号说明”按钮 |
+| [13_SourceInsight与VSCode_源码图示跳转_离线版.html](docs/zh_CN/13_SourceInsight与VSCode_源码图示跳转_离线版.html) | **在Source Insight或VS Code中，按当前文件/光标行跳到对应图与分析** | 说明可单独阅读；实际跳转需要完整ZIP与Python，见13的配置步骤 |
 | [11_源码注释与图示对照_离线版.html](docs/zh_CN/11_源码注释与图示对照_离线版.html) | **左侧完整源码及中文注释，右侧当前代码对应图与分析；支持双向跳转** | 日常主入口；这一个HTML可单独下载、断网阅读 |
 | [01_通信原语与算法图解_离线版.html](docs/zh_CN/01_通信原语与算法图解_离线版.html) | 45张SVG、三种Ring逐轮切换、七类原语和修正说明 | **只下载这一个HTML也能看全部图片和操作交互** |
 | [05_全部函数内部步骤_离线搜索.html](docs/zh_CN/05_全部函数内部步骤_离线搜索.html) | 搜索1178个函数，展开内部步骤和完整函数体 | 这个HTML也可单独下载、断网使用 |
@@ -34,6 +35,7 @@ GitHub不会直接运行仓库中的HTML：打开文件页面，使用 Download 
 | 10 | [源码与图示绑定](docs/zh_CN/10_源码与图示绑定_使用说明.md) | 图示位置与源码的对应关系及维护方法 |
 | 11 | [源码注释与图示对照](docs/zh_CN/11_源码注释与图示对照_离线版.html) | 在同一页阅读源码、注释、图示和分析 |
 | 12 | [使用方法与编号说明](docs/zh_CN/12_使用方法与编号说明.md) | 第一次怎么打开、具体操作、注释编号与图示符号解释、常见问题 |
+| 13 | [Source Insight与VS Code源码图示跳转](docs/zh_CN/13_SourceInsight与VSCode_源码图示跳转.md) | 项目任务、自定义命令、可选快捷键、当前文件/行号定位与排错 |
 
 `docs/zh_CN/logic/`保存按源文件展开的步骤；`visuals/`保存可单独编辑的SVG与逐轮数据模型。`annotation-coverage.json`是注释符号清单，`source-checksums.json`用于验证原始源码未变，`function-logic.json`是函数搜索页的生成输入。
 
@@ -60,6 +62,7 @@ python3 tools/verify_annotations.py
 python3 tools/verify_visual_models.py
 python3 tools/verify_offline_docs.py
 python3 tools/verify_source_diagram_bindings.py
+python3 tools/check_editor_diagram_jump.py
 ```
 
 Windows可将python3改为python。浏览器回归检查另见08；无须为了阅读HTML安装Python或Node。

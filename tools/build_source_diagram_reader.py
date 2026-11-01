@@ -16,7 +16,7 @@ def build(update_annotations=False):
     css = (DOC/'reader-assets/source-diagram-reader.css').read_text(encoding='utf-8')
     script = (DOC/'reader-assets/source-diagram-reader.js').read_text(encoding='utf-8')
     body = '''<header><h1>NCCL 2.12.12 · 源码、中文注释与图示对照</h1>
-<p>V3.3.1 · 先选函数，再按右侧中文主题看代码和图；不必记定位编号。全部源码、图示和使用帮助已内嵌，可单独断网阅读。</p></header>
+<p>V3.3.2 · 先选函数，再按右侧中文主题看代码和图；不必记定位编号。全部源码、图示和使用帮助已内嵌，可单独断网阅读。</p></header>
 <div class="toolbar" id="searchBox"><label for="symbolSearch">找函数/结构体/变量 <input id="symbolSearch" type="search" placeholder="例如 genericOp、ncclConnInfo、sliceSize"></label>
 <button id="quickAllReduce">Ring AllReduce</button><button id="quickGeneric">Simple genericOp</button><button id="openUsage">使用方法</button><button id="openNumberHelp">编号说明</button><div id="searchResults"></div></div>
 <div class="toolbar"><label for="fileSelect">源码文件 <select id="fileSelect"></select></label>
@@ -36,7 +36,7 @@ def build(update_annotations=False):
 <noscript>此对照页需要启用JavaScript。无需安装Python、Node或网络服务。</noscript>'''
     help_body=usage_body()
     body+='<div id="helpModal" class="reader-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="使用方法与编号说明"><div class="modal-head"><strong>使用方法与编号说明</strong><button id="closeHelp">关闭帮助（Esc）</button></div><div class="modal-body help-body"><div class="help-actions"><button id="usageStartSimple">从Simple genericOp开始阅读</button><button id="usageStartAllReduce">从Ring AllReduce开始阅读</button></div>'+help_body+'</div></div>'
-    result = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NCCL 2.12.12 源码注释与图示对照 V3.3.1</title><style>'+css+'</style></head><body>'+body+json_script('source-model',model)+json_script('source-images',images)+'<script>'+script+'</script></body></html>\n'
+    result = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NCCL 2.12.12 源码注释与图示对照 V3.3.2</title><style>'+css+'</style></head><body>'+body+json_script('source-model',model)+json_script('source-images',images)+'<script>'+script+'</script></body></html>\n'
     path=DOC/READER
     path.write_text(result,encoding='utf-8')
     build_usage()
