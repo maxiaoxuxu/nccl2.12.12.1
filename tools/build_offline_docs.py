@@ -161,7 +161,7 @@ const bindings=JSON.parse(document.getElementById('diagram-bindings').textConten
 function sourceLink(id,element,preferredSymbol){
  const candidates=bindings.filter(b=>b.diagrams.includes(id));
  candidates.sort((a,b)=>(a.symbol===preferredSymbol?0:1)-(b.symbol===preferredSymbol?0:1)||(a.scope==='code'?0:1)-(b.scope==='code'?0:1));
- const b=candidates[0];if(b){element.href='11_源码注释与图示对照_离线版.html#'+new URLSearchParams({symbol:b.symbol,binding:b.id});element.textContent=b.id+' · 对应源码与注释（完整ZIP）'}
+ const b=candidates[0];if(b){element.href='11_源码注释与图示对照_离线版.html#'+new URLSearchParams({symbol:b.symbol,binding:b.id});element.textContent=b.title+' · 查看对应源码（完整ZIP）';element.title='图示位置 '+b.id+'；源码定位号 '+b.symbol}
 }
 const byId=id=>document.getElementById(id);let round=0;
 function render(){
@@ -198,14 +198,14 @@ let filtered=D,limit=40;const el=id=>document.getElementById(id);
 function node(tag,txt,cls){const n=document.createElement(tag);if(txt!==undefined)n.textContent=txt;if(cls)n.className=cls;return n}
 function render(){el('results').replaceChildren();el('count').textContent=' 匹配 '+filtered.length+' 个';
  for(const f of filtered.slice(0,limit)){const d=node('details',undefined,'fn');d.id=f.id.toLowerCase();
-  d.append(node('summary',f.id+' · '+(f.owner?f.owner+'::':'')+f.name+' — '+f.file));
+  d.append(node('summary',(f.owner?f.owner+'::':'')+f.name+' — '+f.file+'（函数定位号 '+f.id+'）'));
   d.addEventListener('toggle',()=>{if(!d.open||d.dataset.loaded)return;d.dataset.loaded='1';
    const box=node('div',undefined,'fn-body');box.append(node('p',f.role));
    for(const n of f.human_notes)box.append(node('p','精读：'+n));
    const related=bindings.filter(b=>b.symbol===f.id);
    if(related.length){const panel=node('section',undefined,'panel');panel.append(node('b','这个函数对应的图与分析'));
     const choose=node('select');choose.setAttribute('aria-label','选择函数的图示代码段');
-    for(const b of related){const o=node('option',b.id+' · '+b.title);o.value=b.id;choose.append(o)}
+    for(const b of related){const o=node('option',b.title);o.value=b.id;o.title='图示位置 '+b.id;choose.append(o)}
     const note=node('p'),imageChoose=node('select'),img=node('img'),link=node('a','打开带注释的源码对照（完整ZIP）');
     imageChoose.setAttribute('aria-label','选择代码段中的图示');
     function showImage(){img.src=images[imageChoose.value];img.alt=imageChoose.value+' · 函数对应图示'}
@@ -237,7 +237,7 @@ def build_guide():
         links='<details><summary>对应源码与注释：'+str(len(related))+'处（完整ZIP）</summary><ul>'
         for b in related:
             href=READER+'#symbol='+b['symbol']+'&binding='+b['id']
-            links+='<li><a href="'+html.escape(href,quote=True)+'">'+html.escape(b['id']+' · '+b['symbol']+' · '+b['title'])+'</a></li>'
+            links+='<li><a href="'+html.escape(href,quote=True)+'" title="'+html.escape('图示位置 '+b['id']+'；源码定位号 '+b['symbol'],quote=True)+'">'+html.escape(b['title']+' · '+b['name']+' · '+b['file'])+'</a></li>'
         links+='</ul></details>'
         gallery.append('<figure id="diagram-'+p.stem+'"><figcaption>'+html.escape(p.name+' · '+label)+'</figcaption>'
                        f'<img alt="{html.escape(label, quote=True)}" src="{images[p.stem]}">'+links+'</figure>')
@@ -245,7 +245,7 @@ def build_guide():
     audit, _ = markdown((DOC/'09_本轮修正记录与依据.md').read_text(encoding='utf-8'), images, 'audit')
     toc = '<ul>'+''.join(f'<li><a href="#{ident}">{html.escape(title)}</a></li>'
                         for level, ident, title in headings if level == 2)+'</ul>'
-    intro = '''<nav><strong>NCCL 2.12.12 · V3.3 · 通信原语与算法图解</strong>
+    intro = '''<nav><strong>NCCL 2.12.12 · V3.3.1 · 通信原语与算法图解</strong>
 <p>本HTML内含全部45张图、逐轮模型和交互代码。单独下载后可断网打开；没有外置图片、脚本或字体。“对应源码”链接需完整ZIP中的对照页，其他章节在线链接需要网络。</p>
 <a href="#contents">章节目录</a> · <a href="#all-diagrams">全部图解</a> · <a href="#corrections">本轮修正</a> · '''
     intro += '<a href="'+online_link(SEARCH)+'">函数搜索页下载（在线）</a></nav>'
@@ -262,7 +262,7 @@ def build_guide():
     result += '<section id="corrections">'+audit+'</section>'
     frames = json.loads((DOC/'visuals/collective-steps.json').read_text(encoding='utf-8'))
     scripts = json_script('frames', frames)+json_script('embedded-images', images)+json_script('diagram-bindings',bindings)+'<script>'+GUIDE_JS+'</script>'
-    return page('NCCL 2.12.12 通信原语与算法图解 V3.3（离线单文件）', result, scripts)
+    return page('NCCL 2.12.12 通信原语与算法图解 V3.3.1（离线单文件）', result, scripts)
 
 
 def build_search():
@@ -276,13 +276,13 @@ def build_search():
     for f in logic['functions']:
         assert f['id'] in bodies, ('Missing complete body', f['id'])
         f['body'] = bodies[f['id']]
-    body = '<nav><b>NCCL 2.12.12 · V3.3 · 全部函数内部步骤</b><p>本HTML包含搜索数据、完整函数体及已绑定函数的内嵌图示，单独下载即可断网使用。带完整注释的源码对照链接需完整ZIP。</p><a href="'+online_link('01_通信原语与算法图解.md')+'">通信原语与算法图解（在线）</a></nav>'
+    body = '<nav><b>NCCL 2.12.12 · V3.3.1 · 全部函数内部步骤</b><p>可直接搜索函数名。F开头的是中文注释的函数定位号，用于区分同名定义，不是GPU编号或执行顺序。本HTML含完整函数体与已绑定图示，单独下载可离线使用。</p><a href="12_使用方法与编号说明_离线版.html#number-reference">使用方法与其他编号说明（完整ZIP）</a> · <a href="'+online_link('01_通信原语与算法图解.md')+'">通信原语与算法图解（在线）</a></nav>'
     body += f'<h1>{len(logic["functions"])}个函数：内部步骤与完整函数体</h1>'
     body += '<p>步骤是静态结构展开；编号是阅读顺序，缩进表示嵌套。关键路径另有人工精读，不能将清单数量当作全部语义已经验证。</p>'
-    body += '<label for="q">搜索函数名、文件、F编号或用途</label><input id="q" type="search" placeholder="例如 genericOp、prims_ll、F0001"><span id="count" aria-live="polite"></span><div id="results"></div><button id="more">显示更多</button><noscript>请启用JavaScript以搜索和展开函数。</noscript>'
+    body += '<label for="q">搜索函数名、文件或用途（也支持F函数定位号）</label><input id="q" type="search" placeholder="例如 genericOp、ncclAllReduce、prims_ll"><span id="count" aria-live="polite"></span><div id="results"></div><button id="more">显示更多</button><noscript>请启用JavaScript以搜索和展开函数。</noscript>'
     bindings=json.loads((DOC/'source-diagram-index.json').read_text(encoding='utf-8'))['bindings']
     images={p.stem:'data:image/svg+xml;base64,'+base64.b64encode(p.read_bytes()).decode('ascii') for p in sorted((DOC/'visuals').glob('*.svg'))}
-    return page('NCCL 2.12.12 全部函数内部步骤 V3.3（离线搜索）', body, json_script('logicData', logic)+json_script('search-bindings',bindings)+json_script('search-images',images)+'<script>'+SEARCH_JS+'</script>')
+    return page('NCCL 2.12.12 全部函数内部步骤 V3.3.1（离线搜索）', body, json_script('logicData', logic)+json_script('search-bindings',bindings)+json_script('search-images',images)+'<script>'+SEARCH_JS+'</script>')
 
 
 def main():

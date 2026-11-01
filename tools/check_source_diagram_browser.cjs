@@ -20,6 +20,24 @@ const {pathToFileURL}=require('url');
   fs.copyFileSync(path.join(docs,reader),path.join(tmp,reader));
   // Only one HTML exists here: original source and SVG files are absent.
   await page.goto(local(reader));await page.waitForFunction(()=>window.NCCL_READER);
+  // Beginner help is embedded: no separate file is needed to explain IDs.
+  await page.click('#openUsage');
+  assert(await page.locator('#helpModal').evaluate(el=>el.classList.contains('open')));
+  assert.match(await page.locator('#helpModal').textContent(),/不需要记任何编号/);
+  assert.match(await page.locator('#helpModal').textContent(),/X0\(C2\)/);
+  await page.keyboard.press('Escape');
+  assert(!(await page.locator('#helpModal').evaluate(el=>el.classList.contains('open'))));
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'openUsage');
+  await page.click('#openNumberHelp');
+  await page.waitForFunction(()=>{const h=document.getElementById('number-reference').getBoundingClientRect();return h.top>=0&&h.top<innerHeight});
+  assert.match(await page.locator('#number-reference').textContent(),/编号是什么意思/);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'openNumberHelp');
+  await page.click('#openUsage');await page.click('#usageStartSimple');
+  await page.waitForFunction(()=>document.getElementById('sourceFile').textContent.endsWith('prims_simple.h'));
+  assert(!(await page.locator('#helpModal').evaluate(el=>el.classList.contains('open'))));
+  assert(!/^[BFT]\d/.test(await page.locator('#bindingSelect option:checked').textContent()));
+  assert.match(await page.locator('#bindingMeta').textContent(),/函数定位号 F0232/);
   const model=await page.evaluate(()=>({bindings:NCCL_READER.model.bindings,diagrams:Object.keys(NCCL_READER.model.diagrams)}));
   for(const b of model.bindings){
    await page.evaluate(b=>NCCL_READER.navigate({symbol:b.symbol,binding:b.id}),b);
@@ -70,6 +88,8 @@ const {pathToFileURL}=require('url');
   await page.keyboard.press('Escape');assert(!(await page.locator('#imageModal').evaluate(el=>el.classList.contains('open'))));
   if(evidence)await page.screenshot({path:path.join(evidence,'AllReduce_源码与图示.png')});
   await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await page.click('#openUsage');assert(await page.locator('#helpModal').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+  await page.keyboard.press('Escape');
   await page.setViewportSize({width:1500,height:1000});
   // Now copy the other standalone pages, then exercise cross-file links.
   fs.copyFileSync(path.join(docs,guide),path.join(tmp,guide));fs.copyFileSync(path.join(docs,search),path.join(tmp,search));
@@ -86,7 +106,15 @@ const {pathToFileURL}=require('url');
   await panel.getByRole('link',{name:'打开带注释的源码对照（完整ZIP）'}).click();
   await page.waitForFunction(id=>document.getElementById('bindingSelect')?.value===id,worker.id);
   if(evidence)await page.screenshot({path:path.join(evidence,'genericOp_源码与图示.png')});
+  const usage='12_使用方法与编号说明_离线版.html';
+  const guideOnly=path.join(tmp,'guide-only');fs.mkdirSync(guideOnly);fs.copyFileSync(path.join(docs,usage),path.join(guideOnly,usage));
+  await page.goto(pathToFileURL(path.join(guideOnly,usage)).href);
+  assert.match(await page.locator('main').textContent(),/F0232/);
+  assert.match(await page.locator('main').textContent(),/不是NCCL的GPU编号/);
+  await page.locator('nav a[href="#number-reference"]').click();
+  assert(page.url().endsWith('#number-reference'));
+  await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   assert.deepEqual(errors,[]);assert.deepEqual(network,[]);
-  console.log(JSON.stringify({status:'PASS',offlineSingleReader:true,bindings:model.bindings.length,reverseDiagrams:model.diagrams.length,sourceCommentClicks:true,variableNavigation:true,scrollFollows:true,crossPageLinks:true,unboundSymbolsStayUnbound:true,mobileWidth:390,pageErrors:0,httpRequests:0}));
+  console.log(JSON.stringify({status:'PASS',offlineSingleReader:true,bindings:model.bindings.length,reverseDiagrams:model.diagrams.length,usageHelp:true,numberReference:true,humanReadableLabels:true,standaloneUsageGuide:true,sourceCommentClicks:true,variableNavigation:true,scrollFollows:true,crossPageLinks:true,unboundSymbolsStayUnbound:true,mobileWidth:390,pageErrors:0,httpRequests:0}));
  }finally{await browser.close();fs.rmSync(tmp,{recursive:true,force:true})}
 })().catch(e=>{console.error(e);process.exitCode=1});

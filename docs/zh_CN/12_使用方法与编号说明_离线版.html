@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NCCL源码图解 使用方法与编号说明 V3.3.1</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#172d43;font:17px/1.8 "Microsoft YaHei","Noto Sans SC",sans-serif}
+main{max-width:1160px;margin:auto;padding:28px}h1,h2,h3{line-height:1.45;color:#123b60;overflow-wrap:anywhere}
+h2{margin-top:44px;border-bottom:2px solid #c8d8e7;padding-bottom:10px}a{color:#1256a1;overflow-wrap:anywhere}
+img{display:block;max-width:100%;height:auto;background:white;margin:22px auto;border:1px solid #d6e1eb;border-radius:8px}
+.table-wrap{overflow-x:auto;max-width:100%;margin:20px 0}table{border-collapse:collapse;width:100%;background:white}
+td,th{padding:10px 14px;border:1px solid #d7e1ea;text-align:left;vertical-align:top;min-width:95px}
+code{font-family:Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}pre{background:#e8eef5;padding:16px;overflow:auto;white-space:pre-wrap}
+nav,.panel{background:white;border:1px solid #c8d8e7;border-radius:12px;padding:20px;margin:20px 0}
+button,select,input{font:inherit;padding:8px 12px;max-width:100%;margin:5px 0;border:1px solid #9db4c9;border-radius:6px;background:white;color:#172d43}
+button{cursor:pointer;background:#e7f0fc}button:disabled{opacity:.4;cursor:default}.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+label{display:block}.tag,figcaption{color:#4b647c;font-size:14px}.step{border-left:3px solid #a0bddc;padding:8px 14px;margin:9px 0;background:#f4f7fb}
+.step code{display:block;white-space:pre-wrap}summary{cursor:pointer;padding:12px;font-weight:bold;overflow-wrap:anywhere}
+.fn{border:1px solid #cad9e7;background:white;border-radius:9px;margin:12px 0}.fn-body{padding:0 16px 16px;min-width:0}
+#results{min-height:200px}figure{margin:20px 0}blockquote{border-left:4px solid #a0bddc;padding-left:16px;margin-left:0}
+@media(max-width:650px){main{padding:14px}body{font-size:16px}.panel,nav{padding:12px}h1{font-size:26px}td,th{padding:8px}}
+@media print{body{background:white}.controls,nav{display:none}main{max-width:none;padding:0}img{break-inside:avoid}}
+</style></head><body><main id="top"><nav><strong>NCCL 2.12.12 · 使用方法与编号说明</strong><p>这是一份可单独离线阅读的操作说明。完整ZIP内可从下面的链接开始看源码。</p><a href="11_源码注释与图示对照_离线版.html">打开源码与图示对照（完整ZIP）</a> · <a href="#number-reference">直接查编号含义</a></nav><h1 id="usage-0">NCCL源码图解：使用方法与编号速查</h1>
+<p><strong>先记住一个入口：打开 <code>11_源码注释与图示对照_离线版.html</code>。</strong> 左边是源码和中文注释，右边是当前代码对应的图与分析。开始阅读不需要记任何编号，也不用安装Python、Node或编辑器插件。</p>
+<h2 id="usage-1">1. 第一次怎么打开</h2>
+<ol><li>只下载“源码注释与图示对照”HTML：用Edge或Chrome打开这个文件，即可离线看源码、注释和图。</li><li>下载完整ZIP：先右键“全部解压”，再进入 <code>docs/zh_CN/</code>，打开 <code>11_源码注释与图示对照_离线版.html</code>。</li><li>GitHub网页只显示HTML代码时，先点“Download raw file”下载，再用浏览器打开。不要在文本编辑器里把HTML当普通源码阅读。</li></ol>
+<p>单独下载11对照页，内部的源码搜索、代码定位、图示反查都能用。要在11、01、05等不同HTML之间来回跳转，请完整解压ZIP并保留原目录。</p>
+<div class="table-wrap"><table><thead><tr><th>文件</th><th>什么时候打开</th></tr></thead><tbody><tr><td><code>11_源码注释与图示对照_离线版.html</code></td><td>日常主入口：边读源码和注释，边看对应图</td></tr><tr><td><code>12_使用方法与编号说明_离线版.html</code></td><td>忘了怎么操作、看不懂编号时查阅；11页面内也有“使用方法”和“编号说明”按钮</td></tr><tr><td><code>01_通信原语与算法图解_离线版.html</code></td><td>想先看总体原理、切换通信轮次与原语图</td></tr><tr><td><code>05_全部函数内部步骤_离线搜索.html</code></td><td>按函数名搜索并展开内部步骤、完整函数体；此页主要检索函数</td></tr><tr><td><code>src/</code>中的<code>.cc/.h/.cu</code>文件</td><td>想在IDE或文本编辑器里读、修改、编译真正的源码</td></tr></tbody></table></div>
+<h2 id="usage-2">2. 最容易上手的阅读方法</h2>
+<ol><li>打开11对照页，点击顶部 <strong>“Simple genericOp”</strong>。不用输入编号。</li><li>在右侧“选择本文件的代码主题”中，选择 <strong>“先等连接并建立共享指针”</strong>。左侧会定位到对应代码，右侧解释waitPeer与等待条件。</li><li>再选 <strong>“普通多源多目标融合归约”</strong>，看它怎样组织输入、输出并调用ReduceOrCopyMulti。</li><li>最后选 <strong>“空slice和非worker仍需参与”</strong>，结合源码看为什么没有有效数据时仍需同步和推进。</li><li>看不清图中文字时点 <strong>“放大图示”</strong>，按Esc关闭。随时点 <strong>“使用方法”</strong> 或 <strong>“编号说明”</strong> 查阅帮助。</li></ol>
+<p>理解原语后，再点顶部“Ring AllReduce”，按“首发本地块 → 中间部分和归约转发 → 完成本块归约并开始结果传播 → 只复制已完整结果 → 最后接收”阅读。你可以按中文主题选位置，不必背函数编号。</p>
+<div class="table-wrap"><table><thead><tr><th>页面操作</th><th>作用</th></tr></thead><tbody><tr><td>搜索<code>genericOp</code>、<code>waitPeer</code>等函数名</td><td>找函数；同名函数可根据文件路径区分</td></tr><tr><td>搜索<code>ncclConnInfo</code>等结构体名</td><td>找类型与字段</td></tr><tr><td>搜索<code>sliceSize</code>等变量名</td><td>找对应变量或字段；同名变量需要结合文件、所在函数区分</td></tr><tr><td>点击左侧行号</td><td>黄色标出当前行，右侧显示已有的对应图示</td></tr><tr><td>勾选“滚动源码时跟随图示”</td><td>滚动源码时按所在代码段切换图与分析</td></tr><tr><td>取消“滚动源码时跟随图示”</td><td>看图时保持当前位置，避免滚动源码使图切走</td></tr><tr><td>上一处 / 下一处</td><td>按本文件的代码主题继续阅读</td></tr><tr><td>按图示反查源码</td><td>先挑一张图，再点击关联函数或代码主题返回源码</td></tr><tr><td>当前定位链接</td><td>记录当前阅读位置；编号由页面自动生成，不用手写</td></tr></tbody></table></div>
+<p>黄色表示当前行，浅蓝色表示这一张图对应的代码范围。图说明的是逻辑关系，不能把图中的每个箭头直接当成一次kernel、一个QP或一条WQE。</p>
+<h2 id="number-reference">3. 注释里的编号是什么意思</h2>
+<p><strong>下面这些是我给中文讲解增加的“定位号”，不是NCCL的GPU编号、rank编号或硬件资源编号。</strong> 后面的数字只用来区分条目，不代表源码行号、执行顺序、运行次数或资源数量。</p>
+<div class="table-wrap"><table><thead><tr><th>写法</th><th>含义</th><th>你怎么用</th></tr></thead><tbody><tr><td><code>F0232</code></td><td>函数定位号；本版对应Simple的<code>genericOp</code></td><td>在11对照页或05函数搜索页输入完整编号，能找到这个具体函数</td></tr><tr><td><code>T0181</code></td><td>类型定位号；本版对应<code>ncclConnInfo</code></td><td>在11对照页查结构体/类/联合体/枚举；这里T表示类型条目</td></tr><tr><td><code>V</code>开头的编号</td><td>某处变量或结构体字段的定位号</td><td>在11对照页定位具体声明，方便区分不同函数中的同名变量</td></tr><tr><td><code>B0007</code></td><td>源码与图示的对应位置；本版是AR完成本块归约并开始传播</td><td>在11对照页搜索，或点击左侧源码注释中的这个编号，直接看对应代码和图</td></tr><tr><td><code>M</code>开头的编号</td><td>宏的定位号</td><td>在源码或11对照页查对应宏定义</td></tr><tr><td><code>P</code>开头的编号</td><td>参数读取函数生成项，例如<code>NCCL_PARAM</code>生成的getter</td><td>用来查环境参数的读取与默认值；它不是图中表示rank总数的P</td></tr><tr><td><code>X</code>开头的四位编号</td><td>常量、枚举项或接口声明等条目的定位号</td><td>结合紧邻的“中文逐项-常量/枚举项/接口”标题识别；它不是归约图里的X0输入贡献</td></tr></tbody></table></div>
+<p>例如 <code>F0058</code> 定位到AllReduce的<code>runRing</code>，<code>B0007</code> 定位到该函数中“完成本块归约并开始结果传播”的具体代码段。一个函数可以有多处看图位置，同一张图也可以关联多个函数。</p>
+<p><strong>可以直接按函数名和中文主题使用页面，不需要记F/T/V/B。</strong> 编号主要用于精确查找、区分同名条目和互相交流位置。原有编号和跳转链接继续有效。</p>
+<h2 id="usage-4">4. 图中的C0、X0等记号又是什么意思</h2>
+<div class="table-wrap"><table><thead><tr><th>图中记号</th><th>含义</th><th>容易混淆的地方</th></tr></thead><tbody><tr><td><code>rank 0</code>、<code>rank 1</code></td><td>本次communicator中参与者的编号</td><td>不一定等于本机CUDA设备序号；同一GPU在不同communicator中也可能有不同rank</td></tr><tr><td><code>C0</code>、<code>C1</code>、<code>C2</code></td><td>示例中的第0、1、2个数据块或逻辑段</td><td>C0不是channel 0；AR与AG/RS的分块归属须看对应图的说明</td></tr><tr><td><code>X0(C2)</code></td><td>rank 0输入中的第2块</td><td>前一个数字说明“谁贡献的”，括号里的数字说明“哪一块”</td></tr><tr><td>图里简写的<code>X0</code>、<code>X1</code></td><td>当前所画数据块来自rank 0、rank 1的贡献</td><td>和源码注释定位号X0221是两套记号，按上下文区分</td></tr><tr><td><code>P</code>、<code>C</code></td><td>本文分片公式中，P通常表示rank总数，C表示本次使用的channel数</td><td>以公式所在段落的定义为准，不是注释编号</td></tr><tr><td>模板里的<code>T</code></td><td>C++模板的数据元素类型，例如float</td><td>它和注释定位号T0181不同</td></tr><tr><td><code>tid</code></td><td>当前线程组中的线程编号</td><td>不是GPU rank；线程组拆分时需看该处的赋值</td></tr><tr><td><code>step</code></td><td>连接循环缓冲的协议进度</td><td>不是WQE数量、网络包数量或源码的步骤编号</td></tr><tr><td><code>slice</code>、<code>chunk</code></td><td>原语片段、算法分块</td><td>一个chunk可以继续分成slice；有效长度和协议进度跨度也不同</td></tr></tbody></table></div>
+<p>以4个rank对同一块C2做Sum为例，最终内容是 <code>X0(C2)+X1(C2)+X2(C2)+X3(C2)</code>。这里“四份贡献”和“第2块”是不同维度。AllGather只拼接各rank的段，不执行这个求和；不能把几段并排显示误读成归约。</p>
+<h2 id="usage-5">5. 在普通编辑器中怎么查图</h2>
+<p>普通<code>.cc/.h</code>文本注释不能直接显示SVG。源码中增加了“中文精读：图示绑定”说明，列出中文主题、B定位号和图名。</p>
+<p>读到想看图的地方，可以打开11对照页，搜索对应函数名或B编号。要源码和图并排阅读，直接使用11对照页最方便。IDE适合继续修改、调试或编译真实源码。</p>
+<h2 id="usage-6">6. 遇到这些情况怎么处理</h2>
+<div class="table-wrap"><table><thead><tr><th>现象</th><th>处理方法</th></tr></thead><tbody><tr><td>打开后满屏HTML标签</td><td>用浏览器打开<code>.html</code>，不要用记事本；确认文件没有被保存成<code>.html.txt</code></td></tr><tr><td>点击“在图解页打开”找不到文件</td><td>完整解压ZIP，保留<code>docs/zh_CN</code>下各HTML的相对位置；单独下载11页时用其内部图示即可</td></tr><tr><td>编号搜不到</td><td>输入完整编号并保留前导0；或者直接搜函数名。T/V/B/M/P/X请在11对照页查，05页主要搜索F函数</td></tr><tr><td>变量名出现很多结果</td><td>看文件路径和行号，再结合所在函数/结构体选择具体声明</td></tr><tr><td>右侧显示“暂无专属图示”</td><td>当前辅助函数或代码行尚无人工绑定；可选本文件的其他主题。未绑定不表示源码没有作用</td></tr><tr><td>滚动后图自动切换了</td><td>取消“滚动源码时跟随图示”，需要时再勾选</td></tr><tr><td>图里文字太小</td><td>点击“放大图示”，或用浏览器缩放</td></tr><tr><td>从GitHub下载后没有中文注释</td><td>选择<code>codex/nccl-2.12.12-full-source-walkthrough</code>分析分支或使用本次完整ZIP；原始master保留原版代码</td></tr></tbody></table></div>
+<h2 id="usage-7">7. 当前内容范围</h2>
+<p>阅读页包含121个源码/构建文件、7881个符号位置和45张图。125处人工看图位置覆盖88个关键函数、12个结构体。变量按已绑定的所在代码段/结构体查图，其余辅助代码仍可阅读源码与中文注释。编号、图示模型与浏览器检查不代替CUDA/GPU运行验证。</p></main></body></html>
