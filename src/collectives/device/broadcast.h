@@ -70,6 +70,7 @@ namespace {
  * NCCL_PROTO_LL128。各条件所属分支见紧邻函数体。
  */
   template<typename T, typename RedOp, typename Proto>
+  /* 中文精读V3.1：Broadcast：由root开始沿一个ring方向传递相同chunk。root分输入输出是否相同选择send/copySend；其他rank中nextRank==root的是最后接收者，只recv不再转发以免回绕到root；中间rank执行recvCopySend。rank/root是用户rank而不是channel中的ring->index。换root后的环方向例子见 docs/zh_CN/ring-primitives-deep-dive.md 第4节。 */
   __device__ __forceinline__ void runRing(ncclWorkElem *args) {
 /* 中文逐项-变量 V0236：tid
  * tid（int；函数 runRing 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
