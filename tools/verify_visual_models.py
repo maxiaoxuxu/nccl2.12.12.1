@@ -179,7 +179,7 @@ def check_ring_permutations():
 
 def main():
     diagrams = list(VIS.glob('*.svg'))
-    assert len(diagrams) == 42
+    assert len(diagrams) == 45  # V3.3 adds Channel generation, QP creation, MR cache.
     for path in diagrams:
         root = ET.parse(path).getroot()
         assert root.tag.endswith('svg') and root.attrib.get('viewBox')

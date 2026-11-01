@@ -1053,6 +1053,13 @@ static ncclResult_t SaveProxy(struct ncclChannel* channel, int type, int peer, s
   return ncclSuccess;
 }
 
+/* 中文精读：图示绑定 V3.3 F1024 ncclProxySaveColl
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1024
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0097] ncclProxySaveColl：ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理（调度上下文）
+ *   图：01-submit, 21-proxy-send, 22-proxy-recv
+ *   定位：#symbol=F1024&binding=B0097
+ */
 /* 中文内部逻辑 F1024：ncclProxySaveColl
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclChannel* channel = comm->channels+op->channelId;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -1766,6 +1773,13 @@ void ncclDumpProxyState(int signal) {
  * 数据面后台推进循环：从共享任务池取得 ProxyOp，转成运行参数并轮询 active 操作的 progress 回调。
  * 网络传输尚未完成时继续推进；空闲时让出 CPU。它不负责执行 GPU 上的逐元素归约。
  */
+/* 中文精读：图示绑定 V3.3 F1031 ncclProxyProgress
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1031
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0096] ncclProxyProgress：ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理（调度上下文）
+ *   图：01-submit, 21-proxy-send, 22-proxy-recv
+ *   定位：#symbol=F1031&binding=B0096
+ */
 /* 中文内部逻辑 F1031：ncclProxyProgress
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclComm* comm = (struct ncclComm*)comm_;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -1900,6 +1914,13 @@ void* ncclProxyProgress(void *comm_) {
 /* 中文导读：
  * 将本批已记录的 Proxy 工作发布到对应代理的任务池，让 progress 线程能够开始推进。
  * 它与 GPU FIFO 发布配合；Proxy 工作必须与 GPU 工作使用相同连接、协议和步数。
+ */
+/* 中文精读：图示绑定 V3.3 F1032 ncclProxyStart
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1032
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0095] ncclProxyStart：ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理（调度上下文）
+ *   图：01-submit, 21-proxy-send, 22-proxy-recv
+ *   定位：#symbol=F1032&binding=B0095
  */
 /* 中文内部逻辑 F1032：ncclProxyStart
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。

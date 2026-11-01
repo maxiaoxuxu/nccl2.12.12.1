@@ -845,6 +845,13 @@ ncclResult_t ncclLaunchKernel(ncclComm_t comm) {
  * Start 发布任务并唤醒已有线程，不是每次创建线程，也不是 GPU 给 CPU 发中断。
  * Proxy 可以先挂接收或准备槽位，发送仍须等 GPU 的 sizes/tail/flag 说明数据已就绪。
  */
+/* 中文精读：图示绑定 V3.3 F0399 ncclLaunchProxy
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0399
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0081] ncclLaunchProxy：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断（直接对应）
+ *   图：01-submit
+ *   定位：#symbol=F0399&binding=B0081
+ */
 /* 中文内部逻辑 F0399：ncclLaunchProxy
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：ncclComm_t comm = eqInfo->comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -1364,6 +1371,19 @@ static ncclResult_t getLoopInfo(struct ncclInfo* info) {
  * Ring AllReduce 的每轮通信步数为 2*(nRanks-1)，缓冲区每步大小为 buffSizes[protocol]/NCCL_STEPS。
  * chunk 是算法分块，slice 是原语推进单位，step 是循环缓冲区的进度单位，三者不能随意互换。
  */
+/* 中文精读：图示绑定 V3.3 F0406 computeColl
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0406
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0082] computeColl同时生成GPU与Proxy计划（直接对应）
+ *   图：01-submit, 02-split-layers
+ *   定位：#symbol=F0406&binding=B0082
+ * [B0083] 协议step与chunk的字节容量（直接对应）
+ *   图：02-split-layers, 16-lines
+ *   定位：#symbol=F0406&binding=B0083
+ * [B0084] Proxy总step预算（直接对应）
+ *   图：02-split-layers
+ *   定位：#symbol=F0406&binding=B0084
+ */
 /* 中文内部逻辑 F0406：computeColl
  * 精读：先检查聚合是否已给定通道和线程；已给定时跳到comp_next，避免覆盖整批统一选型。
  * 精读：先填work的用户范围与设备函数索引，再计算物理step/chunk；Tree和CollNet按深度缩小块，LL扣除行flag开销。
@@ -1833,6 +1853,13 @@ reg_fallback:
 /* 中文导读：
  * 准备集合通信的排队描述：计算算法、协议、工作元素和 Proxy 工作，而不是在 API 包装层做数据归约。
  * 后续 HostSetup 将描述放进 channel FIFO，Launch 阶段再提交 GPU kernel。
+ */
+/* 中文精读：图示绑定 V3.3 F0409 ncclSetupCollKernel
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0409
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0078] ncclSetupCollKernel：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断（直接对应）
+ *   图：01-submit
+ *   定位：#symbol=F0409&binding=B0078
  */
 /* 中文内部逻辑 F0409：ncclSetupCollKernel
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
@@ -2890,6 +2917,13 @@ ncclResult_t ncclSetupP2pKernel(struct ncclInfo* info) {
  * 把一项 collective 的工作与 Proxy 需求分配到选中的 channel；聚合时可以装入已有 work 记录。
  * 每个 work 的 bid 是此次操作中的分片编号，不能把它始终当成独立的硬件网口编号。
  */
+/* 中文精读：图示绑定 V3.3 F0420 ncclEnqueueCollKernel
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0420
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0080] ncclEnqueueCollKernel：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断（直接对应）
+ *   图：01-submit
+ *   定位：#symbol=F0420&binding=B0080
+ */
 /* 中文内部逻辑 F0420：ncclEnqueueCollKernel
  * 精读：对bid逐个选择实际channelId；聚合最短队列/轮转策略会使bid与物理channelId不同。
  * 精读：先记录该channel对应的Proxy工作，再尝试把兼容funcIndex/线程数的元素装进已有work，装不下才取新FIFO项。
@@ -3037,6 +3071,13 @@ ncclResult_t ncclEnqueueCollKernel(struct ncclComm* comm, struct ncclQueueElem* 
 
 // Host setup node for CUDA Graph
 // Performs the enqueue job
+/* 中文精读：图示绑定 V3.3 F0421 ncclEnqueueHostSetup
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0421
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0079] ncclEnqueueHostSetup：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断（直接对应）
+ *   图：01-submit
+ *   定位：#symbol=F0421&binding=B0079
+ */
 /* 中文内部逻辑 F0421：ncclEnqueueHostSetup
  * 精读：遍历QueueInfo元素，按P2P或collective分派装入实际channel FIFO。
  * 精读：全部元素装填后setupLaunch补齐终止状态，再LaunchProxy发布任务；该函数本身不直接调用CUDA通信kernel。
@@ -3634,6 +3675,13 @@ static ncclResult_t hostToDevRedOp(
  * 所有主要数据通信 API 的统一入口：检查参数、解析归约操作并保存 stream 信息。
  * 在 group 中先保存任务，最外层 GroupEnd 再调度；否则直接准备 collective、HostSetup、Launch 和事件。
  * 这里 isAsync 主要指 group 调度状态，不要与后来版本的 nonblocking communicator 配置混同。
+ */
+/* 中文精读：图示绑定 V3.3 F0426 ncclEnqueueCheck
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0426
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0077] ncclEnqueueCheck：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断（直接对应）
+ *   图：01-submit
+ *   定位：#symbol=F0426&binding=B0077
  */
 /* 中文内部逻辑 F0426：ncclEnqueueCheck
  * 精读：先完成参数检查和归约句柄复制，防止组内等待期间用户销毁句柄影响任务。

@@ -9,6 +9,25 @@
 #include "primitives.h"
 
 namespace {
+/* 中文精读：图示绑定 V3.3 F0054 runRing
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0054
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0010] Ring allgather的用户段布局（直接对应）
+ *   图：allgather-step-0, allgather-step-1, allgather-step-2, allgather-step-3
+ *   定位：#symbol=F0054&binding=B0010
+ * [B0011] 每个用户段内部按channel切片（直接对应）
+ *   图：02-split-layers, 04-tail
+ *   定位：#symbol=F0054&binding=B0011
+ * [B0014] 先发送并确保本段在输出中（直接对应）
+ *   图：allgather-step-0, 07-copySend
+ *   定位：#symbol=F0054&binding=B0014
+ * [B0015] 转发其他rank的原始段（直接对应）
+ *   图：allgather-step-1, allgather-step-2, 08-recvCopySend
+ *   定位：#symbol=F0054&binding=B0015
+ * [B0016] 只收最后一段（直接对应）
+ *   图：allgather-step-3, 06-recv
+ *   定位：#symbol=F0054&binding=B0016
+ */
 /* 中文内部逻辑 F0054：runRing
  * 精读：size代表本rank贡献长度；复制API已归一成字节，输入与输出偏移要按用户rank段解释。
  * 精读：先把本地贡献放到自己的输出段并发送；中间接收其他贡献后保留和转发，最后只接收。

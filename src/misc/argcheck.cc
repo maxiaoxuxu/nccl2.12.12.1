@@ -86,6 +86,13 @@ ncclResult_t PtrCheck(void* ptr, const char* opname, const char* ptrname) {
  * AllGather/ReduceScatter 的 nBytes 再乘 nRanks，因为公开 count 是单 rank 的贡献/输出规模。
  * 因此 nBytes、内部 count 与公开 API count 不能跨不同 collective 直接套同一解释。
  */
+/* 中文精读：图示绑定 V3.3 F0911 ArgsCheck
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0911
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0085] ArgsCheck：AG/Broadcast的内部count变为字节并选择Int8；AG/RS模型nBytes乘P，不能把公开count直接套到同一分片公式（单位换算上下文）
+ *   图：02-split-layers
+ *   定位：#symbol=F0911&binding=B0085
+ */
 /* 中文内部逻辑 F0911：ArgsCheck
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 条件判断：(info->root < 0 || info->root >= info->comm->nRanks)；为真只进入真分支；为假才考虑else，之后在分支出口继续。

@@ -236,6 +236,13 @@ class Primitives<
     return flags & Aborted;
   }
 
+/* 中文精读：图示绑定 V3.3 F0230 waitPeer
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0230
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0033] waitPeer：发送等空槽，接收等载荷（直接对应）
+ *   图：13-waitpeer, 14-fifo
+ *   定位：#symbol=F0230&binding=B0033
+ */
 /* 中文内部逻辑 F0230：waitPeer
  * 精读：先辨认当前线程负责发送还是接收，并按具体direct谓词决定可省去哪些等待。
  * 精读：发送等head+8足够覆盖目标step，接收等tail达到目标step；等待中刷新进度缓存并查abort。
@@ -381,6 +388,13 @@ class Primitives<
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0231 postPeer
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0231
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0034] postPeer发布各角色自己的step（直接对应）
+ *   图：15-step-roles, 14-fifo
+ *   定位：#symbol=F0231&binding=B0034
+ */
 /* 中文内部逻辑 F0231：postPeer
  * 精读：只有Post角色写共享进度；其本地step与Wait角色的寄存器副本独立，不是同一变量重复加步数。
  * 精读：调用者在此前完成对应barrier/fence；本函数只是推进并发布控制值。
@@ -410,6 +424,34 @@ class Primitives<
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0232 genericOp
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0232
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0025] Simple组合原语的线程与slice总览（直接对应）
+ *   图：12-simple-flow, 15-step-roles
+ *   定位：#symbol=F0232&binding=B0025
+ * [B0026] 尾块归零和slice长度（直接对应）
+ *   图：04-tail, 02-split-layers
+ *   定位：#symbol=F0232&binding=B0026
+ * [B0027] worker的有效slice循环（直接对应）
+ *   图：12-simple-flow
+ *   定位：#symbol=F0232&binding=B0027
+ * [B0028] 先等连接并建立共享指针（直接对应）
+ *   图：13-waitpeer
+ *   定位：#symbol=F0232&binding=B0028
+ * [B0029] direct接收同址省复制（直接对应）
+ *   图：19-direct
+ *   定位：#symbol=F0232&binding=B0029
+ * [B0030] 普通多源多目标融合归约（直接对应）
+ *   图：11-recvReduceCopySend
+ *   定位：#symbol=F0232&binding=B0030
+ * [B0031] 有效slice的会合与发布（直接对应）
+ *   图：12-simple-flow, 15-step-roles
+ *   定位：#symbol=F0232&binding=B0031
+ * [B0032] 空slice和非worker仍需参与（直接对应）
+ *   图：12-simple-flow, 14-fifo
+ *   定位：#symbol=F0232&binding=B0032
+ */
 /* 中文内部逻辑 F0232：genericOp
  * 精读：把非正nelem归零后仍保留约定SlicePerChunk；空数据不等于可跳过协议。
  * 精读：worker路径设置本地指针、waitPeer选邻居指针、subBarrier同步，再选择direct特例或融合搬运。
@@ -900,6 +942,13 @@ class Primitives<
  * 接收一侧读 tail 等生产，写 head 释放消费；发送一侧读 head 等空间，写 tail 发布生产。
  * 这里的 head/tail 是连接视图，具体位于哪一侧 CPU/GPU 内存由 transport connect 填好。
  */
+/* 中文精读：图示绑定 V3.3 F0234 loadRecvConn
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0234
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0036] loadRecvConn：构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子（直接对应）
+ *   图：12-simple-flow, 14-fifo
+ *   定位：#symbol=F0234&binding=B0036
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0234：loadRecvConn
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 条件判断：(flags & (RoleWaitRecv|RolePostRecv))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
@@ -992,6 +1041,13 @@ class Primitives<
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0235 loadSendConn
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0235
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0037] loadSendConn：构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子（直接对应）
+ *   图：12-simple-flow, 14-fifo
+ *   定位：#symbol=F0235&binding=B0037
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0235：loadSendConn
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 条件判断：(flags & (RoleWaitSend|RolePostSend))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
@@ -1098,6 +1154,13 @@ class Primitives<
  * 扫描有效 recvPeers/sendPeers 决定 fan；把部分线程指定为 Wait/Post/Input/Output 角色。
  * group 的低位区分共享内存/命名 barrier 组，高位携带 connIndex，P2P 使用索引 1。
  * 最后装载连接并交换 direct 指针；匹配双方必须执行相容构造路径，否则可能在交换阶段等待。
+ */
+/* 中文精读：图示绑定 V3.3 F0236 Primitives
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0236
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0035] Primitives：构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子（直接对应）
+ *   图：12-simple-flow, 14-fifo
+ *   定位：#symbol=F0236&binding=B0035
  */
   __device__ /* 中文内部逻辑 F0236：Primitives
  * 精读：从邻居列表计算实际收发数并确定worker和额外同步warp。
@@ -1295,6 +1358,13 @@ class Primitives<
     barrier();
   }
 
+/* 中文精读：图示绑定 V3.3 F0238 setDataPtrs
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0238
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0038] setDataPtrs：根据DirectRead/DirectWrite提供或接受用户指针，并交换必要缩放参数；只有匹配的提供/使用方满足契约后才继续（直接对应）
+ *   图：19-direct
+ *   定位：#symbol=F0238&binding=B0038
+ */
   __device__ /* 中文内部逻辑 F0238：setDataPtrs
  * 精读：普通路径只设置本地Input/Output；direct路径再分提供者和接收者。
  * 精读：直接写由接收方提供output，直接读由发送方提供input或output；指针槽以nullptr表示空，所以传输时采用异或编码。
@@ -1574,6 +1644,13 @@ class Primitives<
  * 下面每个包装仅选择 genericOp 的模板位，不会每次单独发射 CUDA kernel。
  * Input/Output 下标都是 T 元素偏移；remoteOutIx 只在 direct 访问远端用户缓冲时需要。
  */
+/* 中文精读：图示绑定 V3.3 F0240 send
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0240
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0039] send：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel（直接对应）
+ *   图：05-send, 12-simple-flow
+ *   定位：#symbol=F0240&binding=B0039
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0240：send
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 0, 0, 1, Input, -1>(inpIx, -1, -1, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1602,6 +1679,13 @@ class Primitives<
  */void sendFromOutput(intptr_t outIx, int eltN) {
     genericOp<0, 0, 0, 1, Output, -1>(outIx, -1, -1, eltN, false);
   }
+/* 中文精读：图示绑定 V3.3 F0242 directSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0242
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0046] directSend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径（直接对应）
+ *   图：05-send, 19-direct
+ *   定位：#symbol=F0242&binding=B0046
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0242：directSend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 1, 0, 1, Input, -1>(inpIx, -1, remoteOutIx, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1633,6 +1717,13 @@ class Primitives<
     genericOp<0, 1, 0, 1, Output, -1>(outIx, -1, remoteOutIx, eltN, false);
   }
 
+/* 中文精读：图示绑定 V3.3 F0244 recv
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0244
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0040] recv：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel（直接对应）
+ *   图：06-recv, 12-simple-flow
+ *   定位：#symbol=F0244&binding=B0040
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0244：recv
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1648,6 +1739,13 @@ class Primitives<
  */void recv(intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, postOp);
   }
+/* 中文精读：图示绑定 V3.3 F0245 directRecv
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0245
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0048] directRecv：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径（直接对应）
+ *   图：06-recv, 19-direct
+ *   定位：#symbol=F0245&binding=B0048
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0245：directRecv
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<1, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1663,6 +1761,13 @@ class Primitives<
     genericOp<1, 0, 1, 0, -1, Output>(-1, outIx, -1, eltN, /*postOp=*/false);
   }
 
+/* 中文精读：图示绑定 V3.3 F0246 copySend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0246
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0041] copySend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel（直接对应）
+ *   图：07-copySend, 12-simple-flow
+ *   定位：#symbol=F0246&binding=B0041
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0246：copySend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 0, 0, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1679,6 +1784,13 @@ class Primitives<
  */void copySend(intptr_t inpIx, intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 0, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);
   }
+/* 中文精读：图示绑定 V3.3 F0247 directCopySend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0247
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0047] directCopySend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径（直接对应）
+ *   图：07-copySend, 19-direct
+ *   定位：#symbol=F0247&binding=B0047
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0247：directCopySend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 1, 0, 1, Input, Output>(inpIx, outIx, remoteOutIx, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1697,6 +1809,13 @@ class Primitives<
     genericOp<0, 1, 0, 1, Input, Output>(inpIx, outIx, remoteOutIx, eltN, postOp);
   }
 
+/* 中文精读：图示绑定 V3.3 F0248 recvCopySend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0248
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0042] recvCopySend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel（直接对应）
+ *   图：08-recvCopySend, 12-simple-flow
+ *   定位：#symbol=F0248&binding=B0042
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0248：recvCopySend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 1, -1, Output>(-1, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1712,6 +1831,13 @@ class Primitives<
  */void recvCopySend(intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 1, -1, Output>(-1, outIx, -1, eltN, postOp);
   }
+/* 中文精读：图示绑定 V3.3 F0249 directRecvCopySend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0249
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0049] directRecvCopySend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径（直接对应）
+ *   图：08-recvCopySend, 19-direct
+ *   定位：#symbol=F0249&binding=B0049
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0249：directRecvCopySend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<1, 1, 1, 1, -1, Output>(-1, outIx, remoteOutIx, eltN, false);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1744,6 +1870,13 @@ class Primitives<
     genericOp<0, 1, 1, 1, -1, Output>(-1, outIx, remoteOutIx, eltN, postOp);
   }
 
+/* 中文精读：图示绑定 V3.3 F0251 recvReduceCopy
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0251
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0044] recvReduceCopy：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel（直接对应）
+ *   图：10-recvReduceCopy, 12-simple-flow
+ *   定位：#symbol=F0251&binding=B0044
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0251：recvReduceCopy
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 0, Input, Output>(inpIx, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1761,6 +1894,13 @@ class Primitives<
     genericOp<0, 0, 1, 0, Input, Output>(inpIx, outIx, -1, eltN, postOp);
   }
 
+/* 中文精读：图示绑定 V3.3 F0252 recvReduceSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0252
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0043] recvReduceSend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel（直接对应）
+ *   图：09-recvReduceSend, 12-simple-flow
+ *   定位：#symbol=F0252&binding=B0043
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0252：recvReduceSend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 1, Input, -1>(inpIx, -1, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1776,6 +1916,13 @@ class Primitives<
  */void recvReduceSend(intptr_t inpIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 1, Input, -1>(inpIx, -1, -1, eltN, postOp);
   }
+/* 中文精读：图示绑定 V3.3 F0253 directRecvReduceSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0253
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0051] directRecvReduceSend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径（直接对应）
+ *   图：09-recvReduceSend, 19-direct
+ *   定位：#symbol=F0253&binding=B0051
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0253：directRecvReduceSend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<1, 0, 1, 1, Input, -1>(inpIx, -1, remoteInpIx, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1793,6 +1940,13 @@ class Primitives<
     genericOp<1, 0, 1, 1, Input, -1>(inpIx, -1, remoteInpIx, eltN, postOp);
   }
 
+/* 中文精读：图示绑定 V3.3 F0254 recvReduceCopySend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0254
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0045] recvReduceCopySend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel（直接对应）
+ *   图：11-recvReduceCopySend, 12-simple-flow
+ *   定位：#symbol=F0254&binding=B0045
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0254：recvReduceCopySend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 0, 1, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。
@@ -1809,6 +1963,13 @@ class Primitives<
  */void recvReduceCopySend(intptr_t inpIx, intptr_t outIx, int eltN, bool postOp=false) {
     genericOp<0, 0, 1, 1, Input, Output>(inpIx, outIx, -1, eltN, postOp);
   }
+/* 中文精读：图示绑定 V3.3 F0255 directRecvReduceCopySend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0255
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0050] directRecvReduceCopySend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径（直接对应）
+ *   图：11-recvReduceCopySend, 19-direct
+ *   定位：#symbol=F0255&binding=B0050
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0255：directRecvReduceCopySend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：genericOp<0, 1, 1, 1, Input, Output>(inpIx, outIx, remoteOutIx, eltN, postOp);；Simple 协议的组合原语核心，逐 slice 等待并融合搬运/归约，随后屏障/fence 并发布进度。

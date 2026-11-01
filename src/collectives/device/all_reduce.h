@@ -9,6 +9,37 @@
 #include "primitives.h"
 
 namespace {
+/* 中文精读：图示绑定 V3.3 F0058 runRing
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0058
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0001] Ring AllReduce完整逻辑轮次（直接对应）
+ *   图：allreduce-step-0, allreduce-step-1, allreduce-step-2, allreduce-step-3, allreduce-step-4, allreduce-step-5, allreduce-step-6
+ *   定位：#symbol=F0058&binding=B0001
+ * [B0002] 协议块上限与loopSize（直接对应）
+ *   图：02-split-layers
+ *   定位：#symbol=F0058&binding=B0002
+ * [B0003] 尾轮realChunkSize与对齐（直接对应）
+ *   图：04-tail
+ *   定位：#symbol=F0058&binding=B0003
+ * [B0004] Simple与LL地址排列（直接对应）
+ *   图：03-layout
+ *   定位：#symbol=F0058&binding=B0004
+ * [B0005] 首发本地块（直接对应）
+ *   图：allreduce-step-0, 05-send
+ *   定位：#symbol=F0058&binding=B0005
+ * [B0006] 中间部分和归约转发（直接对应）
+ *   图：allreduce-step-1, allreduce-step-2, 09-recvReduceSend
+ *   定位：#symbol=F0058&binding=B0006
+ * [B0007] 完成本块归约并开始结果传播（直接对应）
+ *   图：allreduce-step-3, 11-recvReduceCopySend
+ *   定位：#symbol=F0058&binding=B0007
+ * [B0008] 只复制已完整的结果（直接对应）
+ *   图：allreduce-step-4, allreduce-step-5, 08-recvCopySend
+ *   定位：#symbol=F0058&binding=B0008
+ * [B0009] 接收最后缺失块（直接对应）
+ *   图：allreduce-step-6, 06-recv
+ *   定位：#symbol=F0058&binding=B0009
+ */
 /* 中文内部逻辑 F0058：runRing
  * 精读：固定一个channel后，外层gridOffset覆盖全输入；本轮真实块长按剩余量和协议grain调整。
  * 精读：calcOffset对Simple使用channel连续布局，对LL/LL128使用交错布局；nelem截断尾部。
@@ -301,6 +332,13 @@ namespace {
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0059 runTreeUpDown
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0059
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0022] runTreeUpDown：tree.up/down决定该channel实际邻居（直接对应）
+ *   图：23-tree
+ *   定位：#symbol=F0059&binding=B0022
+ */
 /* 中文内部逻辑 F0059：runTreeUpDown
  * 精读：上行把叶的send、中间节点的多收归约转发、根的最终recvReduceCopy分开。
  * 精读：同一线程组上行阶段结束后，换向构造广播原语；根从output发送，叶仅接收，中间节点复制转发。
@@ -568,6 +606,13 @@ namespace {
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0060 runTreeSplit
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0060
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0023] runTreeSplit：tree.up/down决定该channel实际邻居（直接对应）
+ *   图：23-tree
+ *   定位：#symbol=F0060&binding=B0023
+ */
 /* 中文内部逻辑 F0060：runTreeSplit
  * 精读：先按协议确定上下行线程拆分；非根上行组与下行组使用不同group/barrier。
  * 精读：根用融合原语完成多收归约、保留和多发，非根可让前一块下行与后一块上行重叠。
@@ -918,6 +963,13 @@ struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_TREE, NCCL_PROTO_SI
  */
 template<typename T, typename RedOp>
 struct RunWorkElement<ncclFuncAllReduce, T, RedOp, NCCL_ALGO_COLLNET, NCCL_PROTO_SIMPLE> {
+/* 中文精读：图示绑定 V3.3 F0063 run
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0063
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0024] CollNet各线程组与网络归约（直接对应）
+ *   图：24-collnet
+ *   定位：#symbol=F0063&binding=B0024
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0063：run
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：static constexpr int COLLNET_COPY_THREADS = 96;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。

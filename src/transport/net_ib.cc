@@ -79,6 +79,13 @@ struct ncclIbMr {
   ibv_mr *mr;
 };
 
+/* 中文精读：图示绑定 V3.3 T0424 ncclIbMrCache
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0424
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0124] ncclIbMrCache：字段协作图（结构字段上下文）
+ *   图：30-mr-cache
+ *   定位：#symbol=T0424&binding=B0124
+ */
 /* 中文逐项-类型 T0424：ncclIbMrCache
  * 类型职责：真实MR缓存项及设备缓存容器，以页范围和引用计数避免相同缓冲重复注册。
  * 声明内可见成员（含嵌套成员）：slots、capacity、population。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
@@ -1097,6 +1104,13 @@ struct ncclIbHandle {
  */
 #define NCCL_NET_IB_REQ_FLUSH 3
 
+/* 中文精读：图示绑定 V3.3 T0431 ncclIbRequest
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0431
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0125] ncclIbRequest：字段协作图（结构字段上下文）
+ *   图：21-proxy-send, 22-proxy-recv
+ *   定位：#symbol=T0431&binding=B0125
+ */
 /* 中文逐项-类型 T0431：ncclIbRequest
  * 类型职责：单个异步IB请求状态，记录类型、待完成事件数、聚合子项与接收长度。
  * 声明内可见成员（含嵌套成员）：verbs、type、events、addr、nreqs、send、size、data、lkey、offset、recv、sizes。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
@@ -1255,6 +1269,13 @@ struct ncclIbSendFifo {
  * 一个底层发送连接对象：持有 nqps 个 RC 数据 QP、对端接收地址发布 FIFO 及其本地 MR。
  * 高层多个逻辑连接能否共用此对象由 transport/net.cc 决定；不能把一个 SendComm 当成一个 communicator。
  */
+/* 中文精读：图示绑定 V3.3 T0438 ncclIbSendComm
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0438
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0122] ncclIbSendComm：字段协作图（结构字段上下文）
+ *   图：29-ib-qp-creation
+ *   定位：#symbol=T0438&binding=B0122
+ */
 /* 中文逐项-类型 T0438：ncclIbSendComm
  * 类型职责：IB后端真正发送/接收连接，持有控制socket、数据QP、FIFO和verbs请求资源。
  * 声明内可见成员（含嵌套成员）：verbs、fifo、fifoHead、fifoReqs、wrs、sges、sock、ready、qps、nqps、fifoMr。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
@@ -1377,6 +1398,13 @@ struct ncclIbRemFifo {
 /* 中文导读：
  * 一个底层接收连接对象：数据 QP、向发送方发布接收地址的 remFifo，以及可选 GDR flush 资源。
  * 用于写 payload 的 rkey 来自接收缓冲区 MR；RDMA_WRITE_WITH_IMM 的完成通知仍需要预挂接收 WQE。
+ */
+/* 中文精读：图示绑定 V3.3 T0441 ncclIbRecvComm
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0441
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0123] ncclIbRecvComm：字段协作图（结构字段上下文）
+ *   图：29-ib-qp-creation
+ *   定位：#symbol=T0441&binding=B0123
  */
 /* 中文逐项-类型 T0441：ncclIbRecvComm
  * 类型职责：IB后端真正发送/接收连接，持有控制socket、数据QP、FIFO和verbs请求资源。
@@ -1528,6 +1556,13 @@ returning:
  * qpInitAttr 清零后没有绑定 srq，因此本内置后端走每 QP 的接收队列；后续 Irecv 调用 post_recv。
  * 改变为 SRQ 只会改变接收队列组织，不会自然消除各 peer 的 RC QP 或 payload MR。
  */
+/* 中文精读：图示绑定 V3.3 F1109 ncclIbCreateQp
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1109
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0104] ncclIbCreateQp：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘（直接对应）
+ *   图：29-ib-qp-creation
+ *   定位：#symbol=F1109&binding=B0104
+ */
 /* 中文内部逻辑 F1109：ncclIbCreateQp
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ibv_qp_init_attr qpInitAttr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -1595,6 +1630,13 @@ ncclResult_t ncclIbCreateQp(uint8_t ib_port, struct ncclIbVerbs* verbs, int acce
 /* 中文导读：
  * 把 QP 转为 RTR，装入对端 QPN、路由地址、端口与协商 MTU 等信息。
  * IB 与 RoCE 的地址字段处理不同；到达 RTR 后仍需 RTS 才能按本实现正常推进发送。
+ */
+/* 中文精读：图示绑定 V3.3 F1110 ncclIbRtrQp
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1110
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0105] ncclIbRtrQp：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘（直接对应）
+ *   图：29-ib-qp-creation
+ *   定位：#symbol=F1110&binding=B0105
  */
 /* 中文内部逻辑 F1110：ncclIbRtrQp
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
@@ -1667,6 +1709,13 @@ ncclResult_t ncclIbRtrQp(struct ibv_qp* qp, uint32_t qpn, struct ncclIbQpInfo* i
   return ncclSuccess;
 }
 
+/* 中文精读：图示绑定 V3.3 F1111 ncclIbRtsQp
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1111
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0106] ncclIbRtsQp：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘（直接对应）
+ *   图：29-ib-qp-creation
+ *   定位：#symbol=F1111&binding=B0106
+ */
 /* 中文内部逻辑 F1111：ncclIbRtsQp
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ibv_qp_attr qpAttr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -1754,6 +1803,13 @@ ncclResult_t ncclIbListen(int dev, void* opaqueHandle, void** listenComm) {
 /* 中文导读：
  * 发起底层发送连接：socket 握手交换 QP 信息，建立 nqps 个数据 QP，并注册发送方接收控制 FIFO。
  * 连接是分阶段非阻塞推进的，成功返回但 sendComm 仍为空表示尚未完成，调用方必须重试。
+ */
+/* 中文精读：图示绑定 V3.3 F1113 ncclIbConnect
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1113
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0107] ncclIbConnect：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘（直接对应）
+ *   图：29-ib-qp-creation
+ *   定位：#symbol=F1113&binding=B0107
  */
 /* 中文内部逻辑 F1113：ncclIbConnect
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
@@ -1995,6 +2051,13 @@ NCCL_PARAM(IbGdrFlushDisable, "GDR_FLUSH_DISABLE", 0);
 /* 中文导读：
  * 接收侧分阶段建链并配对数据 QP，注册 remFifo；满足条件时再创建一个 flush QP 和 hostMr。
  * 这些控制/flush MR 直接调用 verbs 注册，不进入下方 ncclIbRegMr 的协议缓冲缓存。
+ */
+/* 中文精读：图示绑定 V3.3 F1114 ncclIbAccept
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1114
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0108] ncclIbAccept：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘（直接对应）
+ *   图：29-ib-qp-creation
+ *   定位：#symbol=F1114&binding=B0108
  */
 /* 中文内部逻辑 F1114：ncclIbAccept
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
@@ -2479,6 +2542,13 @@ ncclResult_t ncclIbTest(void* request, int* done, int* size);
  * 此函数没有遍历 QP，mhandle 本质上返回 ibv_mr，发送使用 lkey，远端写入使用接收方发布的 rkey。
  * 缓存局限于本进程对应设备条目及共享 PD；不同进程不能直接共享这里的软件缓存。
  */
+/* 中文精读：图示绑定 V3.3 F1119 ncclIbRegMr
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1119
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0109] ncclIbRegMr：数据MR缓存按本进程IB设备的页起址与页数精确命中，用引用计数管理；控制FIFO和flush MR不走此缓存（直接对应）
+ *   图：30-mr-cache
+ *   定位：#symbol=F1119&binding=B0109
+ */
 /* 中文内部逻辑 F1119：ncclIbRegMr
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 源码语法片段：static_assert(offsetof(struct ncclIbSendComm, verbs) == offsetof(struct ncclIbRecvComm, verbs), "Send and recv comms must have verbs at the same offset");；按紧邻完整函数体解释此片段；不能仅凭片段推断跨线程执行次序。
@@ -2636,6 +2706,13 @@ returning:
  * 释放一次注册引用；只有引用数归零才从缓存删除并真正 ibv_dereg_mr。
  * 单次通信结束不调用这里释放持久缓冲 MR，实际释放由 transport/连接的生命周期控制。
  */
+/* 中文精读：图示绑定 V3.3 F1120 ncclIbDeregMr
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1120
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0110] ncclIbDeregMr：数据MR缓存按本进程IB设备的页起址与页数精确命中，用引用计数管理；控制FIFO和flush MR不走此缓存（直接对应）
+ *   图：30-mr-cache
+ *   定位：#symbol=F1120&binding=B0110
+ */
 /* 中文内部逻辑 F1120：ncclIbDeregMr
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclIbVerbs* verbs = (struct ncclIbVerbs*)comm;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -2723,6 +2800,13 @@ returning:
  * 从接收方公布的 addr/rkey 生成 RDMA_WRITE 链，末端使用 WRITE_WITH_IMM 通知接收完成。
  * 消息按 nqps 切分并以 128B 对齐后投递，各 QP 使用同一个已注册缓冲的 key，不为每个分片另建 MR。
  * 多接收聚合或超过自适应路由阈值时，数据 WRITE 与末尾零字节通知可以分开。
+ */
+/* 中文精读：图示绑定 V3.3 F1121 ncclIbMultiSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1121
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0111] ncclIbMultiSend：这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE（资源使用上下文）
+ *   图：29-ib-qp-creation, 30-mr-cache
+ *   定位：#symbol=F1121&binding=B0111
  */
 /* 中文内部逻辑 F1121：ncclIbMultiSend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
@@ -3175,6 +3259,13 @@ ncclResult_t ncclIbIsend(void* sendComm, void* data, int size, int tag, void* mh
  * 接收方把目标 addr、rkey、tag、size 和序号写回发送方控制 FIFO，授予向该缓冲写入的条件。
  * 控制消息也用 RDMA_WRITE；周期性请求 signaled completion，避免一直 unsignaled 导致 SQ 无法回收。
  */
+/* 中文精读：图示绑定 V3.3 F1123 ncclIbPostFifo
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1123
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0113] ncclIbPostFifo：这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE（资源使用上下文）
+ *   图：29-ib-qp-creation, 30-mr-cache
+ *   定位：#symbol=F1123&binding=B0113
+ */
 /* 中文内部逻辑 F1123：ncclIbPostFifo
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ibv_send_wr wr;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -3311,6 +3402,13 @@ ncclResult_t ncclIbPostFifo(struct ncclIbRecvComm* comm, int n, void** data, int
  * 先在每个数据 QP 上 post_recv 一个零 SGE 接收 WQE，再公布接收缓冲地址/rkey。
  * 零 SGE 因 payload 直接 RDMA 写入目标 MR，RQ WQE 用于接收 WRITE_WITH_IMM 完成通知。
  * 这不是 SRQ：代码直接向各个 qp 投递，完成事件数先设为 nqps。
+ */
+/* 中文精读：图示绑定 V3.3 F1124 ncclIbIrecv
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1124
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0112] ncclIbIrecv：这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE（资源使用上下文）
+ *   图：29-ib-qp-creation, 30-mr-cache
+ *   定位：#symbol=F1124&binding=B0112
  */
 /* 中文内部逻辑 F1124：ncclIbIrecv
  * 精读：先为每个数据QP投递零SGE接收WQE以接收立即数完成通知。

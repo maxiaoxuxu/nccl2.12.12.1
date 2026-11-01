@@ -1,0 +1,1405 @@
+{
+  "version": "3.3",
+  "base_source_commit": "04832308d0885226169b9376c1ba4f17b0cb6484",
+  "source_review_parent": "1ee5fe0556cca004355653e62715bee2809768c0",
+  "method": "人工选择源码符号与代码锚点；生成时解析当前行号。直接对应、调用上下文、结构上下文分别标明；不为无关函数强行套图。",
+  "bindings": [
+    {
+      "id": "B0001",
+      "symbol": "F0058",
+      "title": "Ring AllReduce完整逻辑轮次",
+      "diagrams": [
+        "allreduce-step-0",
+        "allreduce-step-1",
+        "allreduce-step-2",
+        "allreduce-step-3",
+        "allreduce-step-4",
+        "allreduce-step-5",
+        "allreduce-step-6"
+      ],
+      "explanation": "以4rank、0→1→2→3→0和Sum为例追踪贡献来源。当前函数在每个gridOffset内先归约再传播完整结果；图的轮次不是FIFO step，也不是所有线程锁步。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0002",
+      "symbol": "F0058",
+      "title": "协议块上限与loopSize",
+      "diagrams": [
+        "02-split-layers"
+      ],
+      "explanation": "chunkSize已是T元素数；AR每轮容量为nChannels×nranks×chunkSize，实际调用的原语还会继续按slice推进。",
+      "relation": "直接对应",
+      "anchor": "const ssize_t chunkSize",
+      "occurrence": 0
+    },
+    {
+      "id": "B0003",
+      "symbol": "F0058",
+      "title": "尾轮realChunkSize与对齐",
+      "diagrams": [
+        "04-tail"
+      ],
+      "explanation": "此处先按C×P分配剩余元素，再按worker搬运粒度对齐。对齐容量和本轮有效nelem不同。",
+      "relation": "直接对应",
+      "anchor": "for (ssize_t gridOffset",
+      "occurrence": 0
+    },
+    {
+      "id": "B0004",
+      "symbol": "F0058",
+      "title": "Simple与LL地址排列",
+      "diagrams": [
+        "03-layout"
+      ],
+      "explanation": "Simple按bid把P块放在一起；LL/LL128按chunk与channel交错。此公式属于AR，AG/RS按每rank段内部切片。",
+      "relation": "直接对应",
+      "anchor": "auto calcOffset",
+      "occurrence": 0
+    },
+    {
+      "id": "B0005",
+      "symbol": "F0058",
+      "title": "首发本地块",
+      "diagrams": [
+        "allreduce-step-0",
+        "05-send"
+      ],
+      "explanation": "初始send读本地输入块C(index-1)，只发不保留最终结果；下游下一阶段才加入自己的同一块贡献。",
+      "relation": "直接对应",
+      "anchor": "chunk = modRanks(ringIx + nranks-1);",
+      "occurrence": 0
+    },
+    {
+      "id": "B0006",
+      "symbol": "F0058",
+      "title": "中间部分和归约转发",
+      "diagrams": [
+        "allreduce-step-1",
+        "allreduce-step-2",
+        "09-recvReduceSend"
+      ],
+      "explanation": "recvReduceSend把上游部分结果与本地同地址块归约，继续发到next；此时仍不是全rank完整结果。",
+      "relation": "直接对应",
+      "anchor": "for (int j=2; j<nranks; ++j)",
+      "occurrence": 0
+    },
+    {
+      "id": "B0007",
+      "symbol": "F0058",
+      "title": "完成本块归约并开始结果传播",
+      "diagrams": [
+        "allreduce-step-3",
+        "11-recvReduceCopySend"
+      ],
+      "explanation": "directRecvReduceCopySend加入最后贡献、执行所需postOp、写本地输出并开始发送。Simple此包装的direct只用于发送部分。",
+      "relation": "直接对应",
+      "anchor": "chunk = ringIx + 0;",
+      "occurrence": 0
+    },
+    {
+      "id": "B0008",
+      "symbol": "F0058",
+      "title": "只复制已完整的结果",
+      "diagrams": [
+        "allreduce-step-4",
+        "allreduce-step-5",
+        "08-recvCopySend"
+      ],
+      "explanation": "此阶段块已经归约完整，不能再加本地input；本地保留与继续转发融合。",
+      "relation": "直接对应",
+      "anchor": "for (int j=1; j<nranks-1; ++j)",
+      "occurrence": 0
+    },
+    {
+      "id": "B0009",
+      "symbol": "F0058",
+      "title": "接收最后缺失块",
+      "diagrams": [
+        "allreduce-step-6",
+        "06-recv"
+      ],
+      "explanation": "最后directRecv只补齐输出；不能把这个收尾调用再算成一次发送或一个独立kernel。",
+      "relation": "直接对应",
+      "anchor": "chunk = modRanks(ringIx + 1);",
+      "occurrence": 0
+    },
+    {
+      "id": "B0010",
+      "symbol": "F0054",
+      "title": "Ring allgather的用户段布局",
+      "diagrams": [
+        "allgather-step-0",
+        "allgather-step-1",
+        "allgather-step-2",
+        "allgather-step-3"
+      ],
+      "explanation": "图假设4rank自然环顺序。AG只收集各rank原始段，RS归约完整输入后只输出本用户rank段。两者size均描述每rank段，loopSize=C×chunkSize。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0011",
+      "symbol": "F0054",
+      "title": "每个用户段内部按channel切片",
+      "diagrams": [
+        "02-split-layers",
+        "04-tail"
+      ],
+      "explanation": "gridOffset/bid只定位某个用户段内部的chunkOffset；随后rankDest×size定位用户段。不能套用AR的C×P分母。",
+      "relation": "直接对应",
+      "anchor": "for (ssize_t gridOffset",
+      "occurrence": 0
+    },
+    {
+      "id": "B0012",
+      "symbol": "F0370",
+      "title": "Ring reducescatter的用户段布局",
+      "diagrams": [
+        "reducescatter-step-0",
+        "reducescatter-step-1",
+        "reducescatter-step-2",
+        "reducescatter-step-3"
+      ],
+      "explanation": "图假设4rank自然环顺序。AG只收集各rank原始段，RS归约完整输入后只输出本用户rank段。两者size均描述每rank段，loopSize=C×chunkSize。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0013",
+      "symbol": "F0370",
+      "title": "每个用户段内部按channel切片",
+      "diagrams": [
+        "02-split-layers",
+        "04-tail"
+      ],
+      "explanation": "gridOffset/bid只定位某个用户段内部的chunkOffset；随后rankDest×size定位用户段。不能套用AR的C×P分母。",
+      "relation": "直接对应",
+      "anchor": "for (ssize_t gridOffset",
+      "occurrence": 0
+    },
+    {
+      "id": "B0014",
+      "symbol": "F0054",
+      "title": "先发送并确保本段在输出中",
+      "diagrams": [
+        "allgather-step-0",
+        "07-copySend"
+      ],
+      "explanation": "若sendbuff已落在recvbuff的本rank正确段，directSend即可；否则directCopySend同时保留本地并转发。",
+      "relation": "直接对应",
+      "anchor": "rankDest = ringRanks[0];",
+      "occurrence": 0
+    },
+    {
+      "id": "B0015",
+      "symbol": "F0054",
+      "title": "转发其他rank的原始段",
+      "diagrams": [
+        "allgather-step-1",
+        "allgather-step-2",
+        "08-recvCopySend"
+      ],
+      "explanation": "使用ringRanks[nranks-j]找贡献者用户rank，把段保存到按用户rank排列的输出，不做数值归约。",
+      "relation": "直接对应",
+      "anchor": "for (int j=1; j<nranks-1; ++j)",
+      "occurrence": 0
+    },
+    {
+      "id": "B0016",
+      "symbol": "F0054",
+      "title": "只收最后一段",
+      "diagrams": [
+        "allgather-step-3",
+        "06-recv"
+      ],
+      "explanation": "最后是ringRanks[1]对应用户段；本rank接收后已经收齐，不再转发回原贡献者。",
+      "relation": "直接对应",
+      "anchor": "rankDest = ringRanks[1];",
+      "occurrence": 0
+    },
+    {
+      "id": "B0017",
+      "symbol": "F0370",
+      "title": "先发环前方最终归属的段",
+      "diagrams": [
+        "reducescatter-step-0",
+        "05-send"
+      ],
+      "explanation": "rankDest取本地环表最后一项，发送本地输入的对应用户段；每个rank输入都有全部P段。",
+      "relation": "直接对应",
+      "anchor": "rankDest = ringRanks[nranks-1];",
+      "occurrence": 0
+    },
+    {
+      "id": "B0018",
+      "symbol": "F0370",
+      "title": "收到部分和再加入本地贡献",
+      "diagrams": [
+        "reducescatter-step-1",
+        "reducescatter-step-2",
+        "09-recvReduceSend"
+      ],
+      "explanation": "同一用户段沿环前进，接收者把自己的该段加入部分结果；部分和继续流向最终归属rank。",
+      "relation": "直接对应",
+      "anchor": "for (int j=2; j<nranks; ++j)",
+      "occurrence": 0
+    },
+    {
+      "id": "B0019",
+      "symbol": "F0370",
+      "title": "只把本rank最终段写到紧凑输出",
+      "diagrams": [
+        "reducescatter-step-3",
+        "10-recvReduceCopy"
+      ],
+      "explanation": "输入offset包含rankDest×size，输出却用chunkOffset。源与目标偏移不可混同；最后才执行所需postOp。",
+      "relation": "直接对应",
+      "anchor": "rankDest = ringRanks[0];",
+      "occurrence": 0
+    },
+    {
+      "id": "B0020",
+      "symbol": "F0068",
+      "title": "Broadcast在root处切开环",
+      "diagrams": [
+        "26-broadcast",
+        "07-copySend",
+        "08-recvCopySend",
+        "06-recv"
+      ],
+      "explanation": "图以root=0为例；实际条件是rank==root与nextRank==root。root发出，沿环中间节点保存并转发，root前驱只接收。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0021",
+      "symbol": "F0260",
+      "title": "Reduce从root后继出发、到root结束",
+      "diagrams": [
+        "27-reduce",
+        "09-recvReduceSend",
+        "10-recvReduceCopy"
+      ],
+      "explanation": "图以root=0为例；prevRank==root的GPU先send，中间GPU归约转发，root最后加入本地贡献并保留结果。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0022",
+      "symbol": "F0059",
+      "title": "runTreeUpDown：tree.up/down决定该channel实际邻居",
+      "diagrams": [
+        "23-tree"
+      ],
+      "explanation": "tree.up/down决定该channel实际邻居。UpDown分两个阶段；Split在非根用不同线程组服务上下行，图为单块依赖而非所有块串行。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0023",
+      "symbol": "F0060",
+      "title": "runTreeSplit：tree.up/down决定该channel实际邻居",
+      "diagrams": [
+        "23-tree"
+      ],
+      "explanation": "tree.up/down决定该channel实际邻居。UpDown分两个阶段；Split在非根用不同线程组服务上下行，图为单块依赖而非所有块串行。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0024",
+      "symbol": "F0063",
+      "title": "CollNet各线程组与网络归约",
+      "diagrams": [
+        "24-collnet"
+      ],
+      "explanation": "Scatter/Reduce/Gather/Broadcast线程组按head切分工作，网络插件执行Iallreduce。此特化只适用于CollNet+Simple，不能按普通IB发送图替代。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0025",
+      "symbol": "F0232",
+      "title": "Simple组合原语的线程与slice总览",
+      "diagrams": [
+        "12-simple-flow",
+        "15-step-roles"
+      ],
+      "explanation": "所有参与线程必须经过匹配屏障。worker执行有效数据路径，其他线程在后面的循环参与对应屏障和发布；Wait/Post角色各自保存step。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0026",
+      "symbol": "F0232",
+      "title": "尾块归零和slice长度",
+      "diagrams": [
+        "04-tail",
+        "02-split-layers"
+      ],
+      "explanation": "nelem只表示有效元素；sliceSize由有效量、SlicePerChunk和物理step容量共同限制。非正nelem的已约定原语仍需推进协议。",
+      "relation": "直接对应",
+      "anchor": "nelem = nelem < 0 ? 0 : nelem;",
+      "occurrence": 0
+    },
+    {
+      "id": "B0027",
+      "symbol": "F0232",
+      "title": "worker的有效slice循环",
+      "diagrams": [
+        "12-simple-flow"
+      ],
+      "explanation": "只有worker进入有效数据循环；非worker从后面的循环参与同组屏障，不能当成已经提前退出。",
+      "relation": "直接对应",
+      "anchor": "if (tid < nworkers && offset < nelem)",
+      "occurrence": 0
+    },
+    {
+      "id": "B0028",
+      "symbol": "F0232",
+      "title": "先等连接并建立共享指针",
+      "diagrams": [
+        "13-waitpeer"
+      ],
+      "explanation": "Wait角色检查空间或数据条件并填srcs/dsts；subBarrier后worker才使用已准备好的指针。",
+      "relation": "直接对应",
+      "anchor": "waitPeer<DirectRecv, DirectSend, Recv, Send, Src, Dst>(dstIx, remoteIx, offset, sliceSize);",
+      "occurrence": 0
+    },
+    {
+      "id": "B0029",
+      "symbol": "F0232",
+      "title": "direct接收同址省复制",
+      "diagrams": [
+        "19-direct"
+      ],
+      "explanation": "接收源与本地输出同址时可以省一次本地复制；若仍要Send，继续向其他目标写。不是所有direct函数都省全部等待。",
+      "relation": "直接对应",
+      "anchor": "if (DirectRecv && ncclShmem.groups[group].srcs[0] == ncclShmem.groups[group].dsts[0])",
+      "occurrence": 0
+    },
+    {
+      "id": "B0030",
+      "symbol": "F0232",
+      "title": "普通多源多目标融合归约",
+      "diagrams": [
+        "11-recvReduceCopySend"
+      ],
+      "explanation": "PreOpN限定原始输入预处理的源；实际Recv/Src和Send/Dst决定源目标数量，ReduceOrCopyMulti在一次搬运中归约并写多个目标。",
+      "relation": "直接对应",
+      "anchor": "constexpr int PreOpN",
+      "occurrence": 0
+    },
+    {
+      "id": "B0031",
+      "symbol": "F0232",
+      "title": "有效slice的会合与发布",
+      "diagrams": [
+        "12-simple-flow",
+        "15-step-roles"
+      ],
+      "explanation": "屏障有后面非worker循环中的对应项。发布角色按条件fence、warp同步，再postPeer；这与只做volatile读写不同。",
+      "relation": "直接对应",
+      "anchor": "barrier();",
+      "occurrence": 0
+    },
+    {
+      "id": "B0032",
+      "symbol": "F0232",
+      "title": "空slice和非worker仍需参与",
+      "diagrams": [
+        "12-simple-flow",
+        "14-fifo"
+      ],
+      "explanation": "worker剩余空片和非worker都经过约定次数的barrier/postPeer；Wait角色传0元素推进，不把空片当成取消通信。",
+      "relation": "直接对应",
+      "anchor": "while (slice < SlicePerChunk)",
+      "occurrence": 0
+    },
+    {
+      "id": "B0033",
+      "symbol": "F0230",
+      "title": "waitPeer：发送等空槽，接收等载荷",
+      "diagrams": [
+        "13-waitpeer",
+        "14-fifo"
+      ],
+      "explanation": "Simple发送方向检查head+8是否覆盖step+StepPerSlice，接收方向检查tail；满足具体direct谓词时可省部分等待，shared还需从offsFifo取实际字节偏移。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0034",
+      "symbol": "F0231",
+      "title": "postPeer发布各角色自己的step",
+      "diagrams": [
+        "15-step-roles",
+        "14-fifo"
+      ],
+      "explanation": "只有PostRecv/PostSend角色推进自己的线程局部step并写连接进度。它与Wait线程的step不是同一个变量连续加两次。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0035",
+      "symbol": "F0236",
+      "title": "Primitives：构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子",
+      "diagrams": [
+        "12-simple-flow",
+        "14-fifo"
+      ],
+      "explanation": "构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0036",
+      "symbol": "F0234",
+      "title": "loadRecvConn：构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子",
+      "diagrams": [
+        "12-simple-flow",
+        "14-fifo"
+      ],
+      "explanation": "构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0037",
+      "symbol": "F0235",
+      "title": "loadSendConn：构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子",
+      "diagrams": [
+        "12-simple-flow",
+        "14-fifo"
+      ],
+      "explanation": "构造器按实际邻居度设置Wait/Input/Output/Post角色，装载对应连接；图中96线程分工仅是Ring单收单发教学例子。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0038",
+      "symbol": "F0238",
+      "title": "setDataPtrs：根据DirectRead/DirectWrite提供或接受用户指针，并交换必要缩放参数；只有匹配的提供/使用方满足契约后才继续",
+      "diagrams": [
+        "19-direct"
+      ],
+      "explanation": "根据DirectRead/DirectWrite提供或接受用户指针，并交换必要缩放参数；只有匹配的提供/使用方满足契约后才继续。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0039",
+      "symbol": "F0240",
+      "title": "send：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel",
+      "diagrams": [
+        "05-send",
+        "12-simple-flow"
+      ],
+      "explanation": "包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0040",
+      "symbol": "F0244",
+      "title": "recv：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel",
+      "diagrams": [
+        "06-recv",
+        "12-simple-flow"
+      ],
+      "explanation": "包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0041",
+      "symbol": "F0246",
+      "title": "copySend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel",
+      "diagrams": [
+        "07-copySend",
+        "12-simple-flow"
+      ],
+      "explanation": "包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0042",
+      "symbol": "F0248",
+      "title": "recvCopySend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel",
+      "diagrams": [
+        "08-recvCopySend",
+        "12-simple-flow"
+      ],
+      "explanation": "包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0043",
+      "symbol": "F0252",
+      "title": "recvReduceSend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel",
+      "diagrams": [
+        "09-recvReduceSend",
+        "12-simple-flow"
+      ],
+      "explanation": "包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0044",
+      "symbol": "F0251",
+      "title": "recvReduceCopy：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel",
+      "diagrams": [
+        "10-recvReduceCopy",
+        "12-simple-flow"
+      ],
+      "explanation": "包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0045",
+      "symbol": "F0254",
+      "title": "recvReduceCopySend：包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel",
+      "diagrams": [
+        "11-recvReduceCopySend",
+        "12-simple-flow"
+      ],
+      "explanation": "包装选择genericOp的编译期源/目标位；图按Ring单收单发示例解释，不是另外发射一个kernel。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0046",
+      "symbol": "F0242",
+      "title": "directSend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径",
+      "diagrams": [
+        "05-send",
+        "19-direct"
+      ],
+      "explanation": "direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0047",
+      "symbol": "F0247",
+      "title": "directCopySend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径",
+      "diagrams": [
+        "07-copySend",
+        "19-direct"
+      ],
+      "explanation": "direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0048",
+      "symbol": "F0245",
+      "title": "directRecv：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径",
+      "diagrams": [
+        "06-recv",
+        "19-direct"
+      ],
+      "explanation": "direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0049",
+      "symbol": "F0249",
+      "title": "directRecvCopySend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径",
+      "diagrams": [
+        "08-recvCopySend",
+        "19-direct"
+      ],
+      "explanation": "direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0050",
+      "symbol": "F0255",
+      "title": "directRecvReduceCopySend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径",
+      "diagrams": [
+        "11-recvReduceCopySend",
+        "19-direct"
+      ],
+      "explanation": "direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0051",
+      "symbol": "F0253",
+      "title": "directRecvReduceSend：direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径",
+      "diagrams": [
+        "09-recvReduceSend",
+        "19-direct"
+      ],
+      "explanation": "direct是否生效由模板和连接状态决定；特别是directRecvReduceCopySend的接收部分仍使用普通归约路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0052",
+      "symbol": "F0178",
+      "title": "LLGenericOp：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理",
+      "diagrams": [
+        "16-lines",
+        "17-ll-flow"
+      ],
+      "explanation": "LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0053",
+      "symbol": "F0169",
+      "title": "readLL：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理",
+      "diagrams": [
+        "16-lines",
+        "17-ll-flow"
+      ],
+      "explanation": "LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0054",
+      "symbol": "F0161",
+      "title": "recvFlag：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理",
+      "diagrams": [
+        "16-lines",
+        "17-ll-flow"
+      ],
+      "explanation": "LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0055",
+      "symbol": "F0162",
+      "title": "sendFlag：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理",
+      "diagrams": [
+        "16-lines",
+        "17-ll-flow"
+      ],
+      "explanation": "LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0056",
+      "symbol": "F0168",
+      "title": "incSend：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理",
+      "diagrams": [
+        "16-lines",
+        "17-ll-flow"
+      ],
+      "explanation": "LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0057",
+      "symbol": "F0210",
+      "title": "GenericOp：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径",
+      "diagrams": [
+        "16-lines",
+        "18-ll128-flow"
+      ],
+      "explanation": "LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0058",
+      "symbol": "F0209",
+      "title": "recvReduceSendCopy：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径",
+      "diagrams": [
+        "16-lines",
+        "18-ll128-flow"
+      ],
+      "explanation": "LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0059",
+      "symbol": "F0206",
+      "title": "loadRegsBegin：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径",
+      "diagrams": [
+        "16-lines",
+        "18-ll128-flow"
+      ],
+      "explanation": "LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0060",
+      "symbol": "F0207",
+      "title": "loadRegsFinish：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径",
+      "diagrams": [
+        "16-lines",
+        "18-ll128-flow"
+      ],
+      "explanation": "LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0061",
+      "symbol": "F0208",
+      "title": "storeRegs：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径",
+      "diagrams": [
+        "16-lines",
+        "18-ll128-flow"
+      ],
+      "explanation": "LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0062",
+      "symbol": "F0127",
+      "title": "融合搬运内核与原语的关系",
+      "diagrams": [
+        "11-recvReduceCopySend",
+        "12-simple-flow"
+      ],
+      "explanation": "图说明调用者怎样组织多个源和目标；本函数根据对齐/长度选择向量或尾部搬运。图没有展开每条128位加载指令，不能当成本函数逐指令图。",
+      "relation": "调用上下文"
+    },
+    {
+      "id": "B0063",
+      "symbol": "F0051",
+      "title": "ncclAllReduce：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运",
+      "diagrams": [
+        "01-submit",
+        "allreduce-step-0"
+      ],
+      "explanation": "公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运。",
+      "relation": "调用上下文"
+    },
+    {
+      "id": "B0064",
+      "symbol": "F0050",
+      "title": "ncclAllGather：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运",
+      "diagrams": [
+        "01-submit",
+        "allgather-step-0"
+      ],
+      "explanation": "公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运。",
+      "relation": "调用上下文"
+    },
+    {
+      "id": "B0065",
+      "symbol": "F0378",
+      "title": "ncclReduceScatter：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运",
+      "diagrams": [
+        "01-submit",
+        "reducescatter-step-0"
+      ],
+      "explanation": "公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运。",
+      "relation": "调用上下文"
+    },
+    {
+      "id": "B0066",
+      "symbol": "F0052",
+      "title": "ncclBroadcast：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运",
+      "diagrams": [
+        "01-submit",
+        "26-broadcast"
+      ],
+      "explanation": "公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运。",
+      "relation": "调用上下文"
+    },
+    {
+      "id": "B0067",
+      "symbol": "F0377",
+      "title": "ncclReduce：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运",
+      "diagrams": [
+        "01-submit",
+        "27-reduce"
+      ],
+      "explanation": "公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运。",
+      "relation": "调用上下文"
+    },
+    {
+      "id": "B0068",
+      "symbol": "F0379",
+      "title": "ncclSend：公开点对点API通过嵌套Group保存任务；连接准备、channel分块、设备原语与必要的NET代理随后执行",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "公开点对点API通过嵌套Group保存任务；连接准备、channel分块、设备原语与必要的NET代理随后执行。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0069",
+      "symbol": "F0380",
+      "title": "ncclRecv：公开点对点API通过嵌套Group保存任务；连接准备、channel分块、设备原语与必要的NET代理随后执行",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "公开点对点API通过嵌套Group保存任务；连接准备、channel分块、设备原语与必要的NET代理随后执行。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0070",
+      "symbol": "F0374",
+      "title": "runSend：设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0071",
+      "symbol": "F0375",
+      "title": "runRecv：设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0072",
+      "symbol": "F0376",
+      "title": "run：设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0073",
+      "symbol": "F0598",
+      "title": "getP2pChunkSize：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0074",
+      "symbol": "F0599",
+      "title": "ncclGroupEnd：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0075",
+      "symbol": "F0595",
+      "title": "scheduleSend：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0076",
+      "symbol": "F0596",
+      "title": "scheduleRecv：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接",
+      "diagrams": [
+        "25-p2p"
+      ],
+      "explanation": "Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0077",
+      "symbol": "F0426",
+      "title": "ncclEnqueueCheck：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断",
+      "diagrams": [
+        "01-submit"
+      ],
+      "explanation": "普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0078",
+      "symbol": "F0409",
+      "title": "ncclSetupCollKernel：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断",
+      "diagrams": [
+        "01-submit"
+      ],
+      "explanation": "普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0079",
+      "symbol": "F0421",
+      "title": "ncclEnqueueHostSetup：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断",
+      "diagrams": [
+        "01-submit"
+      ],
+      "explanation": "普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0080",
+      "symbol": "F0420",
+      "title": "ncclEnqueueCollKernel：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断",
+      "diagrams": [
+        "01-submit"
+      ],
+      "explanation": "普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0081",
+      "symbol": "F0399",
+      "title": "ncclLaunchProxy：普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断",
+      "diagrams": [
+        "01-submit"
+      ],
+      "explanation": "普通非Group、非Graph路径的图中HostSetup先发布Proxy再进入kernel发射；Group与Graph分支需按实际调用点判断。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0082",
+      "symbol": "F0406",
+      "title": "computeColl同时生成GPU与Proxy计划",
+      "diagrams": [
+        "01-submit",
+        "02-split-layers"
+      ],
+      "explanation": "work保存用户范围/执行模板，proxyOp保存网络协议与步数；两个计划必须对齐，不能独立理解。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0083",
+      "symbol": "F0406",
+      "title": "协议step与chunk的字节容量",
+      "diagrams": [
+        "02-split-layers",
+        "16-lines"
+      ],
+      "explanation": "主机stepSize和chunkSize在这里是字节；Simple+Ring采用API的chunkSteps/sliceSteps，LL/LL128扣除行flag开销。",
+      "relation": "直接对应",
+      "anchor": "int stepSize",
+      "occurrence": 0
+    },
+    {
+      "id": "B0084",
+      "symbol": "F0406",
+      "title": "Proxy总step预算",
+      "diagrams": [
+        "02-split-layers"
+      ],
+      "explanation": "nLoops按总模型字节和每轮有效容量向上取整，再乘nstepsPerLoop与chunkSteps。预算不是WQE数，更不是新建QP数。",
+      "relation": "直接对应",
+      "anchor": "int chunkEffectiveSize",
+      "occurrence": 0
+    },
+    {
+      "id": "B0085",
+      "symbol": "F0911",
+      "title": "ArgsCheck：AG/Broadcast的内部count变为字节并选择Int8；AG/RS模型nBytes乘P，不能把公开count直接套到同一分片公式",
+      "diagrams": [
+        "02-split-layers"
+      ],
+      "explanation": "AG/Broadcast的内部count变为字节并选择Int8；AG/RS模型nBytes乘P，不能把公开count直接套到同一分片公式。",
+      "relation": "单位换算上下文"
+    },
+    {
+      "id": "B0086",
+      "symbol": "F0078",
+      "title": "ncclKernel：kernel按blockIdx.x取channel、解释工作FIFO并分派模板；图展示提交与执行分工，没有展开所有模板实例",
+      "diagrams": [
+        "01-submit"
+      ],
+      "explanation": "kernel按blockIdx.x取channel、解释工作FIFO并分派模板；图展示提交与执行分工，没有展开所有模板实例。",
+      "relation": "调用上下文"
+    },
+    {
+      "id": "B0087",
+      "symbol": "F0895",
+      "title": "initTransportsRank：从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头",
+      "diagrams": [
+        "28-channel-generation"
+      ],
+      "explanation": "从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0088",
+      "symbol": "F0890",
+      "title": "setupChannel：从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头",
+      "diagrams": [
+        "28-channel-generation"
+      ],
+      "explanation": "从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0089",
+      "symbol": "F0887",
+      "title": "devCommSetup：从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头",
+      "diagrams": [
+        "28-channel-generation"
+      ],
+      "explanation": "从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0090",
+      "symbol": "F0048",
+      "title": "initChannel：为某条逻辑channel分配peer表、环顺序表和工作FIFO；结构容量与已建NET连接/QP数量不同",
+      "diagrams": [
+        "28-channel-generation"
+      ],
+      "explanation": "为某条逻辑channel分配peer表、环顺序表和工作FIFO；结构容量与已建NET连接/QP数量不同。",
+      "relation": "结构与分配阶段"
+    },
+    {
+      "id": "B0091",
+      "symbol": "F0489",
+      "title": "ncclTopoCompute：硬件图内搜索带宽/路径约束下的通道候选；结果还须跨rank协调和全局拼接",
+      "diagrams": [
+        "28-channel-generation"
+      ],
+      "explanation": "硬件图内搜索带宽/路径约束下的通道候选；结果还须跨rank协调和全局拼接。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0092",
+      "symbol": "F0429",
+      "title": "ncclTopoPreset：本地候选先转换成可交换摘要，再拼接全局Ring/Tree并复制或限制channel数量",
+      "diagrams": [
+        "28-channel-generation"
+      ],
+      "explanation": "本地候选先转换成可交换摘要，再拼接全局Ring/Tree并复制或限制channel数量。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0093",
+      "symbol": "F0439",
+      "title": "ncclTopoPostset：本地候选先转换成可交换摘要，再拼接全局Ring/Tree并复制或限制channel数量",
+      "diagrams": [
+        "28-channel-generation"
+      ],
+      "explanation": "本地候选先转换成可交换摘要，再拼接全局Ring/Tree并复制或限制channel数量。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0094",
+      "symbol": "F0458",
+      "title": "ncclTopoComputeP2pChannels：计算P2P总channel空间与每peer预算；预算不是已经对所有peer建立了相应连接",
+      "diagrams": [
+        "28-channel-generation",
+        "25-p2p"
+      ],
+      "explanation": "计算P2P总channel空间与每peer预算；预算不是已经对所有peer建立了相应连接。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0095",
+      "symbol": "F1032",
+      "title": "ncclProxyStart：ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理",
+      "diagrams": [
+        "01-submit",
+        "21-proxy-send",
+        "22-proxy-recv"
+      ],
+      "explanation": "ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理。",
+      "relation": "调度上下文"
+    },
+    {
+      "id": "B0096",
+      "symbol": "F1031",
+      "title": "ncclProxyProgress：ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理",
+      "diagrams": [
+        "01-submit",
+        "21-proxy-send",
+        "22-proxy-recv"
+      ],
+      "explanation": "ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理。",
+      "relation": "调度上下文"
+    },
+    {
+      "id": "B0097",
+      "symbol": "F1024",
+      "title": "ncclProxySaveColl：ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理",
+      "diagrams": [
+        "01-submit",
+        "21-proxy-send",
+        "22-proxy-recv"
+      ],
+      "explanation": "ProxyStart发布已有队列，progress循环调用具体transport回调；收发图对应NET transport数据面，不代表每个本地P2P数据块也走网络代理。",
+      "relation": "调度上下文"
+    },
+    {
+      "id": "B0098",
+      "symbol": "F1094",
+      "title": "sendProxyProgress：posted提供槽，协议就绪后isend返回有效request才transmitted前进，网络test完成后done前进；LL/LL128就绪条件还看行flag",
+      "diagrams": [
+        "21-proxy-send"
+      ],
+      "explanation": "posted提供槽，协议就绪后isend返回有效request才transmitted前进，网络test完成后done前进；LL/LL128就绪条件还看行flag。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0099",
+      "symbol": "F1095",
+      "title": "recvProxyProgress：图以Simple接收为主：Irecv、网络完成、必要GDR可见性处理、发布tail、GPU消费、回收",
+      "diagrams": [
+        "22-proxy-recv"
+      ],
+      "explanation": "图以Simple接收为主：Irecv、网络完成、必要GDR可见性处理、发布tail、GPU消费、回收。LL/LL128设备用行flag判断载荷就绪。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0100",
+      "symbol": "F1090",
+      "title": "sendProxyConnect：NET层通过所选后端connect/accept建立连接，再取得缓冲并regMr；IB图只适用于实际选择内置IB的分支",
+      "diagrams": [
+        "20-transport",
+        "29-ib-qp-creation",
+        "30-mr-cache"
+      ],
+      "explanation": "NET层通过所选后端connect/accept建立连接，再取得缓冲并regMr；IB图只适用于实际选择内置IB的分支。",
+      "relation": "后端调用上下文"
+    },
+    {
+      "id": "B0101",
+      "symbol": "F1091",
+      "title": "recvProxyConnect：NET层通过所选后端connect/accept建立连接，再取得缓冲并regMr；IB图只适用于实际选择内置IB的分支",
+      "diagrams": [
+        "20-transport",
+        "29-ib-qp-creation",
+        "30-mr-cache"
+      ],
+      "explanation": "NET层通过所选后端connect/accept建立连接，再取得缓冲并regMr；IB图只适用于实际选择内置IB的分支。",
+      "relation": "后端调用上下文"
+    },
+    {
+      "id": "B0102",
+      "symbol": "F1172",
+      "title": "selectTransport：逻辑边先选择P2P/SHM/NET等transport；只有实际进入IB后端才使用其QP/MR机制",
+      "diagrams": [
+        "20-transport"
+      ],
+      "explanation": "逻辑边先选择P2P/SHM/NET等transport；只有实际进入IB后端才使用其QP/MR机制。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0103",
+      "symbol": "F1175",
+      "title": "ncclTransportP2pSetup：逻辑边先选择P2P/SHM/NET等transport；只有实际进入IB后端才使用其QP/MR机制",
+      "diagrams": [
+        "20-transport"
+      ],
+      "explanation": "逻辑边先选择P2P/SHM/NET等transport；只有实际进入IB后端才使用其QP/MR机制。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0104",
+      "symbol": "F1109",
+      "title": "ncclIbCreateQp：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘",
+      "diagrams": [
+        "29-ib-qp-creation"
+      ],
+      "explanation": "按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0105",
+      "symbol": "F1110",
+      "title": "ncclIbRtrQp：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘",
+      "diagrams": [
+        "29-ib-qp-creation"
+      ],
+      "explanation": "按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0106",
+      "symbol": "F1111",
+      "title": "ncclIbRtsQp：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘",
+      "diagrams": [
+        "29-ib-qp-creation"
+      ],
+      "explanation": "按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0107",
+      "symbol": "F1113",
+      "title": "ncclIbConnect：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘",
+      "diagrams": [
+        "29-ib-qp-creation"
+      ],
+      "explanation": "按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0108",
+      "symbol": "F1114",
+      "title": "ncclIbAccept：按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘",
+      "diagrams": [
+        "29-ib-qp-creation"
+      ],
+      "explanation": "按连接配置创建q个RC数据QP并经历INIT/RTR/RTS；接收侧条件启用的flush另加一个自连接QP，不能随q重复相乘。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0109",
+      "symbol": "F1119",
+      "title": "ncclIbRegMr：数据MR缓存按本进程IB设备的页起址与页数精确命中，用引用计数管理；控制FIFO和flush MR不走此缓存",
+      "diagrams": [
+        "30-mr-cache"
+      ],
+      "explanation": "数据MR缓存按本进程IB设备的页起址与页数精确命中，用引用计数管理；控制FIFO和flush MR不走此缓存。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0110",
+      "symbol": "F1120",
+      "title": "ncclIbDeregMr：数据MR缓存按本进程IB设备的页起址与页数精确命中，用引用计数管理；控制FIFO和flush MR不走此缓存",
+      "diagrams": [
+        "30-mr-cache"
+      ],
+      "explanation": "数据MR缓存按本进程IB设备的页起址与页数精确命中，用引用计数管理；控制FIFO和flush MR不走此缓存。",
+      "relation": "直接对应"
+    },
+    {
+      "id": "B0111",
+      "symbol": "F1121",
+      "title": "ncclIbMultiSend：这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE",
+      "diagrams": [
+        "29-ib-qp-creation",
+        "30-mr-cache"
+      ],
+      "explanation": "这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE。图是资源关系，不是本函数完整WR链时序。",
+      "relation": "资源使用上下文"
+    },
+    {
+      "id": "B0112",
+      "symbol": "F1124",
+      "title": "ncclIbIrecv：这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE",
+      "diagrams": [
+        "29-ib-qp-creation",
+        "30-mr-cache"
+      ],
+      "explanation": "这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE。图是资源关系，不是本函数完整WR链时序。",
+      "relation": "资源使用上下文"
+    },
+    {
+      "id": "B0113",
+      "symbol": "F1123",
+      "title": "ncclIbPostFifo：这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE",
+      "diagrams": [
+        "29-ib-qp-creation",
+        "30-mr-cache"
+      ],
+      "explanation": "这些是连接已建后的使用阶段：多个QP可复用缓冲MR，接收先公布addr/rkey并预挂通知WQE。图是资源关系，不是本函数完整WR链时序。",
+      "relation": "资源使用上下文"
+    },
+    {
+      "id": "B0114",
+      "symbol": "T0175",
+      "title": "ncclComm：字段协作图",
+      "diagrams": [
+        "28-channel-generation",
+        "20-transport"
+      ],
+      "explanation": "ncclComm聚合本rank拓扑、channel、排队和代理资源；图说明对象之间的层次，不把全部字段当成一个全局共享硬件对象。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0115",
+      "symbol": "T0196",
+      "title": "ncclChannel：字段协作图",
+      "diagrams": [
+        "28-channel-generation",
+        "01-submit"
+      ],
+      "explanation": "channel把邻居、peer连接表和工作FIFO联系起来；一次工作只选择相应算法，不会同时执行所有拓扑。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0116",
+      "symbol": "T0184",
+      "title": "ncclRing：字段协作图",
+      "diagrams": [
+        "03-layout",
+        "28-channel-generation"
+      ],
+      "explanation": "ring保存prev/next、index和userRanks；图中的地址布局与全局拼接解释其使用，但index仍需按setupChannel的rank0相对距离计算。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0117",
+      "symbol": "T0181",
+      "title": "ncclConnInfo：字段协作图",
+      "diagrams": [
+        "14-fifo",
+        "19-direct"
+      ],
+      "explanation": "connInfo的head/tail/step、offsFifo和direct指针服务原语；图展示字段协作，不表示每个字段在所有transport中位于同一物理位置。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0118",
+      "symbol": "T0191",
+      "title": "ncclWorkElem：字段协作图",
+      "diagrams": [
+        "01-submit",
+        "02-split-layers"
+      ],
+      "explanation": "workElem携带本次bid/count/nChannels及用户缓冲，GPU据此切片；ProxyOp是另一份网络计划。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0119",
+      "symbol": "T0363",
+      "title": "ncclProxyOp：字段协作图",
+      "diagrams": [
+        "01-submit",
+        "02-split-layers"
+      ],
+      "explanation": "proxyOp保存协议、模式、chunkSteps/sliceSteps/nsteps等，交给CPU代理推进；它不是GPU用户元素布局本身。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0120",
+      "symbol": "T0364",
+      "title": "ncclProxySubArgs：字段协作图",
+      "diagrams": [
+        "21-proxy-send",
+        "22-proxy-recv"
+      ],
+      "explanation": "每个子操作保留base和posted/received/transmitted/done；这些计数在发送和接收方向含义不同。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0121",
+      "symbol": "T0365",
+      "title": "ncclProxyArgs：字段协作图",
+      "diagrams": [
+        "21-proxy-send",
+        "22-proxy-recv"
+      ],
+      "explanation": "ProxyArgs聚合多个sub，达到nsubs完成后结束；图按单个子操作说明主要状态。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0122",
+      "symbol": "T0438",
+      "title": "ncclIbSendComm：字段协作图",
+      "diagrams": [
+        "29-ib-qp-creation"
+      ],
+      "explanation": "IB发送连接持有多个数据QP、CQ、控制FIFO MR；它与一个NCCL communicator或一个逻辑channel不是同一层对象。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0123",
+      "symbol": "T0441",
+      "title": "ncclIbRecvComm：字段协作图",
+      "diagrams": [
+        "29-ib-qp-creation"
+      ],
+      "explanation": "IB接收连接持有数据QP、remFifo与条件分配的gpuFlush；flush额外QP数不是nqps。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0124",
+      "symbol": "T0424",
+      "title": "ncclIbMrCache：字段协作图",
+      "diagrams": [
+        "30-mr-cache"
+      ],
+      "explanation": "缓存条目保存页范围、引用与ibv_mr；精确范围复用和硬件QP配对是不同层次。",
+      "relation": "结构字段上下文"
+    },
+    {
+      "id": "B0125",
+      "symbol": "T0431",
+      "title": "ncclIbRequest：字段协作图",
+      "diagrams": [
+        "21-proxy-send",
+        "22-proxy-recv"
+      ],
+      "explanation": "图解释调用者在request非空及完成后何时推进；IB request.events可能关联多个QP完成，并非一个request总等于一次CQE。",
+      "relation": "结构字段上下文"
+    }
+  ]
+}

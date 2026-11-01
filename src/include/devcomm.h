@@ -300,6 +300,13 @@ static_assert(NCCL_LL_CLEAN_MASK % NCCL_STEPS == 0, "Invalid NCCL_LL_CLEAN_MASK 
  * GPU 原语实际使用的连接视图。buffs 按 LL/LL128/Simple 区分，head/tail 和 step 驱动槽位流控。
  * 此处没有 ibv_qp；网络 QP/MR 由主机端 NET/IB 后端持有，GPU 经这些共享字段与 Proxy 协作。
  */
+/* 中文精读：图示绑定 V3.3 T0181 ncclConnInfo
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0181
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0117] ncclConnInfo：字段协作图（结构字段上下文）
+ *   图：14-fifo, 19-direct
+ *   定位：#symbol=T0181&binding=B0117
+ */
 /* 中文逐项-类型 T0181：ncclConnInfo
  * 类型职责：GPU原语使用的连接视图，记录协议缓冲、进度、共享偏移和直接访问能力。
  * 声明内可见成员（含嵌套成员）：buffs、tail、head、direct、shared、ptrExchange、redOpArgExchange、sizesFifo、offsFifo、step、llLastCleaning。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
@@ -419,6 +426,13 @@ struct ncclConnector {
  * userRanks[0] 是自己，[1] 是下游，[nRanks-1] 是上游；数组从当前 rank 开始旋转。
  * index 是自己在共同环顺序中的内部位置，用来安排 AllReduce 各块的起始归约顺序。
  * AllGather/ReduceScatter 的输出段仍按用户 rank 排列，不会被拓扑优化打乱。
+ */
+/* 中文精读：图示绑定 V3.3 T0184 ncclRing
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0184
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0116] ncclRing：字段协作图（结构字段上下文）
+ *   图：03-layout, 28-channel-generation
+ *   定位：#symbol=T0184&binding=B0116
  */
 /* 中文逐项-类型 T0184：ncclRing
  * 类型职责：环算法的直接邻居与内部到用户rank排列映射，兼顾物理路径和公开输出顺序。
@@ -641,6 +655,13 @@ struct ncclWorkElemHeader {
  * 主机调度器生成的集合通信工作描述：缓冲区、元素数量、channel 分片编号及执行函数索引。
  * count 是数据类型元素数，不能始终当成字节数；funcIndex 编码操作/归约/类型/算法/协议组合。
  */
+/* 中文精读：图示绑定 V3.3 T0191 ncclWorkElem
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0191
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0118] ncclWorkElem：字段协作图（结构字段上下文）
+ *   图：01-submit, 02-split-layers
+ *   定位：#symbol=T0191&binding=B0118
+ */
 /* 中文逐项-类型 T0191：ncclWorkElem
  * 类型职责：一次collective在单channel上的设备任务描述，保存用户指针、元素数、分片号及归约参数。
  * 声明内可见成员（含嵌套成员）：header、regUsed、direct、redOpArgIsPtr、sendbuff、recvbuff、count、lastChunkSize、root、bid、nChannels、redOpArg、pad。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
@@ -844,6 +865,13 @@ static_assert(sizeof(struct ncclWork) == NCCL_WORK_SIZE, "ncclWork size needs to
  * 独立的逻辑通信流水线：拥有 Ring/Tree 拓扑、peer 连接表和工作 FIFO。
  * 常规 kernel 以 blockIdx.x 选 channel；同一 channel 可执行一批工作，多个 channel 并行分担数据。
  * channel 不是网口、QP 或 CUDA stream；collective 与 P2P 使用同一 channels 数组中的对象。
+ */
+/* 中文精读：图示绑定 V3.3 T0196 ncclChannel
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0196
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0115] ncclChannel：字段协作图（结构字段上下文）
+ *   图：28-channel-generation, 01-submit
+ *   定位：#symbol=T0196&binding=B0115
  */
 /* 中文逐项-类型 T0196：ncclChannel
  * 类型职责：独立逻辑执行流水线，持有Ring/Tree、peer表和工作描述符FIFO。

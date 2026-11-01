@@ -157,6 +157,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
  * 源码返回表达式：return sendBuff[i]+sendOffset(i);。CHECK类宏还可能提前返回/跳转。
  */
   inline __device__ union ncclLLFifoLine* sendPtr(int i) { return sendBuff[i]+sendOffset(i); }
+/* 中文精读：图示绑定 V3.3 F0161 recvFlag
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0161
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0054] recvFlag：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理（直接对应）
+ *   图：16-lines, 17-ll-flow
+ *   定位：#symbol=F0161&binding=B0054
+ */
 /* 中文内部逻辑 F0161：recvFlag
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 函数返回：return NCCL_LL_FLAG(recvStep[i]+1);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
@@ -170,6 +177,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
  * 源码返回表达式：return NCCL_LL_FLAG(recvStep[i]+1);。CHECK类宏还可能提前返回/跳转。
  */
   inline __device__ uint32_t recvFlag(int i) { return NCCL_LL_FLAG(recvStep[i]+1); }
+/* 中文精读：图示绑定 V3.3 F0162 sendFlag
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0162
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0055] sendFlag：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理（直接对应）
+ *   图：16-lines, 17-ll-flow
+ *   定位：#symbol=F0162&binding=B0055
+ */
 /* 中文内部逻辑 F0162：sendFlag
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 函数返回：return NCCL_LL_FLAG(sendStep[i]+1);；立即结束本函数当前路径；在组合原语包装中仍须看被返回调用的内部同步职责。
@@ -326,6 +340,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
     if (recvConnHeadPtr) *recvConnHeadPtr = recvConnHead += 1;
   }
 
+/* 中文精读：图示绑定 V3.3 F0168 incSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0168
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0056] incSend：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理（直接对应）
+ *   图：16-lines, 17-ll-flow
+ *   定位：#symbol=F0168&binding=B0056
+ */
 /* 中文内部逻辑 F0168：incSend
  * 精读：当step命中清理掩码时，把未覆盖行的flag也清理/重写，防止序号回绕后误识别旧数据。
  * 精读：随后才递增该邻居发送step；普通行内就绪判断与缓冲空间head流控仍独立存在。
@@ -364,6 +385,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
  * 数据和完成标记放在同一格式内，降低单独等待整片 tail/fence 的延迟，代价是 50% flag 开销。
  * 循环会检查 abort；正常情况下数据可以边到边被下游消费，形成细粒度流水。
  * flag 发生回绕时 incSend 的 cleanup 会清理整段，防止旧 flag 与新期望值碰巧相同。
+ */
+/* 中文精读：图示绑定 V3.3 F0169 readLL
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0169
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0053] readLL：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理（直接对应）
+ *   图：16-lines, 17-ll-flow
+ *   定位：#symbol=F0169&binding=B0053
  */
   __device__ /* 中文内部逻辑 F0169：readLL
  * 精读：每次读整行的data/flag视图，只有flag1和flag2同时等于当前期望序号才拼出有效64位数据。
@@ -827,6 +855,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL, P2p>:
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0178 LLGenericOp
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0178
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0052] LLGenericOp：LL按16字节行的两个flag检查8字节载荷，期望值为NCCL_LL_FLAG(step+1)；head另管复用，标记回绕另有清理（直接对应）
+ *   图：16-lines, 17-ll-flow
+ *   定位：#symbol=F0178&binding=B0052
+ */
 /* 中文内部逻辑 F0178：LLGenericOp
  * 精读：SEND先waitSend获取可写空间并考虑标记回绕清理；每线程按LL行跨步处理元素。
  * 精读：Begin本地加载与预读其他邻居在前，首邻居readLL等待两个flag，再完成本地预处理和多源归约。

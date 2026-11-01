@@ -45,6 +45,13 @@ static_assert(NCCL_MAX_WORK_ELEMENTS <= MAXCHANNELS, "Not enough sub space for m
  * 主线程提交给 Proxy 的紧凑任务描述；描述 channel、协议和应推进的步数，不携带全部用户数据。
  * 它会转换为 ncclProxyArgs/SubArgs；连接建好后，同一资源可以处理多次 ProxyOp。
  */
+/* 中文精读：图示绑定 V3.3 T0363 ncclProxyOp
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0363
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0119] ncclProxyOp：字段协作图（结构字段上下文）
+ *   图：01-submit, 02-split-layers
+ *   定位：#symbol=T0363&binding=B0119
+ */
 /* 中文逐项-类型 T0363：ncclProxyOp
  * 类型职责：代理紧凑提交描述、每连接子任务进度和聚合运行态，分离提交与异步执行生命周期。
  * 声明内可见成员（含嵌套成员）：connection、channelId、nsteps、nbytes、root、next、opCount、sliceSteps、chunkSteps、chunkSize、dtype、redOp、pattern、protocol、pad。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。
@@ -117,6 +124,13 @@ static_assert(sizeof(struct ncclProxyOp) == 64, "Keep ProxyOp aligned with cache
 /* 中文导读：
  * 一个子操作的运行状态。posted/received/flushed/transmitted/done 表示不同阶段，含义依 send/recv 分支而定。
  * requests 保存异步网络请求；只有相应阶段完成才能发布进度或复用槽位，避免 GPU/NIC 并发覆盖。
+ */
+/* 中文精读：图示绑定 V3.3 T0364 ncclProxySubArgs
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0364
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0120] ncclProxySubArgs：字段协作图（结构字段上下文）
+ *   图：21-proxy-send, 22-proxy-recv
+ *   定位：#symbol=T0364&binding=B0120
  */
 /* 中文逐项-类型 T0364：ncclProxySubArgs
  * 类型职责：代理紧凑提交描述、每连接子任务进度和聚合运行态，分离提交与异步执行生命周期。
@@ -191,6 +205,13 @@ struct ncclProxySubArgs {
  * progress 指向 transport 的推进函数；state 在 Ready/Progress/None 间切换。
  * next/nextPeer/proxyAppendPtr 维护活跃任务及同连接的先后依赖，防止同连接被乱序推进。
  * idle 表示本轮没取得进展，调用者可让出 CPU；它不表示整个 communicator 已空闲。
+ */
+/* 中文精读：图示绑定 V3.3 T0365 ncclProxyArgs
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0365
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0121] ncclProxyArgs：字段协作图（结构字段上下文）
+ *   图：21-proxy-send, 22-proxy-recv
+ *   定位：#symbol=T0365&binding=B0121
  */
 /* 中文逐项-类型 T0365：ncclProxyArgs
  * 类型职责：代理紧凑提交描述、每连接子任务进度和聚合运行态，分离提交与异步执行生命周期。

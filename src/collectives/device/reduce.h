@@ -9,6 +9,13 @@
 #include "primitives.h"
 
 namespace {
+/* 中文精读：图示绑定 V3.3 F0260 runRing
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0260
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0021] Reduce从root后继出发、到root结束（直接对应）
+ *   图：27-reduce, 09-recvReduceSend, 10-recvReduceCopy
+ *   定位：#symbol=F0260&binding=B0021
+ */
 /* 中文内部逻辑 F0260：runRing
  * 精读：root后继先send本地输入，中间rank接收并归约转发，root最终接收归约后保留结果。
  * 精读：root处停止，不再结果广播；只有root接收缓冲要求持有完整归约输出。

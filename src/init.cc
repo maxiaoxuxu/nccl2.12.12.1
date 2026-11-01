@@ -600,6 +600,13 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
  * peers 要指向 devPeers，workFifoDev 要指向 GPU 可读取的位置；设备 kernel 再拷到共享内存。
  * 因此调试 host 地址与 device 地址时必须辨认当前字段属于哪一侧，不能只看结构体名字相同。
  */
+/* 中文精读：图示绑定 V3.3 F0887 devCommSetup
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0887
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0089] devCommSetup：从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头（直接对应）
+ *   图：28-channel-generation
+ *   定位：#symbol=F0887&binding=B0089
+ */
 /* 中文内部逻辑 F0887：devCommSetup
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：ncclDevCommAndChannels *devCommAndChans;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -752,6 +759,13 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
  * setupChannel 把环顺序旋转到本 rank 开头，写入主机 userRanks；devCommSetup随后复制到devUserRanks。ring.index=(ixRank-ixZero+nranks)%nranks，是相对用户rank0的环距离。
  * AllGather/ReduceScatter 用用户 rank 决定输出/输入段位置；AllReduce 用内部环 index 排算法块。
  * 物理相邻 GPU、用户 rank 相邻、环顺序相邻是三种关系，应分别跟踪。
+ */
+/* 中文精读：图示绑定 V3.3 F0890 setupChannel
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0890
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0088] setupChannel：从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头（直接对应）
+ *   图：28-channel-generation
+ *   定位：#symbol=F0890&binding=B0088
  */
 /* 中文内部逻辑 F0890：setupChannel
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
@@ -1165,6 +1179,13 @@ NCCL_PARAM(NvbPreconnect, "NVB_PRECONNECT", 1);
  * 4. Preset/Postset 将机内顺序与机间端点拼成完整 ring/tree，分配 channel 并建立邻居连接。
  * 5. 调优模型、P2P channel 映射、共享资源和启动参数就绪后，devCommSetup 复制设备视图。
  * 这里的 bootstrapAllGather 是 CPU 控制信息交换，不是调用公开 ncclAllGather GPU API。
+ */
+/* 中文精读：图示绑定 V3.3 F0895 initTransportsRank
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0895
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0087] initTransportsRank：从硬件路径和候选图到全局邻居、逻辑channel与GPU视图；ring.index相对用户rank0，userRanks先以本rank开头（直接对应）
+ *   图：28-channel-generation
+ *   定位：#symbol=F0895&binding=B0087
  */
 /* 中文内部逻辑 F0895：initTransportsRank
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。

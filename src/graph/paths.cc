@@ -2046,6 +2046,13 @@ static int nextPow2(int v) {
  * 遍历本地 GPU/所有 peer 取限制，再向上对齐到 2 的幂，并用位反转偏移让通道分布更均匀。
  * 日志里的 8 p2p channels、2 per peer 不是 8×2 个独立 channel；具体任务还会按大小调整拆分。
  */
+/* 中文精读：图示绑定 V3.3 F0458 ncclTopoComputeP2pChannels
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0458
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0094] ncclTopoComputeP2pChannels：计算P2P总channel空间与每peer预算；预算不是已经对所有peer建立了相应连接（直接对应）
+ *   图：28-channel-generation, 25-p2p
+ *   定位：#symbol=F0458&binding=B0094
+ */
 /* 中文内部逻辑 F0458：ncclTopoComputeP2pChannels
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：comm->p2pnChannels = std::min(comm->nChannels, (int)ncclParamMaxP2pNChannels());；对不同整型宽度取较小有效范围，避免最后一块读取超过剩余元素。

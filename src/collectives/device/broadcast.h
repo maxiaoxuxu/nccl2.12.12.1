@@ -9,6 +9,13 @@
 #include "primitives.h"
 
 namespace {
+/* 中文精读：图示绑定 V3.3 F0068 runRing
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0068
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0020] Broadcast在root处切开环（直接对应）
+ *   图：26-broadcast, 07-copySend, 08-recvCopySend, 06-recv
+ *   定位：#symbol=F0068&binding=B0020
+ */
 /* 中文内部逻辑 F0068：runRing
  * 精读：按root、root前驱和其他rank分三种原语：send/copySend、recv、recvCopySend。
  * 精读：在root前驱切断回环边，避免重复传回root；不同slice仍能形成流水。

@@ -12,6 +12,13 @@ NCCL_API(ncclResult_t, ncclAllReduce, const void* sendbuff, void* recvbuff, size
  * 公开 API 只将用户参数封装为 ncclInfo，指定 AllReduce 的 chunk/slice 参数，再进入统一排队入口。
  * 真正的数据归约在设备端 all_reduce.h 与协议原语中完成，跨机网络推进由 Proxy/NET 后端配合。
  */
+/* 中文精读：图示绑定 V3.3 F0051 ncclAllReduce
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0051
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0063] ncclAllReduce：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运（调用上下文）
+ *   图：01-submit, allreduce-step-0
+ *   定位：#symbol=F0051&binding=B0063
+ */
 /* 中文内部逻辑 F0051：ncclAllReduce
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。

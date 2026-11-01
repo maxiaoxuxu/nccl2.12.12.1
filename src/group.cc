@@ -334,6 +334,13 @@ ncclResult_t ncclGroupStart() {
   return ncclSuccess;
 }
 
+/* 中文精读：图示绑定 V3.3 F0595 scheduleSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0595
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0075] scheduleSend：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0595&binding=B0075
+ */
 /* 中文内部逻辑 F0595：scheduleSend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclInfo info = { ncclFuncSend, "Send", NULL, buff, count, ncclInt8, ncclSum, peer, comm, comm->userStream, 1, 1 };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -375,6 +382,13 @@ static ncclResult_t scheduleSend(struct ncclComm* comm, int peer, int chunk, siz
   NCCLCHECK(ncclSetupP2pKernel(&info));
   return ncclSuccess;
 }
+/* 中文精读：图示绑定 V3.3 F0596 scheduleRecv
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0596
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0076] scheduleRecv：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0596&binding=B0076
+ */
 /* 中文内部逻辑 F0596：scheduleRecv
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclInfo info = { ncclFuncRecv, "Recv", NULL, buff, count, ncclInt8, ncclSum, peer, comm, comm->userStream, 1, 1 };；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -460,6 +474,13 @@ void* ncclAsyncThreadPreconnect(void* args_) {
  * 大块降低调度开销，小块增加并行度；实际折中还考虑同一 work 内同时活跃的 peer 数。
  * 这层 chunk 是 Group 给 channel 的消息块，设备 runSend/runRecv 内还会继续分成协议块。
  */
+/* 中文精读：图示绑定 V3.3 F0598 getP2pChunkSize
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0598
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0073] getP2pChunkSize：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0598&binding=B0073
+ */
 /* 中文内部逻辑 F0598：getP2pChunkSize
  * 精读：先按最小通道数估每块尺寸，超过最大块阈值时倍增通道数直到预算上限。
  * 精读：最后按minSize对齐，所以小消息不一定用满per-peer预算；粒度/并发和调度开销在这里折中。
@@ -510,6 +531,13 @@ NCCL_API(ncclResult_t, ncclGroupEnd);
  * group 的实际提交点：执行初始化任务、补建 P2P 连接、按节点/peer 分块调度通信、准备并启动 kernels。
  * 将同进程多个 communicator 的准备与发射阶段分开，避免一部分 GPU 还未启动而其他路径先阻塞。
  * 调用完成仍不代表 CUDA stream 上的全部通信已经完成；应用需按 CUDA 流/事件规则等待。
+ */
+/* 中文精读：图示绑定 V3.3 F0599 ncclGroupEnd
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0599
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0074] ncclGroupEnd：Group先预建缺失连接，再按一致的peer次序和channel预算拆分任务；不是按每条消息重新建立全部硬件连接（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0599&binding=B0074
  */
 /* 中文内部逻辑 F0599：ncclGroupEnd
  * 精读：只有最外层GroupEnd真正提交；先汇总前序错误，再执行初始化线程与P2P预建链。

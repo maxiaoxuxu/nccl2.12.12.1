@@ -21,6 +21,13 @@ NCCL_API(ncclResult_t, ncclSend, const void* sendbuff, size_t count, ncclDataTyp
  * 调用内部 GroupStart/End 支持单条提交，应用外层 Group 则能让多条收发一起排队发射。
  * 调用链：SaveP2p -> GroupEnd 分块与预建链 -> SetupP2pKernel -> FIFO -> device/sendrecv.h。
  */
+/* 中文精读：图示绑定 V3.3 F0379 ncclSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0379
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0068] ncclSend：公开点对点API通过嵌套Group保存任务；连接准备、channel分块、设备原语与必要的NET代理随后执行（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0379&binding=B0068
+ */
 /* 中文内部逻辑 F0379：ncclSend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。
@@ -71,6 +78,13 @@ NCCL_API(ncclResult_t, ncclRecv, void* recvbuff, size_t count, ncclDataType_t da
 /* 中文导读：
  * 接收侧按 peer 和 count 记录任务，与对端 Send 匹配；count 的单位仍是 datatype 元素。
  * 在本版本中，全互联交换可由应用按 peer 组合 Send/Recv；调度与资源使用取决于实际出现的 peer 集合。
+ */
+/* 中文精读：图示绑定 V3.3 F0380 ncclRecv
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0380
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0069] ncclRecv：公开点对点API通过嵌套Group保存任务；连接准备、channel分块、设备原语与必要的NET代理随后执行（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0380&binding=B0069
  */
 /* 中文内部逻辑 F0380：ncclRecv
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。

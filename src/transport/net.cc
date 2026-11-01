@@ -1478,6 +1478,13 @@ static ncclResult_t recvProxySetup(struct ncclProxyConnection* connection, struc
  * shared 且 maxRecvs>1 且 NET_SHARED_COMMS 启用时，尝试按 netDev/remoteRank/channel 复用 sendComm。
  * 注册按协议缓冲区执行，而非按 qps[] 循环执行，所以增加单连接 QP 数不直接倍增这些 MR。
  */
+/* 中文精读：图示绑定 V3.3 F1090 sendProxyConnect
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1090
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0100] sendProxyConnect：NET层通过所选后端connect/accept建立连接，再取得缓冲并regMr；IB图只适用于实际选择内置IB的分支（后端调用上下文）
+ *   图：20-transport, 29-ib-qp-creation, 30-mr-cache
+ *   定位：#symbol=F1090&binding=B0100
+ */
 /* 中文内部逻辑 F1090：sendProxyConnect
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct sendResources* resources = (struct sendResources*)(connection->transportResources);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -1766,6 +1773,13 @@ static ncclResult_t sendProxyConnect(struct ncclProxyConnection* connection, str
  * 完成接收方向底层 accept、共享/专用缓冲分配和协议 MR 注册。
  * 共享连接表按 netDev/proxyRank/channel 索引，条件不满足时为逻辑连接单独 accept。
  * closeListen 只关闭监听资源，不会把已经建立的 netRecvComm 一起销毁。
+ */
+/* 中文精读：图示绑定 V3.3 F1091 recvProxyConnect
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1091
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0101] recvProxyConnect：NET层通过所选后端connect/accept建立连接，再取得缓冲并regMr；IB图只适用于实际选择内置IB的分支（后端调用上下文）
+ *   图：20-transport, 29-ib-qp-creation, 30-mr-cache
+ *   定位：#symbol=F1091&binding=B0101
  */
 /* 中文内部逻辑 F1091：recvProxyConnect
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
@@ -2235,6 +2249,13 @@ static_assert(NCCL_STEPS <= NCCL_NET_MAX_REQUESTS, "Not enough net requests to c
  * LL/LL128 的就绪判断有协议专门分支；不能只看 tail 就认定所有协议数据均已可发送。
  * GDR 模式下 Proxy 提交的是指向 GPU 内存的网络请求，不要求 CPU 把 payload 拷入系统内存。
  */
+/* 中文精读：图示绑定 V3.3 F1094 sendProxyProgress
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1094
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0098] sendProxyProgress：posted提供槽，协议就绪后isend返回有效request才transmitted前进，网络test完成后done前进；LL/LL128就绪条件还看行flag（直接对应）
+ *   图：21-proxy-send
+ *   定位：#symbol=F1094&binding=B0098
+ */
 /* 中文内部逻辑 F1094：sendProxyProgress
  * 精读：本文件NET发送Ready阶段只初始化本任务base和相对计数，后续回调从Progress继续，不应每轮重置。
  * 精读：先提供可写槽，再等GPU sizes/tail/flag就绪；Isend给出有效请求后transmitted前进。
@@ -2693,6 +2714,13 @@ static ncclResult_t sendProxyProgress(struct ncclComm* comm, struct ncclProxyArg
  * 接收状态机：按相同 recvComm 分组挂接收 → test 网络完成 → 必要时 flush → 发布给 GPU → 等待消费。
  * 网络完成与 GPU 可见性分开处理；Simple+GDR 的条件分支可能调用 iflush。
  * maxRecvs 描述一次接口调用可聚合的接收数，不等于 verbs SRQ。
+ */
+/* 中文精读：图示绑定 V3.3 F1095 recvProxyProgress
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1095
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0099] recvProxyProgress：图以Simple接收为主：Irecv、网络完成、必要GDR可见性处理、发布tail、GPU消费、回收（直接对应）
+ *   图：22-proxy-recv
+ *   定位：#symbol=F1095&binding=B0099
  */
 /* 中文内部逻辑 F1095：recvProxyProgress
  * 精读：Ready时把相同recvComm子项归组，Irecv挂接收后posted前进。

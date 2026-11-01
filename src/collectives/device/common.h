@@ -441,6 +441,13 @@ static __device__ void ncclRedopPtrDeref(struct ncclWorkElem* we) {
  */
 extern __shared__ ncclShmemData ncclShmem;
 
+/* 中文精读：图示绑定 V3.3 F0078 ncclKernel
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0078
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0086] ncclKernel：kernel按blockIdx.x取channel、解释工作FIFO并分派模板；图展示提交与执行分工，没有展开所有模板实例（调用上下文）
+ *   图：01-submit
+ *   定位：#symbol=F0078&binding=B0086
+ */
 /* 中文内部逻辑 F0078：ncclKernel
  * 精读：blockIdx.x选择实际channel，先把comm/channel元数据复制到共享内存。
  * 精读：channel0可用首条内联参数，其他任务从FIFO复制；取走描述后就可把主机槽标Unused。

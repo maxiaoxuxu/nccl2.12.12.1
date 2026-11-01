@@ -2260,6 +2260,13 @@ __device__ int ptrAlign128(T* ptr) { return (uint64_t)ptr % alignof(Pack128); }
  */
 #define PACKELEMS (sizeof(Pack128) / sizeof(T))
 
+/* 中文精读：图示绑定 V3.3 F0127 ReduceOrCopyMulti
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0127
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0062] 融合搬运内核与原语的关系（调用上下文）
+ *   图：11-recvReduceCopySend, 12-simple-flow
+ *   定位：#symbol=F0127&binding=B0062
+ */
 /* 中文内部逻辑 F0127：ReduceOrCopyMulti
  * 精读：先检查全部有效源目标的16B对齐，条件满足才走128bit包快路径。
  * 精读：依次处理完整展开包、少量不展开包、标量展开与最后余数，任何路径都不能漏尾元素。

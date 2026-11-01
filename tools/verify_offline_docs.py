@@ -67,9 +67,9 @@ def main():
         assert data == path.read_bytes(), path
         ET.fromstring(data)
     assert guide.images and all(src in images.values() for src in guide.images)
-    assert json.loads(guide.scripts['frames']) == json.loads((DOC/'visuals/collective-steps.json').read_text())
+    assert json.loads(guide.scripts['frames']) == json.loads((DOC/'visuals/collective-steps.json').read_text(encoding='utf-8'))
     embedded = json.loads(search.scripts['logicData'])
-    canonical = json.loads((DOC/'function-logic.json').read_text())
+    canonical = json.loads((DOC/'function-logic.json').read_text(encoding='utf-8'))
     ids = set()
     for function in embedded['functions']:
         assert function['body'].strip(), function['id']
@@ -81,7 +81,7 @@ def main():
     # where examples can intentionally contain Markdown-like strings.
     links = 0
     for path in [ROOT/'README.md', ROOT/'START_HERE_ZH.md', ROOT/'00_从这里开始_NCCL源码阅读指南.md', *DOC.rglob('*.md')]:
-        text = re.sub(r'```[\s\S]*?```', '', path.read_text())
+        text = re.sub(r'```[\s\S]*?```', '', path.read_text(encoding='utf-8'))
         for match in re.finditer(r'!?\[([^\]]*)\]\(([^)\s]+)\)', text):
             href = match[2]
             if urlsplit(href).scheme:
@@ -91,12 +91,12 @@ def main():
             assert target.exists(), (path.relative_to(ROOT), href)
             if fragment.startswith('L') and fragment[1:].isdigit():
                 line = int(fragment[1:])
-                rows = target.read_text().splitlines()
+                rows = target.read_text(encoding='utf-8').splitlines()
                 assert 1 <= line <= len(rows), (path, href)
                 if re.fullmatch(r'[FT]\d+', match[1]):
                     assert match[1] in rows[line-1], ('Stale symbol anchor', path, href, match[1])
             if re.fullmatch(r'f\d+', fragment):
-                assert f'id="{fragment}"' in target.read_text(), (path, href)
+                assert f'id="{fragment}"' in target.read_text(encoding='utf-8'), (path, href)
             links += 1
     print(f'PASS: {len(svgs)} embedded SVG assets; {len(guide.images)} static images; 1178 embedded complete function bodies; legacy HTML aliases identical; {links} local links')
     print('No external runtime resources. Run browser regression for actual file:// interactions.')

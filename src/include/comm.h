@@ -275,6 +275,13 @@ struct ncclNodeRanks {
  * 持有拓扑、channel、连接、调优模型、工作队列和 Proxy 状态；不是一个 RDMA QP。
  * 多 communicator 的工作与连接通常分别管理，不能据此假定硬件资源自动共享。
  */
+/* 中文精读：图示绑定 V3.3 T0175 ncclComm
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=T0175
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0114] ncclComm：字段协作图（结构字段上下文）
+ *   图：28-channel-generation, 20-transport
+ *   定位：#symbol=T0175&binding=B0114
+ */
 /* 中文逐项-类型 T0175：ncclComm
  * 类型职责：每个rank的主机端通信总对象，拥有硬件拓扑、channel、调优模型、任务队列和Proxy状态。
  * 声明内可见成员（含嵌套成员）：channels、peerInfo、topo、bootstrap、connect、connectSend、connectRecv、rank、nRanks、cudaDev、busId、cpuAffinity、node、nNodes、localRank、localRanks、maxLocalRanks、rankToNode、rankToLocalRank、localRankToRank、nodeRanks、launchMode、userStream、userStreamSet、doneEvent、intDoneEvent、checkPointers、opCount、collOpCount、nChannels、p2pnChannels、p2pnChannelsPerPeer、p2pChannels、buffSizes、threadThresholds、latencies、bandwidths、maxThreads、groupCudaStream、groupStream、fatalError、abortFlag、devComm、hostDevComm、intraRank、intraRanks、intraBarrier、intraPhase、intraParams、myParams、intraThreads、intraCudaDevs、intraCGMode、intraCC、args、argsptrs、proxyState、collNetSupport、intraHighestTransportType、asyncOps、asyncOpCount、asyncTotalSize、channelSize、lastChannel、asyncAllocMode、p2pSends、p2pRecvs、p2pSendCount、p2pRecvCount、usingCudaGraph、enqueueInfo、nQueueInfoCreated、nQueueInfoDestroyed、lastSetupNode、lastCudaGraphId、driverVersion、pfnCuMemGetAddressRange、graphHelperThread、graphHelperResources、disableGraphHelper、graphRegister、userRedOpCapacity、userRedOpFreeHead、userRedOps。各字段在声明旁逐项解释，不假设同名字段在别的结构中含义相同。

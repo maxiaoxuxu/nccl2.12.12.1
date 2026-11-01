@@ -9,6 +9,25 @@
 #include "primitives.h"
 
 namespace {
+/* 中文精读：图示绑定 V3.3 F0370 runRing
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0370
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0012] Ring reducescatter的用户段布局（直接对应）
+ *   图：reducescatter-step-0, reducescatter-step-1, reducescatter-step-2, reducescatter-step-3
+ *   定位：#symbol=F0370&binding=B0012
+ * [B0013] 每个用户段内部按channel切片（直接对应）
+ *   图：02-split-layers, 04-tail
+ *   定位：#symbol=F0370&binding=B0013
+ * [B0017] 先发环前方最终归属的段（直接对应）
+ *   图：reducescatter-step-0, 05-send
+ *   定位：#symbol=F0370&binding=B0017
+ * [B0018] 收到部分和再加入本地贡献（直接对应）
+ *   图：reducescatter-step-1, reducescatter-step-2, 09-recvReduceSend
+ *   定位：#symbol=F0370&binding=B0018
+ * [B0019] 只把本rank最终段写到紧凑输出（直接对应）
+ *   图：reducescatter-step-3, 10-recvReduceCopy
+ *   定位：#symbol=F0370&binding=B0019
+ */
 /* 中文内部逻辑 F0370：runRing
  * 精读：size是每rank recvcount，不是整输入长度；输入共有P段，逐段读取同一channel偏移。
  * 精读：先发一个段，随后接收加本地同段再转发；最后把自己的完整段写到短输出的chunkOffset。

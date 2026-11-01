@@ -13,6 +13,13 @@ NCCL_API(ncclResult_t, ncclAllGather, const void* sendbuff, void* recvbuff, size
  * AllGather 的 count 是每个 rank 的输入贡献元素数，输出需能容纳 nRanks 份贡献。
  * API 包装后进入统一调度，rank 排序与设备 Ring 顺序的转换在设备算法中处理。
  */
+/* 中文精读：图示绑定 V3.3 F0050 ncclAllGather
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0050
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0064] ncclAllGather：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运（调用上下文）
+ *   图：01-submit, allgather-step-0
+ *   定位：#symbol=F0050&binding=B0064
+ */
 /* 中文内部逻辑 F0050：ncclAllGather
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。

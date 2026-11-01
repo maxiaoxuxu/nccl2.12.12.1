@@ -47,6 +47,13 @@ struct ncclTransport ncclTransports[NTRANSPORTS] = {
   collNetTransport
 };
 
+/* 中文精读：图示绑定 V3.3 F1172 selectTransport
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1172
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0102] selectTransport：逻辑边先选择P2P/SHM/NET等transport；只有实际进入IB后端才使用其QP/MR机制（直接对应）
+ *   图：20-transport
+ *   定位：#symbol=F1172&binding=B0102
+ */
 /* 中文内部逻辑 F1172：selectTransport
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclPeerInfo* myInfo = comm->peerInfo+comm->rank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -266,6 +273,13 @@ void dumpData(struct ncclConnect* data, int ndata) {
 /* 中文导读：
  * 消费待连接位图：选择 transport/setup → bootstrap 交换连接句柄 → connect → 同步设备端 connector。
  * connIndex 区分连接用途；一次逻辑边可能使用本地 P2P，也可能落到网络后端的一组 QP。
+ */
+/* 中文精读：图示绑定 V3.3 F1175 ncclTransportP2pSetup
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F1175
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0103] ncclTransportP2pSetup：逻辑边先选择P2P/SHM/NET等transport；只有实际进入IB后端才使用其QP/MR机制（直接对应）
+ *   图：20-transport
+ *   定位：#symbol=F1175&binding=B0103
  */
 /* 中文内部逻辑 F1175：ncclTransportP2pSetup
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。

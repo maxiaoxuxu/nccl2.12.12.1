@@ -20,6 +20,13 @@ NCCL_PARAM(GdrCopyFifoEnable, "GDRCOPY_FIFO_ENABLE", 1);
  * 为一个 channel 分配 peer 表、Ring rank 顺序及工作 FIFO 等对象。
  * peer 表预留了 rank 槽位；只有 transport setup/connect 成功的 connector 才有相应通信资源。
  */
+/* 中文精读：图示绑定 V3.3 F0048 initChannel
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0048
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0090] initChannel：为某条逻辑channel分配peer表、环顺序表和工作FIFO；结构容量与已建NET连接/QP数量不同（结构与分配阶段）
+ *   图：28-channel-generation
+ *   定位：#symbol=F0048&binding=B0090
+ */
 /* 中文内部逻辑 F0048：initChannel
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclChannel* channel = comm->channels+channelid;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。

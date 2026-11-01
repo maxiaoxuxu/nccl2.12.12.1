@@ -13,6 +13,13 @@ NCCL_API(ncclResult_t, ncclBroadcast, const void* sendbuff, void* recvbuff, size
  * Broadcast 将 root 的输入传播到各 rank，公开入口使用统一 ncclInfo 描述。
  * 实际沿环流水或树向下执行，取决于该版本可用实现与调度结果；它不进行跨 rank 求和。
  */
+/* 中文精读：图示绑定 V3.3 F0052 ncclBroadcast
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0052
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0066] ncclBroadcast：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运（调用上下文）
+ *   图：01-submit, 26-broadcast
+ *   定位：#symbol=F0052&binding=B0066
+ */
 /* 中文内部逻辑 F0052：ncclBroadcast
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。

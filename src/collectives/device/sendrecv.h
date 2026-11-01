@@ -17,6 +17,13 @@ template<typename T, typename RedOp>
  * 对 self 的匹配通信可转为本地复制；对其他 peer 通过连接能力选择直接访问或缓冲区路径。
  */
 struct RunWork<ncclFuncSendRecv, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
+/* 中文精读：图示绑定 V3.3 F0374 runSend
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0374
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0070] runSend：设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0374&binding=B0070
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0374：runSend
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 条件判断：(args->peer == ncclShmem.comm.rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
@@ -106,6 +113,13 @@ struct RunWork<ncclFuncSendRecv, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0375 runRecv
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0375
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0071] runRecv：设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0375&binding=B0071
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0375：runRecv
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 条件判断：(args->peer != ncclShmem.comm.rank)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
@@ -175,6 +189,13 @@ struct RunWork<ncclFuncSendRecv, T, RedOp, NCCL_ALGO_RING, NCCL_PROTO_SIMPLE> {
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0376 run
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0376
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0072] run：设备按chunkSize继续切块；self由发送组复制；零字节用do-while推进一次，与-1无此方向不同（直接对应）
+ *   图：25-p2p
+ *   定位：#symbol=F0376&binding=B0072
+ */
   __device__ __forceinline__ /* 中文内部逻辑 F0376：run
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：struct ncclWorkElemP2p* args = work->p2pElems;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。

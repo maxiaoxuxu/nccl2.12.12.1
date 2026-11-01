@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 import xml.etree.ElementTree as ET
+from source_diagram_model import READER
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / 'docs/zh_CN'
@@ -156,12 +157,19 @@ def markdown(text, images, prefix):
 GUIDE_JS = '''
 const frames=JSON.parse(document.getElementById('frames').textContent);
 const images=JSON.parse(document.getElementById('embedded-images').textContent);
+const bindings=JSON.parse(document.getElementById('diagram-bindings').textContent);
+function sourceLink(id,element,preferredSymbol){
+ const candidates=bindings.filter(b=>b.diagrams.includes(id));
+ candidates.sort((a,b)=>(a.symbol===preferredSymbol?0:1)-(b.symbol===preferredSymbol?0:1)||(a.scope==='code'?0:1)-(b.scope==='code'?0:1));
+ const b=candidates[0];if(b){element.href='11_源码注释与图示对照_离线版.html#'+new URLSearchParams({symbol:b.symbol,binding:b.id});element.textContent=b.id+' · 对应源码与注释（完整ZIP）'}
+}
 const byId=id=>document.getElementById(id);let round=0;
 function render(){
  const k=byId('collective').value,fs=frames[k],f=fs[round];
  byId('frame').src=images[k+'-step-'+round];byId('frame').alt=k+' '+f.title;
  byId('counter').textContent=(round+1)+' / '+fs.length;
  byId('desc').textContent=f.title+'。'+f.description;
+ sourceLink(k+'-step-'+round,byId('frameSource'),{allreduce:'F0058',allgather:'F0054',reducescatter:'F0370'}[k]);
  byId('prev').disabled=round===0;byId('next').disabled=round===fs.length-1;
  const table=document.createElement('table');
  for(let r=0;r<4;r++){const tr=document.createElement('tr');
@@ -175,13 +183,17 @@ byId('prev').onclick=()=>{if(round>0)round--;render()};
 byId('next').onclick=()=>{if(round<frames[byId('collective').value].length-1)round++;render()};
 const ps=['send','recv','copySend','recvCopySend','recvReduceSend','recvReduceCopy','recvReduceCopySend'];
 ps.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p;byId('primitive').append(o)});
-function primitive(){const i=Number(byId('primitive').value);byId('primitiveImage').src=images[String(i+5).padStart(2,'0')+'-'+ps[i]];byId('primitiveImage').alt=ps[i]+'原语数据流'}
+function primitive(){const i=Number(byId('primitive').value),id=String(i+5).padStart(2,'0')+'-'+ps[i];byId('primitiveImage').src=images[id];byId('primitiveImage').alt=ps[i]+'原语数据流';sourceLink(id,byId('primitiveSource'),['F0240','F0244','F0246','F0248','F0252','F0251','F0254'][i])}
 byId('primitive').onchange=primitive;primitive();render();
+function revealDiagram(){const id=decodeURIComponent(location.hash.slice(1));if(id.startsWith('diagram-')){byId('all-diagrams').open=true;requestAnimationFrame(()=>byId(id)?.scrollIntoView({block:'start'}))}}
+addEventListener('hashchange',revealDiagram);revealDiagram();
 '''
 
 
 SEARCH_JS = '''
 const D=JSON.parse(document.getElementById('logicData').textContent).functions;
+const bindings=JSON.parse(document.getElementById('search-bindings').textContent);
+const images=JSON.parse(document.getElementById('search-images').textContent);
 let filtered=D,limit=40;const el=id=>document.getElementById(id);
 function node(tag,txt,cls){const n=document.createElement(tag);if(txt!==undefined)n.textContent=txt;if(cls)n.className=cls;return n}
 function render(){el('results').replaceChildren();el('count').textContent=' 匹配 '+filtered.length+' 个';
@@ -190,6 +202,16 @@ function render(){el('results').replaceChildren();el('count').textContent=' 匹�
   d.addEventListener('toggle',()=>{if(!d.open||d.dataset.loaded)return;d.dataset.loaded='1';
    const box=node('div',undefined,'fn-body');box.append(node('p',f.role));
    for(const n of f.human_notes)box.append(node('p','精读：'+n));
+   const related=bindings.filter(b=>b.symbol===f.id);
+   if(related.length){const panel=node('section',undefined,'panel');panel.append(node('b','这个函数对应的图与分析'));
+    const choose=node('select');choose.setAttribute('aria-label','选择函数的图示代码段');
+    for(const b of related){const o=node('option',b.id+' · '+b.title);o.value=b.id;choose.append(o)}
+    const note=node('p'),imageChoose=node('select'),img=node('img'),link=node('a','打开带注释的源码对照（完整ZIP）');
+    imageChoose.setAttribute('aria-label','选择代码段中的图示');
+    function showImage(){img.src=images[imageChoose.value];img.alt=imageChoose.value+' · 函数对应图示'}
+    function showBinding(){const b=related.find(b=>b.id===choose.value);note.textContent=b.relation+'：'+b.explanation;imageChoose.replaceChildren();for(const id of b.diagrams){const o=node('option',id);o.value=id;imageChoose.append(o)}link.href='11_源码注释与图示对照_离线版.html#'+new URLSearchParams({symbol:b.symbol,binding:b.id});showImage()}
+    choose.onchange=showBinding;imageChoose.onchange=showImage;panel.append(choose,note,imageChoose,img,link);showBinding();box.append(panel);
+   }
    const source=node('details',undefined,'source');source.append(node('summary','完整函数体（已内嵌，离线可读）'));
    const pre=node('pre');pre.append(node('code',f.body));source.append(pre);box.append(source);
    f.steps.forEach((s,i)=>{const row=node('div',undefined,'step');row.style.marginLeft=Math.min(s.depth,4)*8+'px';
@@ -204,53 +226,63 @@ render();hash();addEventListener('hashchange',hash);
 
 
 def build_guide():
+    binding_path=DOC/'source-diagram-index.json'
+    bindings=json.loads(binding_path.read_text(encoding='utf-8'))['bindings']
     images, gallery = {}, []
     for p in sorted((DOC/'visuals').glob('*.svg')):
         images[p.stem] = 'data:image/svg+xml;base64,'+base64.b64encode(p.read_bytes()).decode('ascii')
         title = ET.parse(p).getroot().find('{http://www.w3.org/2000/svg}title')
         label = title.text if title is not None else p.stem
-        gallery.append('<figure><figcaption>'+html.escape(p.name+' · '+label)+'</figcaption>'
-                       f'<img alt="{html.escape(label, quote=True)}" src="{images[p.stem]}"></figure>')
-    body, headings = markdown((DOC/'01_通信原语与算法图解.md').read_text(), images, 'guide')
-    audit, _ = markdown((DOC/'09_本轮修正记录与依据.md').read_text(), images, 'audit')
+        related=[b for b in bindings if p.stem in b['diagrams']]
+        links='<details><summary>对应源码与注释：'+str(len(related))+'处（完整ZIP）</summary><ul>'
+        for b in related:
+            href=READER+'#symbol='+b['symbol']+'&binding='+b['id']
+            links+='<li><a href="'+html.escape(href,quote=True)+'">'+html.escape(b['id']+' · '+b['symbol']+' · '+b['title'])+'</a></li>'
+        links+='</ul></details>'
+        gallery.append('<figure id="diagram-'+p.stem+'"><figcaption>'+html.escape(p.name+' · '+label)+'</figcaption>'
+                       f'<img alt="{html.escape(label, quote=True)}" src="{images[p.stem]}">'+links+'</figure>')
+    body, headings = markdown((DOC/'01_通信原语与算法图解.md').read_text(encoding='utf-8'), images, 'guide')
+    audit, _ = markdown((DOC/'09_本轮修正记录与依据.md').read_text(encoding='utf-8'), images, 'audit')
     toc = '<ul>'+''.join(f'<li><a href="#{ident}">{html.escape(title)}</a></li>'
                         for level, ident, title in headings if level == 2)+'</ul>'
-    intro = '''<nav><strong>NCCL 2.12.12 · V3.2 · 通信原语与算法图解</strong>
-<p>本HTML内含全部42张图、逐轮模型和交互代码。单独下载后可断网打开；没有外置图片、脚本或字体。正文的源码及其他章节链接为在线参考。</p>
+    intro = '''<nav><strong>NCCL 2.12.12 · V3.3 · 通信原语与算法图解</strong>
+<p>本HTML内含全部45张图、逐轮模型和交互代码。单独下载后可断网打开；没有外置图片、脚本或字体。“对应源码”链接需完整ZIP中的对照页，其他章节在线链接需要网络。</p>
 <a href="#contents">章节目录</a> · <a href="#all-diagrams">全部图解</a> · <a href="#corrections">本轮修正</a> · '''
     intro += '<a href="'+online_link(SEARCH)+'">函数搜索页下载（在线）</a></nav>'
     intro += '''<section class="panel"><h2 style="margin-top:0">逐轮看：数据中包含谁的贡献？</h2>
 <p>环顺序0→1→2→3→0；归约图以Sum举例。箭头表示数据依赖，不表示所有rank锁步执行。</p>
 <div class="controls"><label for="collective">算法</label><select id="collective"><option value="allreduce">Ring AllReduce</option><option value="allgather">Ring AllGather</option><option value="reducescatter">Ring ReduceScatter</option></select>
 <button id="prev">上一轮</button><button id="next">下一轮</button><span id="counter" aria-live="polite"></span></div><p id="desc"></p>'''
-    intro += f'<img id="frame" alt="AllReduce初始块" src="{images["allreduce-step-0"]}"><div id="ownership" class="table-wrap"></div></section>'
+    intro += f'<img id="frame" alt="AllReduce初始块" src="{images["allreduce-step-0"]}"><a id="frameSource" href="{READER}">对应源码与注释（完整ZIP）</a><div id="ownership" class="table-wrap"></div></section>'
     intro += '<section class="panel"><h2 style="margin-top:0">七种基础原语：读哪里，写哪里？</h2><label for="primitive">Ring单收单发示例</label><select id="primitive"></select>'
-    intro += f'<img id="primitiveImage" alt="send原语" src="{images["05-send"]}"><p>direct能力和多源归约需结合模板及实际连接判断，详见正文。</p></section>'
+    intro += f'<img id="primitiveImage" alt="send原语" src="{images["05-send"]}"><a id="primitiveSource" href="{READER}">对应源码与注释（完整ZIP）</a><p>direct能力和多源归约需结合模板及实际连接判断，详见正文。</p></section>'
     intro += '<noscript><p>浏览器未启用JavaScript，切换控件不可用；正文与“全部42张图”仍可阅读。</p></noscript>'
     intro += '<details class="panel" id="contents"><summary>章节目录</summary>'+toc+'</details>'
-    result = intro+body+'<details id="all-diagrams" class="panel"><summary>全部42张图（包括每一轮与七类原语）</summary>'+''.join(gallery)+'</details>'
+    result = intro+body+'<details id="all-diagrams" class="panel"><summary>全部45张图（包括每一轮与七类原语、Channel和QP/MR）</summary>'+''.join(gallery)+'</details>'
     result += '<section id="corrections">'+audit+'</section>'
-    frames = json.loads((DOC/'visuals/collective-steps.json').read_text())
-    scripts = json_script('frames', frames)+json_script('embedded-images', images)+'<script>'+GUIDE_JS+'</script>'
-    return page('NCCL 2.12.12 通信原语与算法图解 V3.2（离线单文件）', result, scripts)
+    frames = json.loads((DOC/'visuals/collective-steps.json').read_text(encoding='utf-8'))
+    scripts = json_script('frames', frames)+json_script('embedded-images', images)+json_script('diagram-bindings',bindings)+'<script>'+GUIDE_JS+'</script>'
+    return page('NCCL 2.12.12 通信原语与算法图解 V3.3（离线单文件）', result, scripts)
 
 
 def build_search():
-    logic = json.loads((DOC/'function-logic.json').read_text())
+    logic = json.loads((DOC/'function-logic.json').read_text(encoding='utf-8'))
     bodies = {}
     for p in (DOC/'logic').glob('*.md'):
-        for match in re.finditer(r'<a id="(f\d+)"></a>([\s\S]*?)(?=<a id="f\d+"></a>|\Z)', p.read_text()):
+        for match in re.finditer(r'<a id="(f\d+)"></a>([\s\S]*?)(?=<a id="f\d+"></a>|\Z)', p.read_text(encoding='utf-8')):
             body = re.search(r'```cpp\n([\s\S]*?)\n```', match[2])
             if body:
                 bodies[match[1].upper()] = body[1]
     for f in logic['functions']:
         assert f['id'] in bodies, ('Missing complete body', f['id'])
         f['body'] = bodies[f['id']]
-    body = '<nav><b>NCCL 2.12.12 · V3.2 · 全部函数内部步骤</b><p>本HTML包含搜索数据和完整函数体，单独下载即可断网使用。</p><a href="'+online_link('01_通信原语与算法图解.md')+'">通信原语与算法图解（在线）</a></nav>'
+    body = '<nav><b>NCCL 2.12.12 · V3.3 · 全部函数内部步骤</b><p>本HTML包含搜索数据、完整函数体及已绑定函数的内嵌图示，单独下载即可断网使用。带完整注释的源码对照链接需完整ZIP。</p><a href="'+online_link('01_通信原语与算法图解.md')+'">通信原语与算法图解（在线）</a></nav>'
     body += f'<h1>{len(logic["functions"])}个函数：内部步骤与完整函数体</h1>'
     body += '<p>步骤是静态结构展开；编号是阅读顺序，缩进表示嵌套。关键路径另有人工精读，不能将清单数量当作全部语义已经验证。</p>'
     body += '<label for="q">搜索函数名、文件、F编号或用途</label><input id="q" type="search" placeholder="例如 genericOp、prims_ll、F0001"><span id="count" aria-live="polite"></span><div id="results"></div><button id="more">显示更多</button><noscript>请启用JavaScript以搜索和展开函数。</noscript>'
-    return page('NCCL 2.12.12 全部函数内部步骤 V3.2（离线搜索）', body, json_script('logicData', logic)+'<script>'+SEARCH_JS+'</script>')
+    bindings=json.loads((DOC/'source-diagram-index.json').read_text(encoding='utf-8'))['bindings']
+    images={p.stem:'data:image/svg+xml;base64,'+base64.b64encode(p.read_bytes()).decode('ascii') for p in sorted((DOC/'visuals').glob('*.svg'))}
+    return page('NCCL 2.12.12 全部函数内部步骤 V3.3（离线搜索）', body, json_script('logicData', logic)+json_script('search-bindings',bindings)+json_script('search-images',images)+'<script>'+SEARCH_JS+'</script>')
 
 
 def main():

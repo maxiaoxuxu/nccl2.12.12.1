@@ -92,3 +92,6 @@ All source code and accompanying documentation is copyright (c) 2015-2020, NVIDI
 
 
 中文阅读入口：[00_从这里开始_NCCL源码阅读指南.md](00_从这里开始_NCCL源码阅读指南.md)。
+
+
+V3.3：[源码注释与图示对照（离线单文件）](docs/zh_CN/11_源码注释与图示对照_离线版.html) · [绑定使用说明](docs/zh_CN/10_源码与图示绑定_使用说明.md)。125处人工绑定覆盖100个关键符号，45张图全部可反查源码。

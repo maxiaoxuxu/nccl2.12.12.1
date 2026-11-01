@@ -346,6 +346,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL128, P2p>:
     if (sendConnTailPtr) { __threadfence(); *sendConnTailPtr = sendConnTail += 1; }
   }
 
+/* 中文精读：图示绑定 V3.3 F0206 loadRegsBegin
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0206
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0059] loadRegsBegin：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径（直接对应）
+ *   图：16-lines, 18-ll128-flow
+ *   定位：#symbol=F0206&binding=B0059
+ */
 /* 中文内部逻辑 F0206：loadRegsBegin
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：constexpr int EltPer16B = 16/sizeof(T);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -491,6 +498,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL128, P2p>:
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0207 loadRegsFinish
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0207
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0060] loadRegsFinish：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径（直接对应）
+ *   图：16-lines, 18-ll128-flow
+ *   定位：#symbol=F0207&binding=B0060
+ */
 /* 中文内部逻辑 F0207：loadRegsFinish
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
@@ -521,6 +535,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL128, P2p>:
     }
   }
 
+/* 中文精读：图示绑定 V3.3 F0208 storeRegs
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0208
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0061] storeRegs：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径（直接对应）
+ *   图：16-lines, 18-ll128-flow
+ *   定位：#symbol=F0208&binding=B0061
+ */
 /* 中文内部逻辑 F0208：storeRegs
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：constexpr int EltPer16B = 16/sizeof(T);；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -632,6 +653,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL128, P2p>:
  */
   #define WARP_MASK 0xffffffff
 
+/* 中文精读：图示绑定 V3.3 F0209 recvReduceSendCopy
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0209
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0058] recvReduceSendCopy：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径（直接对应）
+ *   图：16-lines, 18-ll128-flow
+ *   定位：#symbol=F0209&binding=B0058
+ */
 /* 中文内部逻辑 F0209：recvReduceSendCopy
  * 精读：负责flag的lane检查行尾序号，经any_sync决定整个warp是否重读。
  * 精读：等待首邻居期间本地加载已提前开始，之后Finish重排并对原始输入做preOp。
@@ -936,6 +964,13 @@ class Primitives<T, RedOp, Fan, Direct, ProtoLL128, P2p>:
  */
   static constexpr int DataEltPerSlice = (WireWordPerSlice - WireWordPerSlice/NCCL_LL128_LINEELEMS)*(sizeof(uint64_t)/sizeof(T));
 
+/* 中文精读：图示绑定 V3.3 F0210 GenericOp
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0210
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0057] GenericOp：LL128每128字节行含120字节载荷和一个flag，warp协作检查标记，并重叠寄存器加载/重排；不能套用Simple的tail等待路径（直接对应）
+ *   图：16-lines, 18-ll128-flow
+ *   定位：#symbol=F0210&binding=B0057
+ */
 /* 中文内部逻辑 F0210：GenericOp
  * 精读：先获取发送空间并barrier，按warp计算wireOffset和本地元素范围。
  * 精读：每轮Begin预取本地寄存器、收/归约/发，再按DST写用户结果，地址按全部warp跨度前进。

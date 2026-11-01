@@ -13,6 +13,13 @@ NCCL_API(ncclResult_t, ncclReduce, const void* sendbuff, void* recvbuff, size_t 
  * Reduce 汇总各 rank 的输入，但最终结果只要求在 root 的接收缓冲有效。
  * 数据归约由设备原语执行；API 层的 root 语义与 P2P 把同一字段用作 peer 的语义不同。
  */
+/* 中文精读：图示绑定 V3.3 F0377 ncclReduce
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0377
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0067] ncclReduce：公开API只封装ncclInfo并进入统一调度；Ring图展示选为该设备算法后的路径，数据并不是在这个CPU包装函数中搬运（调用上下文）
+ *   图：01-submit, 27-reduce
+ *   定位：#symbol=F0377&binding=B0067
+ */
 /* 中文内部逻辑 F0377：ncclReduce
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 调用 / 计算 / 写入：NVTX3_FUNC_RANGE_IN(nccl_domain);；调用上述接口/对象方法；返回值和副作用按实际函数/函数表契约解释，静态名字不足以解析全部重载。

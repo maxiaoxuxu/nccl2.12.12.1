@@ -2452,6 +2452,13 @@ NCCL_PARAM(CrossNic, "CROSS_NIC", 2);
  * 从候选路径、带宽和 channel 数等条件搜索通信图，受搜索预算限制并可使用 XML 图输入。
  * 它寻找适合当前硬件的方案，不直接分配 QP，也不能被理解为固定按 GPU 数生成全连接。
  */
+/* 中文精读：图示绑定 V3.3 F0489 ncclTopoCompute
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0489
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0091] ncclTopoCompute：硬件图内搜索带宽/路径约束下的通道候选；结果还须跨rank协调和全局拼接（直接对应）
+ *   图：28-channel-generation
+ *   定位：#symbol=F0489&binding=B0091
+ */
 /* 中文内部逻辑 F0489：ncclTopoCompute
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：int ngpus = system->nodes[GPU].count;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。

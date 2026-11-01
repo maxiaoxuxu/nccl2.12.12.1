@@ -20,6 +20,13 @@
  * 各 rank 交换该摘要后，Postset 才知道每台机器应与哪些远端端点拼接。
  * 先本地搜索、后全局拼接，避免每个 rank 独立猜测一个互不一致的完整集群拓扑。
  */
+/* 中文精读：图示绑定 V3.3 F0429 ncclTopoPreset
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0429
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0092] ncclTopoPreset：本地候选先转换成可交换摘要，再拼接全局Ring/Tree并复制或限制channel数量（直接对应）
+ *   图：28-channel-generation
+ *   定位：#symbol=F0429&binding=B0092
+ */
 /* 中文内部逻辑 F0429：ncclTopoPreset
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
  * 1. 准备局部状态：int rank = comm->rank;；声明本作用域临时值/引用并按右侧初始化；此阶段准备后续分支或数据地址，不自动创建新的通信连接。
@@ -930,6 +937,13 @@ static int copyChannels(struct ncclComm* comm, int start, int end, int* ringPrev
 /* 中文导读：
  * 把各节点的局部拓扑结果拼成全局 Ring/Tree，并应用 channel 数限制/复制策略。
  * 这是硬件局部搜索结果变成每 rank 可执行邻居关系的关键阶段，随后才进入 transport 建链。
+ */
+/* 中文精读：图示绑定 V3.3 F0439 ncclTopoPostset
+ * 源码旁看图：docs/zh_CN/11_源码注释与图示对照_离线版.html#symbol=F0439
+ * 普通源码编辑器不直接渲染图片；离线对照页左侧保留本文件原始源码与全部注释。
+ * [B0093] ncclTopoPostset：本地候选先转换成可交换摘要，再拼接全局Ring/Tree并复制或限制channel数量（直接对应）
+ *   图：28-channel-generation
+ *   定位：#symbol=F0439&binding=B0093
  */
 /* 中文内部逻辑 F0439：ncclTopoPostset
  * 以下编号是静态阅读顺序，缩进表示分支/循环；并非并行线程时间线。
