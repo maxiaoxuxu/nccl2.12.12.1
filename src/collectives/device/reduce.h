@@ -79,6 +79,7 @@ namespace {
  * 源码返回表达式：return realChunkSize;。CHECK类宏还可能提前返回/跳转。
  */
   template<typename T, typename RedOp, typename Proto>
+  /* 中文精读V3.1：Reduce：从root在环中的后继开始向root传递部分和，而不是固定从rank0开始。prevRank==root的是首发者send；中间节点recvReduceSend；rank==root末次recvReduceCopy，写最终归约结果。用户张量按bid/gridOffset切片；这一流向是有终点的单向归约，而非AllReduce的结果广播。逐步图见 docs/zh_CN/ring-primitives-deep-dive.md 第5节。 */
   __device__ __forceinline__ void runRing(ncclWorkElem *args) {
 /* 中文逐项-变量 V0717：tid
  * tid（int；函数 runRing 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
