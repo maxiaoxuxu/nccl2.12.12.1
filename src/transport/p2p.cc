@@ -121,7 +121,7 @@ struct p2pRecvResources {
  */
 static int busIdToCudaDev(int64_t busId) {
 /* 中文逐项-变量 V4583：ndev
- * ndev（int；函数 busIdToCudaDev 内）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * ndev（int；函数 busIdToCudaDev 内）：cudaGetDeviceCount返回的本进程CUDA可见GPU数，用于按busId查找本地设备序号。
  * 此处未显式给初值；后续首个文本使用点：if (cudaGetDeviceCount(&ndev) != cudaSuccess)。若由输出参数填入，必须先检查填充调用成功再读值。
  */
   int ndev;

@@ -97,7 +97,7 @@
 
 ## F0230：waitPeer
 
-用途：发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+用途：Simple发送侧按head等空槽、接收侧按tail等数据；满足direct谓词时可省部分等待，并按shared/FIFO条件装配本slice指针。
 
 - 先辨认当前线程负责发送还是接收，并按具体direct谓词决定可省去哪些等待。
 - 发送等head+8足够覆盖目标step，接收等tail达到目标step；等待中刷新进度缓存并查abort。

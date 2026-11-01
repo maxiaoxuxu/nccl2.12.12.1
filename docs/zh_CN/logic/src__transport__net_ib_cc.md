@@ -471,7 +471,7 @@
 
 ## F1104：ncclIbGdrSupport
 
-用途：按设备能力检测能否注册 GPU 缓冲，给上层报告 GDR 支持状态。
+用途：检查并缓存nv_mem/nvidia-peermem的sysfs模块标记是否存在；本函数没有执行GPU注册探测。
 
 | 步骤 | 层级/种类 | 代码与条件 | 内部作用 |
 | --- | --- | --- | --- |
@@ -1123,7 +1123,7 @@ ib_send:
 | 61 | 0 / 条件判断 | <code>(ncclParamIbUseInline())</code> | 为真只进入真分支；为假才考虑else，之后在分支出口继续。 |
 | 62 | 1 / 真分支 | <code></code> | 仅条件为真执行以下子项。 |
 | 63 | 2 / 调用 / 计算 / 写入 | <code>rComm-&gt;remFifo.flags = IBV_SEND_INLINE;</code> | 按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。 |
-| 64 | 0 / 调用 / 计算 / 写入 | <code>rComm-&gt;gpuFlush.enabled = (ncclIbGdrSupport(lComm-&gt;dev) == 0) && (ncclParamIbGdrFlushDisable() == 0) ? 1 : 0;</code> | 按设备能力检测能否注册 GPU 缓冲，给上层报告 GDR 支持状态。 |
+| 64 | 0 / 调用 / 计算 / 写入 | <code>rComm-&gt;gpuFlush.enabled = (ncclIbGdrSupport(lComm-&gt;dev) == 0) && (ncclParamIbGdrFlushDisable() == 0) ? 1 : 0;</code> | 检查并缓存nv_mem/nvidia-peermem的sysfs模块标记是否存在；本函数没有执行GPU注册探测。 |
 | 65 | 0 / 条件判断 | <code>(rComm-&gt;gpuFlush.enabled)</code> | 为真只进入真分支；为假才考虑else，之后在分支出口继续。 |
 | 66 | 1 / 真分支 | <code></code> | 仅条件为真执行以下子项。 |
 | 67 | 2 / 调用 / 计算 / 写入 | <code>NCCLCHECK(wrap_ibv_reg_mr(&rComm-&gt;gpuFlush.hostMr, rComm-&gt;verbs.pd, &rComm-&gt;gpuFlush.hostMem, sizeof(int), IBV_ACCESS_LOCAL_WRITE));</code> | 失败时可能提前return，成功才继续；把指定虚拟地址范围注册到 PD 并取得 lkey/rkey；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。 |

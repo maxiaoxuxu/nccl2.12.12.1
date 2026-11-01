@@ -474,7 +474,7 @@ NCCL_PARAM(GraphRegister, "GRAPH_REGISTER", 0);
 /* 中文逐项-函数 F0886：commAlloc
  * 用途与位置：分配并初始化当前 rank 的 communicator 总对象、排队状态、事件与连接需求表。
  * 参数 comret（ncclComm_t* comret）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
- * 参数 ndev（int ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 ndev（int ndev）：该communicator的总rank数，参与后续表/队列分配；不是本机CUDA设备枚举数。
  * 参数 rank（int rank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/init.cc::ncclCommInitRankSync。
  * 本体直接出现的调用/包装：CUDACHECK；NCCLCHECK；cudaDriverGetVersion；cudaEventCreateWithFlags；cudaGetDevice；cudaGetDriverEntryPoint；getBusId；getenv；ncclCalloc；ncclCreateQueueInfo；ncclCudaHostCalloc；ncclParamAggChannelSize；ncclParamCheckPointers；ncclParamDisableGraphHelper；ncclParamGraphRegister；ncclParamGroupCudaStream；strcmp。
@@ -749,7 +749,7 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
 
 /* 中文精读：内部环顺序怎样映射回用户 rank
  * 拓扑搜索可以把 GPU 排成任意有利于带宽的顺序，用户的 rank 编号不随之改变。
- * setupChannel 把环顺序旋转到本 rank 开头，写入 userRanks/devUserRanks，并算 ring.index。
+ * setupChannel 把环顺序旋转到本 rank 开头，写入主机 userRanks；devCommSetup随后复制到devUserRanks。ring.index=(ixRank-ixZero+nranks)%nranks，是相对用户rank0的环距离。
  * AllGather/ReduceScatter 用用户 rank 决定输出/输入段位置；AllReduce 用内部环 index 排算法块。
  * 物理相邻 GPU、用户 rank 相邻、环顺序相邻是三种关系，应分别跟踪。
  */
@@ -2565,7 +2565,7 @@ NCCL_API(ncclResult_t, ncclCommInitAll, ncclComm_t* comms, int ndev, const int* 
 /* 中文逐项-函数 F0899：ncclCommInitAll
  * 用途与位置：单进程本地多 GPU 便捷初始化，使用同一 uniqueId 和 Group 协调各设备加入同一通信组。
  * 参数 comms（ncclComm_t* comms）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
- * 参数 ndev（int ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 ndev（int ndev）：本次单进程InitAll参与的GPU/rank数量；devlist为空时使用设备0到ndev-1。
  * 参数 devlist（const int* devlist）：指向声明类型对象的地址引用；其拥有关系和地址空间由赋值/分配接口决定。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体直接出现的调用/包装：NCCLCHECK；PtrCheck；ncclCommInitRankDev；ncclGetUniqueId；ncclGroupEnd；ncclGroupStart。

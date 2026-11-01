@@ -59,7 +59,7 @@ static const char* ncclNetName() { return ncclNet->name; }
  */
 /* 中文逐项-函数 F0661：ncclNetDevices
  * 用途与位置：查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量。
- * 参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 ndev（int* ndev）：输出地址：由已选NET后端devices回调返回可用网络设备条目数。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/graph/topo.cc::ncclTopoGetSystem；src/net.cc::ncclGpuGdrSupport。
  * 本体直接出现的调用/包装：NCCLCHECK；ncclNet->devices。
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。

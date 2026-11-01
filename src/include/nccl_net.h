@@ -162,7 +162,7 @@ typedef /* 中文逐项-类型 T0305：ncclNet_v5_t
   // Return the number of adapters.
 /* 中文逐项-变量 V2706：devices
  * devices 是函数指针字段/变量：查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量；函数表保存可调用入口，不是调用返回的数据。完整声明：(*devices)(int* ndev)。
- * 回调参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 回调参数 ndev（int* ndev）：当前网络后端枚举的设备/端口数，或devices回调的输出地址；它不是CUDA设备数或communicator的rank数。
  * devices（ncclResult_t；成员 ncclNet_v5_t）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  */
   ncclResult_t (*devices)(int* ndev);
@@ -339,7 +339,7 @@ typedef /* 中文逐项-类型 T0306：ncclCollNet_v5_t
   // If ndev returns 0, all other functions might be set to NULL.
 /* 中文逐项-变量 V2722：devices
  * devices 是函数指针字段/变量：查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量；函数表保存可调用入口，不是调用返回的数据。完整声明：(*devices)(int* ndev)。
- * 回调参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 回调参数 ndev（int* ndev）：当前网络后端枚举的设备/端口数，或devices回调的输出地址；它不是CUDA设备数或communicator的rank数。
  * devices（ncclResult_t；成员 ncclCollNet_v5_t）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  */
   ncclResult_t (*devices)(int* ndev);
@@ -532,7 +532,7 @@ typedef /* 中文逐项-类型 T0308：ncclNet_v4_t
   // Return the number of adapters.
 /* 中文逐项-变量 V2743：devices
  * devices 是函数指针字段/变量：查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量；函数表保存可调用入口，不是调用返回的数据。完整声明：(*devices)(int* ndev)。
- * 回调参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 回调参数 ndev（int* ndev）：当前网络后端枚举的设备/端口数，或devices回调的输出地址；它不是CUDA设备数或communicator的rank数。
  * devices（ncclResult_t；成员 ncclNet_v4_t）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  */
   ncclResult_t (*devices)(int* ndev);
@@ -691,7 +691,7 @@ typedef /* 中文逐项-类型 T0309：ncclCollNet_v4_t
   // If ndev returns 0, all other functions might be set to NULL.
 /* 中文逐项-变量 V2759：devices
  * devices 是函数指针字段/变量：查询该后端可用设备数量；本层通过函数指针转交已选后端，不额外复制整个用户张量；函数表保存可调用入口，不是调用返回的数据。完整声明：(*devices)(int* ndev)。
- * 回调参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 回调参数 ndev（int* ndev）：当前网络后端枚举的设备/端口数，或devices回调的输出地址；它不是CUDA设备数或communicator的rank数。
  * devices（ncclResult_t；成员 ncclCollNet_v4_t）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
  */
   ncclResult_t (*devices)(int* ndev);

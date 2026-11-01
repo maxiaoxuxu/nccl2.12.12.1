@@ -187,7 +187,7 @@ ncclResult_t ncclSocketInit(ncclDebugLogger_t logFunction) {
  */
 /* 中文逐项-函数 F1132：ncclSocketDevices
  * 用途与位置：报告 Socket 后端发现并筛选后的网络接口数量。
- * 参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 ndev（int* ndev）：输出地址：写入Socket后端筛选后的网络接口数，不是GPU/rank数。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。

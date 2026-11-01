@@ -158,7 +158,7 @@ ncclResult_t ncclNvmlEnsureInitialized() {
   }
 
 /* 中文逐项-变量 V3407：ndev
- * ndev（unsigned int；文件/静态存储作用域）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * ndev（unsigned int；文件/静态存储作用域）：NVML管理接口枚举的GPU设备总数，供设备句柄和PCI标识缓存分配使用。
  * 此处未显式给初值；后续首个文本使用点：res1 = (have_v2 ? pfn_nvmlDeviceGetCount_v2 :
  * pfn_nvmlDeviceGetCount)(&ndev);。若由输出参数填入，必须先检查填充调用成功再读值。
  */

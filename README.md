@@ -5,7 +5,7 @@
 
 当前注释分支：`codex/nccl-2.12.12-full-source-walkthrough`。默认 `master` 尚未合并这些注释；直接从默认分支下载会得到原版。
 
-[详细图解](docs/zh_CN/visual-guide.md) · [全部函数内部步骤](docs/zh_CN/function-logic-index.md) · [全部函数/类型索引](docs/zh_CN/symbol-index.md) · [按问题阅读](docs/zh_CN/source-map.md) · [本地完整性检查](tools/verify_annotations.py)
+[详细图解](docs/zh_CN/01_通信原语与算法图解.md) · [全部函数内部步骤](docs/zh_CN/05_全部函数内部步骤_文件索引.md) · [全部函数/类型索引](docs/zh_CN/07_函数与类型定义索引.md) · [按问题阅读](docs/zh_CN/06_按问题查找源码.md) · [本地完整性检查](tools/verify_annotations.py)
 
 ---
 
@@ -88,4 +88,7 @@ All source code and accompanying documentation is copyright (c) 2015-2020, NVIDI
 
 ## 中文源码导读
 
-本仓库的中文注释、调用流程与关键数据结构说明见 [NCCL 2.12.12 中文源码导读](docs/zh_CN/README.md)。其中包含 [初始化与 GPU 执行](docs/zh_CN/execution.md) 及 [Proxy、IB 和 QP/MR 核算](docs/zh_CN/rdma.md)。
+本仓库的中文注释、调用流程与关键数据结构说明见 [NCCL 2.12.12 中文源码导读](docs/zh_CN/README.md)。其中包含 [初始化与 GPU 执行](docs/zh_CN/03_初始化_Channel生成与Kernel执行.md) 及 [Proxy、IB 和 QP/MR 核算](docs/zh_CN/04_Proxy_RDMA与QP_MR资源核算.md)。
+
+
+中文阅读入口：[00_从这里开始_NCCL源码阅读指南.md](00_从这里开始_NCCL源码阅读指南.md)。

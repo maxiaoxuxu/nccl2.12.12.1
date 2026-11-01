@@ -13953,7 +13953,7 @@
       "file": "src/collectives/device/prims_simple.h",
       "name": "waitPeer",
       "owner": "Primitives<\n    T, RedOp, Fan, Direct, ProtoSimple<SlicePerChunk, StepPerSlice, Unroll>, P2p\n  >",
-      "role": "发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针",
+      "role": "Simple发送侧按head等空槽、接收侧按tail等数据；满足direct谓词时可省部分等待，并按shared/FIFO条件装配本slice指针",
       "steps": [
         {
           "kind": "准备局部状态",
@@ -66490,7 +66490,9 @@
           "depth": 0
         }
       ],
-      "human_notes": []
+      "human_notes": [
+        "ring.index相对用户rank0计算；devUserRanks以本rank为第0项。setupChannel先填主机表，devCommSetup随后复制设备表。"
+      ]
     },
     {
       "id": "F0891",
@@ -96108,7 +96110,7 @@
       "file": "src/transport/net_ib.cc",
       "name": "ncclIbGdrSupport",
       "owner": "",
-      "role": "按设备能力检测能否注册 GPU 缓冲，给上层报告 GDR 支持状态",
+      "role": "检查并缓存nv_mem/nvidia-peermem的sysfs模块标记是否存在；本函数没有执行GPU注册探测。",
       "steps": [
         {
           "kind": "准备局部状态",

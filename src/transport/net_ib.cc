@@ -820,7 +820,7 @@ ncclResult_t ncclIbInit(ncclDebugLogger_t logFunction) {
  */
 /* 中文逐项-函数 F1103：ncclIbDevices
  * 用途与位置：返回当前已初始化并通过筛选的 IB/RoCE 数据端口数量。
- * 参数 ndev（int* ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 ndev（int* ndev）：输出地址：写入内置IB后端筛选后的IB/RoCE端口条目数，不是GPU/rank数。
  * 直接调用检索未命中；公开API、线程入口、模板及函数表可能间接进入，不能因此认定不可达。
  * 本体不依赖额外可见函数调用，主要执行当前表达式、字段读写或返回。
  * 源码返回表达式：return ncclSuccess;。CHECK类宏还可能提前返回/跳转。
@@ -847,8 +847,8 @@ ncclResult_t ncclIbDevices(int* ndev) {
  * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__transport__net_ib_cc.md#f1104
  */
 /* 中文逐项-函数 F1104：ncclIbGdrSupport
- * 用途与位置：按设备能力检测能否注册 GPU 缓冲，给上层报告 GDR 支持状态。
- * 参数 ibDev（int ibDev）：当前声明类型的值；下面列出它的确定来源或首个使用点，避免仅凭缩写推断用途。
+ * 用途与位置：检查并缓存nv_mem/nvidia-peermem的sysfs模块标记是否存在；本函数没有执行GPU注册探测。
+ * 参数 ibDev（int ibDev）：接口保留的IB设备编号；本版本函数体没有读取它，不能据此声称逐NIC探测注册能力。
  * 按同名符号检索的直接调用候选（未做重载/类型解析）：src/transport/net_ib.cc::ncclIbGetProperties；src/transport/net_ib.cc::ncclIbAccept。
  * 本体直接出现的调用/包装：access。
  * 需要对照的边界/推进条件：moduleLoaded == -1；moduleLoaded == 0。各条件所属分支见紧邻函数体。
@@ -2061,7 +2061,7 @@ NCCL_PARAM(IbGdrFlushDisable, "GDR_FLUSH_DISABLE", 0);
  * 61. 条件判断：(ncclParamIbUseInline())；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *   62. 真分支：；仅条件为真执行以下子项。
  *     63. 调用 / 计算 / 写入：rComm->remFifo.flags = IBV_SEND_INLINE;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
- * 64. 调用 / 计算 / 写入：rComm->gpuFlush.enabled = (ncclIbGdrSupport(lComm->dev) == 0) && (ncclParamIbGdrFlushDisable() == 0) ? 1 : 0;；按设备能力检测能否注册 GPU 缓冲，给上层报告 GDR 支持状态。
+ * 64. 调用 / 计算 / 写入：rComm->gpuFlush.enabled = (ncclIbGdrSupport(lComm->dev) == 0) && (ncclParamIbGdrFlushDisable() == 0) ? 1 : 0;；检查并缓存nv_mem/nvidia-peermem的sysfs模块标记是否存在；本函数没有执行GPU注册探测。
  * 65. 条件判断：(rComm->gpuFlush.enabled)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *   66. 真分支：；仅条件为真执行以下子项。
  *     67. 调用 / 计算 / 写入：NCCLCHECK(wrap_ibv_reg_mr(&rComm->gpuFlush.hostMr, rComm->verbs.pd, &rComm->gpuFlush.hostMem, sizeof(int), IBV_ACCESS_LOCAL_WRITE));；失败时可能提前return，成功才继续；把指定虚拟地址范围注册到 PD 并取得 lkey/rkey；包装层统一动态符号检查与 verbs 错误返回，硬件操作由 provider 执行。

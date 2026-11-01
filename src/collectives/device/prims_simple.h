@@ -292,7 +292,7 @@ class Primitives<
  * 配套图解：docs/zh_CN/visual-guide.md；完整内部步骤：docs/zh_CN/logic/src__collectives__device__prims_simple_h.md#f0230
  */
 /* 中文逐项-函数 F0230：waitPeer
- * 用途与位置：发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ * 用途与位置：Simple发送侧按head等空槽、接收侧按tail等数据；满足direct谓词时可省部分等待，并按shared/FIFO条件装配本slice指针。
  * 参数 dstIx（intptr_t dstIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 remoteIx（intptr_t remoteIx）：原语访问本地输入/输出或直接远端用户缓冲的元素下标，乘 sizeof(T) 才是字节偏移。
  * 参数 offset（int offset）：当前缓冲/数组范围内的位移；看指针类型和赋值公式确认字节还是元素。
@@ -437,7 +437,7 @@ class Primitives<
  *       19. 条件判断：(Dst && (flags & (DstBuf==Input ? RoleInput : RoleOutput)))；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *         20. 真分支：；仅条件为真执行以下子项。
  *           21. 调用 / 计算 / 写入：ncclShmem.groups[group].dsts[0] = userBuff + dstIx + offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
- *       22. 调用 / 计算 / 写入：waitPeer<DirectRecv, DirectSend, Recv, Send, Src, Dst>(dstIx, remoteIx, offset, sliceSize);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *       22. 调用 / 计算 / 写入：waitPeer<DirectRecv, DirectSend, Recv, Send, Src, Dst>(dstIx, remoteIx, offset, sliceSize);；Simple发送侧按head等空槽、接收侧按tail等数据；满足direct谓词时可省部分等待，并按shared/FIFO条件装配本slice指针。
  *       23. 调用 / 计算 / 写入：subBarrier();；只同步负责数据搬运的 worker 子组，配合同步 warp 让复制与进度发布流水重叠。
  *       24. 条件判断：(DirectRecv && ncclShmem.groups[group].srcs[0] == ncclShmem.groups[group].dsts[0])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *         25. 真分支：；仅条件为真执行以下子项。
@@ -463,7 +463,7 @@ class Primitives<
  * 45. 编译期分支/指令：#pragma unroll 1；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
  * 46. 循环：初始 ；继续条件 (slice < SlicePerChunk)；每轮更新；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
  *   47. 调用 / 计算 / 写入：sliceSize = sliceSize < nelem-offset ? sliceSize : nelem-offset;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
- *   48. 调用 / 计算 / 写入：waitPeer<DirectRecv, DirectSend, Recv, Send, Src, Dst>(0, 0, 0, 0);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *   48. 调用 / 计算 / 写入：waitPeer<DirectRecv, DirectSend, Recv, Send, Src, Dst>(0, 0, 0, 0);；Simple发送侧按head等空槽、接收侧按tail等数据；满足direct谓词时可省部分等待，并按shared/FIFO条件装配本slice指针。
  *   49. 调用 / 计算 / 写入：barrier();；同步本原语全部参与线程，确保数据搬运和进度发布阶段保持一致，命名 barrier 由 group 区分。
  *   50. 条件判断：(Send && (flags & RolePostSend) && sliceSize > 0 && index == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *     51. 真分支：；仅条件为真执行以下子项。
@@ -681,7 +681,7 @@ class Primitives<
  *           17. 条件判断：(tid == 0)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *             18. 真分支：；仅条件为真执行以下子项。
  *               19. 调用 / 计算 / 写入：ncclShmem.groups[group].totalSendSize[slice] = 0;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
- *           20. 调用 / 计算 / 写入：waitPeer<0, DirectSend, 0, 1, 1, 0>(0, inpIx, offset, realSize);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *           20. 调用 / 计算 / 写入：waitPeer<0, DirectSend, 0, 1, 1, 0>(0, inpIx, offset, realSize);；Simple发送侧按head等空槽、接收侧按tail等数据；满足direct谓词时可省部分等待，并按shared/FIFO条件装配本slice指针。
  *           21. 调用 / 计算 / 写入：subBarrier();；只同步负责数据搬运的 worker 子组，配合同步 warp 让复制与进度发布流水重叠。
  *           22. 编译期分支/指令：#pragma unroll；由宏配置决定哪些片段进入编译；下面各编译分支不代表运行时都顺序执行。
  *           23. 循环：初始 int j=0;；继续条件 j<fan.nsend()；每轮更新 j++；每轮按条件决定是否继续；循环体结束后执行增量/再检查，break和continue另有控制转移。
@@ -709,7 +709,7 @@ class Primitives<
  *               45. 条件判断：(skip >= 0 && index >= skip)；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *                 46. 真分支：；仅条件为真执行以下子项。
  *                   47. 调用 / 计算 / 写入：peerOffset += peerElem;；按此表达式更新本地值或目标字段，后续条件/地址计算使用更新后的值。
- *               48. 调用 / 计算 / 写入：waitPeer<DirectRecv, 0, 1, 0, 0, 1>(outIx, outIx+peerOffset, offset, realSize);；发送侧等空槽、接收侧等数据，并按 direct/shared/固定 FIFO 条件装配本 slice 的实际指针。
+ *               48. 调用 / 计算 / 写入：waitPeer<DirectRecv, 0, 1, 0, 0, 1>(outIx, outIx+peerOffset, offset, realSize);；Simple发送侧按head等空槽、接收侧按tail等数据；满足direct谓词时可省部分等待，并按shared/FIFO条件装配本slice指针。
  *               49. 调用 / 计算 / 写入：subBarrier();；只同步负责数据搬运的 worker 子组，配合同步 warp 让复制与进度发布流水重叠。
  *               50. 条件判断：(DirectRecv && ncclShmem.groups[group].srcs[0] == ncclShmem.groups[group].dsts[0])；为真只进入真分支；为假才考虑else，之后在分支出口继续。
  *                 51. 真分支：；仅条件为真执行以下子项。

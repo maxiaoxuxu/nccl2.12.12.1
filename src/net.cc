@@ -551,7 +551,7 @@ ncclResult_t ncclNetInit() {
 
     // net plugin is already initialized
 /* 中文逐项-变量 V3582：ndev
- * ndev（int；函数 ncclNetInit 内）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * ndev（int；函数 ncclNetInit 内）：当前网络后端枚举的设备/端口数，或devices回调的输出地址；它不是CUDA设备数或communicator的rank数。
  * 此处未显式给初值；后续首个文本使用点：if (nets[i]->devices(&ndev) != ncclSuccess) continue;。若由输出参数填入，必须先检查填充调用成功再读值。
  */
     int ndev;

@@ -91,7 +91,7 @@ struct ncclInitArgs {
  */
   ncclComm_t* newcomm;
 /* 中文逐项-变量 V1881：ndev
- * ndev（int；成员 ncclInitArgs）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * ndev（int；成员 ncclInitArgs）：待初始化communicator的总rank数，在异步任务中保存并传给初始化工作函数。
  */
   int ndev;
 /* 中文逐项-变量 V1882：commId
@@ -217,7 +217,7 @@ void* ncclAsyncThreadMain(void* args_) {
  * 用途与位置：把初始化函数、rank、设备和 uniqueId 复制到本线程 Group 任务数组。
  * 参数 func（ncclInitFunc_t func）：函数指针或 CUDA kernel 入口地址，由所选算法/函数表/解析器回调决定。
  * 参数 newcomm（ncclComm_t* newcomm）：公开初始化结果句柄的输出地址，只有初始化成功后才能交给后续通信调用。
- * 参数 ndev（int ndev）：当前初始化/枚举范围内的设备数，单进程InitAll中等于该组参与GPU数。
+ * 参数 ndev（int ndev）：待初始化communicator的总rank数，保存到异步初始化任务。
  * 参数 commId（ncclUniqueId commId）：应用分发的引导会合标识，同一通信组所有rank需要使用同一份。
  * 参数 myrank（int myrank）：参与者在当前通信组中的用户编号；与本地 CUDA 设备编号不同。
  * 参数 cudaDev（int cudaDev）：本进程 CUDA 可见设备序号，供切换设备上下文使用。

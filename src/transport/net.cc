@@ -483,6 +483,11 @@ struct setupReq {
 
 /* Determine if we will use this transport for this peer and return connect
  * information for this peer */
+/* 中文精读V3.2：Simple与LL/LL128的就绪条件
+ * sendProxyProgress中LL允许不等tail，但必须验证每个LL行的两个flag；LL128系统内存路径还检查行尾flag。
+ * 接收Proxy对Simple+GDR+有效数据执行所需flush，随后发布tail；LL/LL128设备按行flag等载荷，不能照搬Simple等待图。
+ * Proxy的received/transmitted/done仍跟踪网络、发布和槽位回收，不能据设备已读某行就回收整条request。
+ */
 /* 中文导读：
  * NET 发送方向配置：选择 NIC/Proxy rank，判断 GDR 能力，然后向 service 发送 setup 请求。
  * graph 非空时此处使用专用缓冲；普通无图 P2P 默认可使用共享缓冲。setup 与 connect 是分离阶段。

@@ -190,6 +190,11 @@ namespace {
         realChunkSize = min(chunkSize, divUp(size-gridOffset, nChannels*nranks*minChunkSize)*minChunkSize);
       realChunkSize = int(realChunkSize);
 
+/* 中文精读V3.2：编号与分片公式的适用范围
+ * ring->index是从用户rank0沿本channel环到当前rank的距离，而非用户rank或任意未旋转数组位置。
+ * 本函数size是整个AllReduce输入的T元素数，loopSize=C*P*chunkSize；AG/RS的size是每rank段长，loopSize=C*chunkSize。
+ * 图示加号以Sum举例；其他RedOp保持各自数学语义。贡献来源完整不等于浮点不同归约顺序逐位相同。
+ */
 /* 中文精读：AllReduce 的地址公式与数值示例
  * 所有偏移以 T 元素计。Simple 使用 channel 连续布局：
  * offset=gridOffset + bid*nranks*realChunkSize + chunk*realChunkSize。

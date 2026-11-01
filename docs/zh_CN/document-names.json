@@ -1,0 +1,12 @@
+{
+  "visual-guide.md": "01_通信原语与算法图解.md",
+  "visual-guide.html": "01_通信原语与算法图解_离线版.html",
+  "ring-primitives-deep-dive.md": "02_Ring五类集合通信_源码精读.md",
+  "execution.md": "03_初始化_Channel生成与Kernel执行.md",
+  "rdma.md": "04_Proxy_RDMA与QP_MR资源核算.md",
+  "function-logic-index.md": "05_全部函数内部步骤_文件索引.md",
+  "function-logic.html": "05_全部函数内部步骤_离线搜索.html",
+  "source-map.md": "06_按问题查找源码.md",
+  "symbol-index.md": "07_函数与类型定义索引.md",
+  "verification.md": "08_核验方法与已知边界.md"
+}

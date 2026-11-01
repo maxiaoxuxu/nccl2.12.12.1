@@ -78,7 +78,7 @@ namespace {
  * Ring AllGather：将本 rank 的贡献放到按用户 rank 排列的输出位置，再沿环接收并转发其他贡献。
  * 与 AllReduce 的结果传播阶段相似，但不执行跨 rank 的归约运算；输出按用户 rank 而非内部环顺序排列。
  */
-  /* 中文精读V3.1：AllGather：设备每个channel独立处理本rank输入的一个chunk；offset=chunkOffset+rankDest*size表示recvbuff中用户rank对应段，不能按环index直接拼接。起点directSend/directCopySend取决于输入是否已原地放在输出槽；中间directRecvCopySend转发前驱的完整数据；最后directRecv停止转发。Direct是协议可用能力而非强制零拷贝。具体4-rank逐轮数据图和详细解读见 docs/zh_CN/ring-primitives-deep-dive.md 第1节。 */
+/* 中文精读V3.1：AllGather：设备每个channel独立处理本rank输入的一个chunk；offset=chunkOffset+rankDest*size表示recvbuff中用户rank对应段，不能按环index直接拼接。起点directSend/directCopySend取决于输入是否已原地放在输出槽；中间directRecvCopySend转发前驱的完整数据；最后directRecv停止转发。Direct是协议可用能力而非强制零拷贝。具体4-rank逐轮数据图和详细解读见 docs/zh_CN/ring-primitives-deep-dive.md 第1节。 */
   __device__ __forceinline__ void runRing(ncclWorkElem *args) {
 /* 中文逐项-变量 V0092：tid
  * tid（int；函数 runRing 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。

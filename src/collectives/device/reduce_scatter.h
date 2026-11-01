@@ -71,7 +71,7 @@ namespace {
  * Ring ReduceScatter：沿环逐块接收、合并本地输入并转发，最终只保留属于本 rank 的归约分块。
  * 与完整 AllReduce 的区别是没有再传播所有结果的 AllGather 阶段。
  */
-  /* 中文精读V3.1：ReduceScatter：此处size=args->count代表每rank最终输出的元素数，用户sendbuff包含nranks个这样的段。首步发送ringRanks[nranks-1]段；中间recvReduceSend把本rank相同段的输入合入前驱部分和；末步recvReduceCopy(offset,chunkOffset,...)中特别注意src offset带rankDest*size、输出chunkOffset却不带：只写紧凑的本rank结果。逐轮示意参见 docs/zh_CN/ring-primitives-deep-dive.md 第2节。 */
+/* 中文精读V3.1：ReduceScatter：此处size=args->count代表每rank最终输出的元素数，用户sendbuff包含nranks个这样的段。首步发送ringRanks[nranks-1]段；中间recvReduceSend把本rank相同段的输入合入前驱部分和；末步recvReduceCopy(offset,chunkOffset,...)中特别注意src offset带rankDest*size、输出chunkOffset却不带：只写紧凑的本rank结果。逐轮示意参见 docs/zh_CN/ring-primitives-deep-dive.md 第2节。 */
   __device__ __forceinline__ void runRing(ncclWorkElem *args) {
 /* 中文逐项-变量 V0814：tid
  * tid（int；函数 runRing 内）：当前执行范围内线程号，设备代码可由 threadIdx.x 派生或减去组起点。
